@@ -1,0 +1,28 @@
+[package]
+name = "num-modular"
+version = "0.0.1"
+edition = "2018"
+
+repository = "https://github.com/cmpute/num-modular"
+keywords = ["mathematics", "numerics", "number-theory", "bigint", "num"]
+categories = ["data-structures", "science", "algorithms"]
+documentation = "https://docs.rs/num-modular"
+license = "Apache-2.0"
+description = """
+Implementation of efficient modular arithmetic operations with generic number types.
+Supports various backends including num-bigint, rug, etc..
+"""
+readme = "README.md"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+num-integer = "0.1.44"
+num-traits = "0.2.14"
+
+[dependencies.num-bigint]
+optional = true
+version = "0.4.3"
+default-features = false
+
+[dev-dependencies]
+rand = "0.8.4"
