@@ -1,17 +1,17 @@
-use num_integer::Integer;
-use std::rc::Rc;
-use std::borrow::Borrow;
 use crate::ModularOps;
+use num_integer::Integer;
+use std::borrow::Borrow;
+use std::rc::Rc;
 
 /// Operations of a integer represented in Montgomery form. This data type can
 /// be used in place of a normal integer with regard to modular arithmetics.
-/// 
+///
 /// The generic type T represents the underlying integer representation, and
 /// R=2^B will be used as the auxiliary modulus, where B is automatically selected
-/// based on the size of T. 
+/// based on the size of T.
 pub trait Montgomery: ModularOps + Sized {
     /// The type for inversion of the modulus.
-    /// 
+    ///
     /// This type is usually the same as Self, but it can be smaller when using
     /// Montgomery form on multi-precision integer representations.
     type Inv;
@@ -49,7 +49,7 @@ pub struct MontgomeryInt<T: Integer + Montgomery> {
     m: Option<Rc<T>>,
 
     /// The modular inverse of the modulus. It's calculated only when necessary
-    minv: Option<T::Inv>
+    minv: Option<T::Inv>,
 }
 
 impl<T: Integer + Montgomery> MontgomeryInt<T> {
@@ -64,11 +64,11 @@ impl<T: Integer + Montgomery> MontgomeryInt<T> {
             Some(rc) => {
                 let inv = match self.minv {
                     Some(v) => v,
-                    None => <T as Montgomery>::inv(rc.borrow())
+                    None => <T as Montgomery>::inv(rc.borrow()),
                 };
                 Montgomery::reduce(self.a, rc.borrow(), &inv)
-            },
-            None => self.a
+            }
+            None => self.a,
         }
     }
 }

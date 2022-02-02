@@ -27,19 +27,24 @@ pub trait ModularOps<Rhs = Self, Modulus = Self> {
         Self: Sized;
 
     /// Calculate Jacobi Symbol (a|n), where a is self
+    ///
+    /// Note that we don't provide Legendre symbol function
+    /// here, as it depends on primality test. However, if
+    /// n is surely a prime, this function can be directly used as
+    /// Legendre symbol.
     fn jacobi(self, n: Modulus) -> i8;
 
     // TODO: Calculate Kronecker Symbol (a|n), where a is self
-    // fn kronecker(self, n: Modulus) -> i8;
+    fn kronecker(self, n: Modulus) -> i8;
 
     // TODO: ModularOps sqrt aka Quadratic residue
     // fn sqrtm(self, m: Modulus);
 }
 
-mod prim;
 mod monty;
+mod prim;
 
-#[cfg(feature="num-bigint")]
+#[cfg(feature = "num-bigint")]
 mod bigint;
 
 // tests for ModularOps goes here
@@ -47,8 +52,8 @@ mod bigint;
 mod tests {
     use super::*;
     use rand;
-    
-    #[cfg(feature="num-bigint")]
+
+    #[cfg(feature = "num-bigint")]
     use num_bigint::BigUint;
 
     #[test]
@@ -61,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature="num-bigint")]
+    #[cfg(feature = "num-bigint")]
     fn biguint_basic_mod_test() {
         let a = rand::random::<u128>();
         let ra = &BigUint::from(a);
@@ -121,7 +126,7 @@ mod tests {
                 y
             );
 
-            #[cfg(feature="num-bigint")]
+            #[cfg(feature = "num-bigint")]
             {
                 assert_eq!(
                     BigUint::from(*x).addm(BigUint::from(*y), &BigUint::from(m)),
@@ -182,8 +187,8 @@ mod tests {
                 x,
                 y
             );
-            
-            #[cfg(feature="num-bigint")]
+
+            #[cfg(feature = "num-bigint")]
             {
                 assert_eq!(
                     BigUint::from(*x).subm(BigUint::from(*y), &BigUint::from(m)),
@@ -222,8 +227,8 @@ mod tests {
                 a,
                 m
             );
-            
-            #[cfg(feature="num-bigint")]
+
+            #[cfg(feature = "num-bigint")]
             {
                 assert_eq!(
                     ModularOps::<&BigUint>::invm(&BigUint::from(*a), &BigUint::from(*m)).unwrap(),
@@ -257,7 +262,13 @@ mod tests {
         ];
 
         for (a, n, res) in test_cases.iter() {
-            assert_eq!(ModularOps::<&u8>::jacobi(a, n), *res, "u8 a: {}, n: {}", a, n);
+            assert_eq!(
+                ModularOps::<&u8>::jacobi(a, n),
+                *res,
+                "u8 a: {}, n: {}",
+                a,
+                n
+            );
             assert_eq!(
                 ModularOps::<&u16>::jacobi(&(*a as u16), &(*n as u16)),
                 *res,
@@ -287,10 +298,83 @@ mod tests {
                 n
             );
 
-            #[cfg(feature="num-bigint")]
+            #[cfg(feature = "num-bigint")]
             {
                 assert_eq!(
                     ModularOps::<&BigUint>::jacobi(&(BigUint::from(*a)), &(BigUint::from(*n))),
+                    *res,
+                    "biguint a: {}, n: {}",
+                    a,
+                    n
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn kronecker_test() {
+        let test_cases: [(u8, u8, i8); 18] = [
+            (0, 15, 0),
+            (1, 15, 1),
+            (2, 15, 1),
+            (4, 15, 1),
+            (7, 15, -1),
+            (10, 15, 0),
+            (0, 14, 0),
+            (1, 14, 1),
+            (2, 14, 0),
+            (4, 14, 0),
+            (9, 14, 1),
+            (10, 14, 0),
+            (0, 11, 0),
+            (1, 11, 1),
+            (2, 11, -1),
+            (4, 11, 1),
+            (9, 11, 1),
+            (10, 11, -1),
+        ];
+
+        for (a, n, res) in test_cases.iter() {
+            assert_eq!(
+                ModularOps::<&u8>::kronecker(a, n),
+                *res,
+                "u8 a: {}, n: {}",
+                a,
+                n
+            );
+            assert_eq!(
+                ModularOps::<&u16>::kronecker(&(*a as u16), &(*n as u16)),
+                *res,
+                "u16 a: {}, n: {}",
+                a,
+                n
+            );
+            assert_eq!(
+                ModularOps::<&u32>::kronecker(&(*a as u32), &(*n as u32)),
+                *res,
+                "u32 a: {}, n: {}",
+                a,
+                n
+            );
+            assert_eq!(
+                ModularOps::<&u64>::kronecker(&(*a as u64), &(*n as u64)),
+                *res,
+                "u64 a: {}, n: {}",
+                a,
+                n
+            );
+            assert_eq!(
+                ModularOps::<&u128>::kronecker(&(*a as u128), &(*n as u128)),
+                *res,
+                "u128 a: {}, n: {}",
+                a,
+                n
+            );
+
+            #[cfg(feature = "num-bigint")]
+            {
+                assert_eq!(
+                    ModularOps::<&BigUint>::kronecker(&(BigUint::from(*a)), &(BigUint::from(*n))),
                     *res,
                     "biguint a: {}, n: {}",
                     a,

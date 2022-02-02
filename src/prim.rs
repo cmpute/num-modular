@@ -1,7 +1,7 @@
-use num_integer::Integer;
 use crate::ModularOps;
+use num_integer::Integer;
 
-macro_rules! impl_jacobi_prim {
+macro_rules! impl_jacobi_uprim {
     ($T:ty) => {
         fn jacobi(self, n: &$T) -> i8 {
             if n % 2 == 0 || n < &0 {
@@ -37,11 +37,40 @@ macro_rules! impl_jacobi_prim {
                 0
             }
         }
+
+        #[inline]
+        fn kronecker(self, n: &$T) -> i8 {
+            match n {
+                0 => {
+                    if self == 1 {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                1 => 1,
+                2 => {
+                    if self & 1 == 0 {
+                        0
+                    } else if self & 7 == 1 || self & 7 == 7 {
+                        1
+                    } else {
+                        -1
+                    }
+                }
+                _ => {
+                    let f = n.trailing_zeros();
+                    let n = n >> f;
+                    ModularOps::<&$T, &$T>::kronecker(self, &2).pow(f)
+                        * ModularOps::<&$T, &$T>::jacobi(self, &n)
+                }
+            }
+        }
     };
 }
 
 // implement inverse mod using extended euclidean algorithm
-macro_rules! impl_invm_prim {
+macro_rules! impl_invm_uprim {
     ($T:ty) => {
         fn invm(self, m: &$T) -> Option<Self::Output> {
             let x = if &self >= m { self % m } else { self.clone() };
@@ -119,8 +148,8 @@ macro_rules! impl_mod_arithm_uu {
                     m - x
                 }
             }
-            impl_jacobi_prim!($T);
-            impl_invm_prim!($T);
+            impl_jacobi_uprim!($T);
+            impl_invm_uprim!($T);
         }
     };
 }
@@ -130,7 +159,6 @@ impl_mod_arithm_uu!(u16, u32);
 impl_mod_arithm_uu!(u32, u64);
 impl_mod_arithm_uu!(u64, u128);
 impl_mod_arithm_uu!(usize, u128);
-
 
 impl ModularOps<u128, &u128> for u128 {
     type Output = u128;
@@ -211,8 +239,8 @@ impl ModularOps<u128, &u128> for u128 {
         }
     }
 
-    impl_jacobi_prim!(u128);
-    impl_invm_prim!(u128);
+    impl_jacobi_uprim!(u128);
+    impl_invm_uprim!(u128);
 }
 
 macro_rules! impl_mod_arithm_by_deref {
@@ -247,6 +275,10 @@ macro_rules! impl_mod_arithm_by_deref {
             fn jacobi(self, n: &$T) -> i8 {
                 ModularOps::<$T, &$T>::jacobi(*self, n)
             }
+            #[inline]
+            fn kronecker(self, n: &$T) -> i8 {
+                ModularOps::<$T, &$T>::kronecker(*self, n)
+            }
         }
 
         impl ModularOps<&$T, &$T> for $T {
@@ -279,6 +311,10 @@ macro_rules! impl_mod_arithm_by_deref {
             fn jacobi(self, n: &$T) -> i8 {
                 ModularOps::<$T, &$T>::jacobi(self, n)
             }
+            #[inline]
+            fn kronecker(self, n: &$T) -> i8 {
+                ModularOps::<$T, &$T>::kronecker(self, n)
+            }
         }
 
         impl ModularOps<&$T, &$T> for &$T {
@@ -310,6 +346,10 @@ macro_rules! impl_mod_arithm_by_deref {
             #[inline]
             fn jacobi(self, n: &$T) -> i8 {
                 ModularOps::<$T, &$T>::jacobi(*self, n)
+            }
+            #[inline]
+            fn kronecker(self, n: &$T) -> i8 {
+                ModularOps::<$T, &$T>::kronecker(*self, n)
             }
         }
     )*};
