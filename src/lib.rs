@@ -36,15 +36,20 @@ pub trait ModularOps<Rhs = Self, Modulus = Self> {
     // fn sqrtm(self, m: Modulus);
 }
 
-mod bigint;
 mod prim;
 mod monty;
+
+#[cfg(feature="num-bigint")]
+mod bigint;
 
 // tests for ModularOps goes here
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand;
+    
+    #[cfg(feature="num-bigint")]
+    use num_bigint::BigUint;
 
     #[test]
     fn u64_basic_mod_test() {
@@ -58,7 +63,6 @@ mod tests {
     #[test]
     #[cfg(feature="num-bigint")]
     fn biguint_basic_mod_test() {
-        let mut rng = rand::thread_rng();
         let a = rand::random::<u128>();
         let ra = &BigUint::from(a);
         let m = rand::random::<u128>();
