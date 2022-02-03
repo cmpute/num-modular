@@ -3,7 +3,6 @@
 //! `num-bigint`. The latter option is enabled optionally.
 
 use std::ops::{Add, Sub, Mul, Neg};
-use num_traits::{Zero, One};
 
 /// This trait describes modular arithmetic operations
 pub trait ModularOps<Rhs = Self, Modulus = Self> {
@@ -58,10 +57,16 @@ pub trait ModularInteger : Sized + PartialEq + Add<Self, Output = Self> + Sub<Se
     type Base;
 
     /// Return the modulus of the ring
-    fn modulus(&self) -> Self::Base;
+    fn modulus(&self) -> &Self::Base;
 
     /// Return the normalized residue of this integer in the ring
     fn residue(&self) -> Self::Base;
+
+    /// Convert an normal integer into the same ring.
+    /// 
+    /// This method should be perferred over the static
+    /// constructor to prevent unnecessary overhead of pre-computation.
+    fn new(&self, n: Self::Base) -> Self;
 }
 
 mod prim;
@@ -124,67 +129,82 @@ mod tests {
         assert_eq!(MontgomeryInt::new(a, m).residue(), a % m, "u64 a {}, m {}", a, m);
     }
 
+    const ADDM_M: u8 = 5;
+    const ADDM_CASES: [(u8, u8, u8); 10] = [
+        // [x, y, rem]: x + y = rem (mod m)
+        (0, 0, 0),
+        (1, 2, 3),
+        (2, 1, 3),
+        (2, 2, 4),
+        (3, 2, 0),
+        (2, 3, 0),
+        (6, 1, 2),
+        (1, 6, 2),
+        (11, 7, 3),
+        (7, 11, 3),
+    ];
+
     #[test]
     fn addm_test() {
-        let m = 5;
+        let m = ADDM_M;
 
-        let test_cases: [(u8, u8, u8); 10] = [
-            // [x, y, rem]: x + y = rem (mod m)
-            (0, 0, 0),
-            (1, 2, 3),
-            (2, 1, 3),
-            (2, 2, 4),
-            (3, 2, 0),
-            (2, 3, 0),
-            (6, 1, 2),
-            (1, 6, 2),
-            (11, 7, 3),
-            (7, 11, 3),
-        ];
-
-        for (x, y, r) in test_cases.iter() {
+        for (x, y, r) in ADDM_CASES.iter() {
             assert_eq!(x.addm(y, &m), *r, "u8 x: {}, y: {}", x, y);
             assert_eq!(
                 (*x as u16).addm(*y as u16, &(m as u16)),
-                *r as u16,
-                "u16 x: {}, y: {}",
-                x,
-                y
+                *r as u16
             );
             assert_eq!(
                 (*x as u32).addm(*y as u32, &(m as u32)),
-                *r as u32,
-                "u32 x: {}, y: {}",
-                x,
-                y
+                *r as u32
             );
             assert_eq!(
                 (*x as u64).addm(*y as u64, &(m as u64)),
-                *r as u64,
-                "u64 x: {}, y: {}",
-                x,
-                y
+                *r as u64
             );
             assert_eq!(
                 (*x as u128).addm(*y as u128, &(m as u128)),
-                *r as u128,
-                "u128 x: {}, y: {}",
-                x,
-                y
+                *r as u128
             );
 
             #[cfg(feature = "num-bigint")]
             {
                 assert_eq!(
                     BigUint::from(*x).addm(BigUint::from(*y), &BigUint::from(m)),
-                    BigUint::from(*r),
-                    "biguint x: {}, y: {}",
-                    x,
-                    y
+                    BigUint::from(*r)
                 );
             }
         }
     }
+    
+    #[test]
+    fn monty_add_test() {
+        let m = ADDM_M;
+
+        for (x, y, r) in ADDM_CASES.iter() {
+            let mx = MontgomeryInt::new(*x, m as u8);
+            let my = MontgomeryInt::new(*y, m as u8);
+            assert_eq!((mx + my).residue(), *r);
+            
+            // test the `new()` method
+            let mx = MontgomeryInt::new(*x, m as u8);
+            let my = mx.new(*y);
+            assert_eq!((mx + my).residue(), *r);
+
+            let mx = MontgomeryInt::new(*x as u16, m as u16);
+            let my = MontgomeryInt::new(*y as u16, m as u16);
+            assert_eq!((mx + my).residue(), *r as u16);
+
+            let mx = MontgomeryInt::new(*x as u32, m as u32);
+            let my = MontgomeryInt::new(*y as u32, m as u32);
+            assert_eq!((mx + my).residue(), *r as u32);
+            
+            let mx = MontgomeryInt::new(*x as u32, m as u32);
+            let my = MontgomeryInt::new(*y as u32, m as u32);
+            assert_eq!((mx + my).residue(), *r as u32);
+        }
+    }
+
 
     #[test]
     fn subm_test() {
