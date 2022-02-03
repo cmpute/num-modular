@@ -106,7 +106,22 @@ mod tests {
         let a = rand::random::<u8>();
         let m = rand::random::<u8>();
         let m = m >> m.trailing_zeros();
-        assert_eq!(MontgomeryInt::new(a, m).residue(), a % m, "a {}, m {}", a, m);
+        assert_eq!(MontgomeryInt::new(a, m).residue(), a % m, "u8 a {}, m {}", a, m);
+
+        let a = rand::random::<u16>();
+        let m = rand::random::<u16>();
+        let m = m >> m.trailing_zeros();
+        assert_eq!(MontgomeryInt::new(a, m).residue(), a % m, "u16 a {}, m {}", a, m);
+        
+        let a = rand::random::<u32>();
+        let m = rand::random::<u32>();
+        let m = m >> m.trailing_zeros();
+        assert_eq!(MontgomeryInt::new(a, m).residue(), a % m, "u32 a {}, m {}", a, m);
+
+        let a = rand::random::<u64>();
+        let m = rand::random::<u64>();
+        let m = m >> m.trailing_zeros();
+        assert_eq!(MontgomeryInt::new(a, m).residue(), a % m, "u64 a {}, m {}", a, m);
     }
 
     #[test]

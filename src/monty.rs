@@ -44,7 +44,8 @@ pub trait Montgomery: Sized {
 //      https://docs.rs/ring-algorithm/latest/ring_algorithm/
 //      https://github.com/vks/discrete-log/blob/master/src/main.rs
 
-/* Entry i contains (2i+1)^(-1) mod 2^8.  */
+// Entry i contains (2i+1)^(-1) mod 2^8.
+// Reference: https://github.com/coreutils/coreutils/blob/master/src/factor.c#L1859
 const BINVERT_TABLE: [u8; 128] = [
   0x01, 0xAB, 0xCD, 0xB7, 0x39, 0xA3, 0xC5, 0xEF,
   0xF1, 0x1B, 0x3D, 0xA7, 0x29, 0x13, 0x35, 0xDF,
@@ -64,6 +65,54 @@ const BINVERT_TABLE: [u8; 128] = [
   0x11, 0x3B, 0x5D, 0xC7, 0x49, 0x33, 0x55, 0xFF
 ];
 
+macro_rules! impl_uprim_montgomery {
+    () => {
+        fn transform(target: Self, m: &Self) -> Self {
+            (((target as Self::Double) << Self::BITS) % (*m as Self::Double)) as _
+        }
+
+        fn reduce(monty: Self::Double, m: &Self, minv: &Self::Inv) -> Self {
+            // REDC algorithm
+            debug_assert!(monty < ((*m as Self::Double) << Self::BITS));
+
+            let tm = (monty as Self).wrapping_mul(*minv);
+            let (t, overflow) = monty.overflowing_add((tm as Self::Double) * (*m as Self::Double));
+            let t = (t >> Self::BITS) as Self;
+            
+            // in case of overflow, we need to add another `R mod m` = `R - m`
+            let t = if overflow {
+                t + m.wrapping_neg()
+            } else { t };
+
+            if &t >= m { return t-m } else { return t }
+        }
+
+        fn mul(lhs: Self, rhs: Self, m: &Self, minv: &Self::Inv) -> Self {
+            Montgomery::reduce((lhs as Self::Double) * (rhs as Self::Double), m, minv)
+        }
+
+        fn pow(base: Self, exp: Self, m: &Self, minv: &Self::Inv) -> Self {
+            match exp {
+                1 => base,
+                2 => Montgomery::mul(base, base, m, minv),
+                _ => {
+                    let mut multi = base;
+                    let mut exp = exp;
+                    let mut result = 1;
+                    while exp > 0 {
+                        if exp & 1 > 0 {
+                            result = Montgomery::mul(result, multi, m, minv);
+                        }
+                        multi = Montgomery::mul(multi, multi, m, minv);
+                        exp >>= 1;
+                    }
+                    result
+                }
+            }
+        }
+    };
+}
+
 impl Montgomery for u8 {
     type Inv = u8;
     type Double = u16;
@@ -72,49 +121,46 @@ impl Montgomery for u8 {
         BINVERT_TABLE[((m >> 1) & 0x7F) as usize].wrapping_neg()
     }
 
-    fn transform(target: Self, m: &Self) -> Self {
-        (((target as u16) << 8) % (*m as u16)) as _
+    impl_uprim_montgomery!();
+}
+
+impl Montgomery for u16 {
+    type Inv = u16;
+    type Double = u32;
+
+    fn neginv(m: &Self) -> Self {
+        let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u16;
+        i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
     }
 
-    fn reduce(monty: Self::Double, m: &Self, minv: &Self::Inv) -> Self {
-        // REDC algorithm
-        debug_assert!(monty < ((*m as u16) << u8::BITS));
+    impl_uprim_montgomery!();
+}
 
-        let tm = (monty as u8).wrapping_mul(*minv);
-        let (t, overflow) = monty.overflowing_add((tm as u16) * (*m as u16));
-        let t = (t >> u8::BITS) as u8;
-        
-        // in case of overflow, we need to add another `R mod m` = `R - m`
-        let t = if overflow {
-            t + m.wrapping_neg()
-        } else { t };
+impl Montgomery for u32 {
+    type Inv = u32;
+    type Double = u64;
 
-        if &t >= m { return t-m } else { return t }
+    fn neginv(m: &Self) -> Self {
+        let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u32;
+        let i = 2u32.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
+        i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
     }
 
-    fn mul(lhs: Self, rhs: Self, m: &Self, minv: &Self::Inv) -> Self {
-        Montgomery::reduce((lhs as u16) * (rhs as u16), m, minv)
+    impl_uprim_montgomery!();
+}
+
+impl Montgomery for u64 {
+    type Inv = u64;
+    type Double = u128;
+
+    fn neginv(m: &Self) -> Self {
+        let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u64;
+        let i = 2u64.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
+        let i = 2u64.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
+        i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
     }
 
-    fn pow(base: Self, exp: Self, m: &Self, minv: &Self::Inv) -> Self {
-        match exp {
-            1 => base,
-            2 => Montgomery::mul(base, base, m, minv),
-            _ => {
-                let mut multi = base;
-                let mut exp = exp;
-                let mut result = 1;
-                while exp > 0 {
-                    if exp & 1 > 0 {
-                        result = Montgomery::mul(result, multi, m, minv);
-                    }
-                    multi = Montgomery::mul(multi, multi, m, minv);
-                    exp >>= 1;
-                }
-                result
-            }
-        }
-    }
+    impl_uprim_montgomery!();
 }
 
 /// A integer represented in Montgomery form, which can be used in place of normal integers.
