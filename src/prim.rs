@@ -120,24 +120,23 @@ macro_rules! impl_mod_arithm_uu {
                 (((self as $Tdouble) * (rhs as $Tdouble)) % (*m as $Tdouble)) as $T
             }
             fn powm(self, exp: $T, m: &$T) -> $T {
-                if exp == 1 {
-                    return self % m;
-                }
-                if exp == 2 {
-                    return self.mulm(self, m);
-                }
-
-                let mut multi = self % m;
-                let mut exp = exp;
-                let mut result = 1;
-                while exp > 0 {
-                    if exp & 1 > 0 {
-                        result = result.mulm(multi, m);
+                match exp {
+                    1 => self % m,
+                    2 => self.mulm(self, m),
+                    _ => {
+                        let mut multi = self % m;
+                        let mut exp = exp;
+                        let mut result = 1;
+                        while exp > 0 {
+                            if exp & 1 > 0 {
+                                result = result.mulm(multi, m);
+                            }
+                            multi = multi.mulm(multi, m);
+                            exp >>= 1;
+                        }
+                        result
                     }
-                    multi = multi.mulm(multi, m);
-                    exp >>= 1;
                 }
-                result
             }
             #[inline]
             fn negm(self, m: &$T) -> $T {

@@ -2,6 +2,9 @@
 //! for various integer types, including primitive integers and
 //! `num-bigint`. The latter option is enabled optionally.
 
+use std::ops::{Add, Sub, Mul, Neg};
+use num_traits::{Zero, One};
+
 /// This trait describes modular arithmetic operations
 pub trait ModularOps<Rhs = Self, Modulus = Self> {
     type Output;
@@ -22,6 +25,8 @@ pub trait ModularOps<Rhs = Self, Modulus = Self> {
     fn negm(self, m: Modulus) -> Self::Output;
 
     /// Calculate modular inverse (x such that self*x = 1 mod m).
+    /// 
+    /// This operation is only available for integer that is coprime to `m`
     fn invm(self, m: Modulus) -> Option<Self::Output>
     where
         Self: Sized;
@@ -32,17 +37,36 @@ pub trait ModularOps<Rhs = Self, Modulus = Self> {
     /// here, as it depends on primality test. However, if
     /// n is surely a prime, this function can be directly used as
     /// Legendre symbol.
+    /// 
+    /// # Panics
+    /// if n is negative or even
     fn jacobi(self, n: Modulus) -> i8;
 
-    // TODO: Calculate Kronecker Symbol (a|n), where a is self
+    /// Calculate Kronecker Symbol (a|n), where a is self
     fn kronecker(self, n: Modulus) -> i8;
 
     // TODO: ModularOps sqrt aka Quadratic residue
     // fn sqrtm(self, m: Modulus);
 }
 
-mod monty;
+/// Represents an number defined in a modulo ring ℤ/nℤ
+/// 
+/// The operators should panic if the modulus of two number
+/// are not the same.
+pub trait ModularInteger : Sized + PartialEq + Add<Self, Output = Self> + Sub<Self, Output = Self> + Neg<Output = Self> + Mul<Self, Output = Self> {
+    /// The underlying representation type of the integer
+    type Base;
+
+    /// Return the modulus of the ring
+    fn modulus(&self) -> Self::Base;
+
+    /// Return the normalized residue of this integer in the ring
+    fn residue(&self) -> Self::Base;
+}
+
 mod prim;
+mod monty;
+pub use monty::{Montgomery, MontgomeryInt};
 
 #[cfg(feature = "num-bigint")]
 mod bigint;
@@ -75,6 +99,14 @@ mod tests {
         assert_eq!(ra.addm(ra, rm), (ra + ra) % rm);
         assert_eq!(ra.mulm(ra, rm), (ra * ra) % rm);
         assert_eq!(ra.powm(BigUint::from(3u8), rm), ra.pow(3) % rm);
+    }
+
+    #[test]
+    fn monty_int_basic_test() {
+        let a = rand::random::<u8>();
+        let m = rand::random::<u8>();
+        let m = m >> m.trailing_zeros();
+        assert_eq!(MontgomeryInt::new(a, m).residue(), a % m, "a {}, m {}", a, m);
     }
 
     #[test]
