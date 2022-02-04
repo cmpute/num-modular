@@ -1,17 +1,30 @@
 //! This crate provides efficient Modular arithmetic operations for various integer types,
 //! including primitive integers and `num-bigint`. The latter option is enabled optionally.
 //! 
-//! To achieve fast modular arithmetics, converting integer to any [ModularInteger]
-//! implementations. [MontgomeryInt] and [MontgomeryBigint] are two builtin implementation
-//! based on the Montgomery form. The former one is for stack allocated integer (like primitive
-//! types) and the latter one is for heap allocated integers (like `num-bigint::BigUint`)
+//! To achieve fast modular arithmetics, convert integers to any [ModularInteger] implementation
+//! use static `new()` or associated [ModularInteger::new()]. [MontgomeryInt] and [MontgomeryBigint]
+//! are two builtin implementation based on the Montgomery form. The former one is for stack
+//! allocated integer (like primitive types) and the latter one is for heap allocated integers (like `num-bigint::BigUint`)
+//! 
+//! Example code:
+//! ```rust
+//! use num_modular::{ModularCoreOps, ModularInteger, MontgomeryInt};
+//! 
+//! // directly using methods in ModularCoreOps
+//! let (x, y, m) = (12u8, 13u8, 5u8);
+//! assert_eq!(x.mulm(y, &m), x * y % m);
+//! 
+//! // convert integers into ModularInteger
+//! let mx = MontgomeryInt::new(x, m);
+//! let my = mx.new(y); // faster than static new()
+//! assert_eq!((mx * my).residue(), x * y % m);
+//! ```
 //! 
 
 use std::ops::{Add, Mul, Neg, Sub};
 
-/// This trait describes modular arithmetic operations
-/// TODO: split this trait into basic ops and extended ops
-pub trait ModularOps<Rhs = Self, Modulus = Self> {
+/// This trait describes core modular arithmetic operations
+pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
     type Output;
 
     /// Return (self + rhs) % m
@@ -23,11 +36,14 @@ pub trait ModularOps<Rhs = Self, Modulus = Self> {
     /// Return (self * rhs) % m
     fn mulm(self, rhs: Rhs, m: Modulus) -> Self::Output;
 
-    /// Return (self ^ exp) % m
-    fn powm(self, exp: Rhs, m: Modulus) -> Self::Output;
-
     /// Return (-self) % m and make sure the result is normalized in range [0,m)
     fn negm(self, m: Modulus) -> Self::Output;
+}
+
+/// This trait describes modular arithmetic operations
+pub trait ModularOps<Rhs = Self, Modulus = Self> : ModularCoreOps<Rhs, Modulus> {
+    /// Return (self ^ exp) % m
+    fn powm(self, exp: Rhs, m: Modulus) -> Self::Output;
 
     /// Calculate modular inverse (x such that self*x = 1 mod m).
     ///
@@ -238,8 +254,6 @@ mod tests {
         }
     }
 
-    // TODO: add test for mul and pow
-
     #[test]
     fn monty_sub_test() {
         for (m, x, y, r) in SUBM_CASES.iter() {
@@ -278,12 +292,12 @@ mod tests {
     #[test]
     fn negm_test() {
         for (m, x, r) in NEGM_CASES.iter() {
-            assert_eq!(ModularOps::<&u8>::negm(x, m), *r);
+            assert_eq!(ModularCoreOps::<&u8>::negm(x, m), *r);
 
             #[cfg(feature = "num-bigint")]
             {
                 assert_eq!(
-                    ModularOps::<&BigUint, &BigUint>::negm(BigUint::from(*x), &BigUint::from(*m)),
+                    ModularCoreOps::<&BigUint, &BigUint>::negm(BigUint::from(*x), &BigUint::from(*m)),
                     BigUint::from(*r),
                 );
             }

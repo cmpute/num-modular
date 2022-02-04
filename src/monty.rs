@@ -62,6 +62,7 @@ macro_rules! impl_uprim_montgomery {
     () => {
         #[inline]
         fn transform(target: Self, m: &Self) -> Self {
+            if target == 0 { return 0; }
             (((target as Self::Double) << Self::BITS) % (*m as Self::Double)) as _
         }
 

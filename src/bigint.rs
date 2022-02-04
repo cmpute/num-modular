@@ -1,11 +1,11 @@
-use crate::ModularOps;
+use crate::{ModularCoreOps, ModularOps};
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
 use std::convert::TryInto;
 
 macro_rules! impl_mod_arithm_by_ref {
     ($T:ty) => {
-        impl ModularOps<$T, &$T> for &$T {
+        impl ModularCoreOps<$T, &$T> for &$T {
             type Output = $T;
             #[inline]
             fn addm(self, rhs: $T, m: &$T) -> $T {
@@ -20,12 +20,14 @@ macro_rules! impl_mod_arithm_by_ref {
                 self.mulm(&rhs, &m)
             }
             #[inline]
+            fn negm(self, m: &$T) -> $T {
+                ModularCoreOps::<&$T, &$T>::negm(self, m)
+            }
+        }
+        impl ModularOps<$T, &$T> for &$T {
+            #[inline]
             fn powm(self, exp: $T, m: &$T) -> $T {
                 self.powm(&exp, &m)
-            }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularOps::<&$T, &$T>::negm(self, m)
             }
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
@@ -41,7 +43,7 @@ macro_rules! impl_mod_arithm_by_ref {
             }
         }
 
-        impl ModularOps<&$T, &$T> for $T {
+        impl ModularCoreOps<&$T, &$T> for $T {
             type Output = $T;
             #[inline]
             fn addm(self, rhs: &$T, m: &$T) -> $T {
@@ -56,12 +58,14 @@ macro_rules! impl_mod_arithm_by_ref {
                 (&self).mulm(rhs, &m)
             }
             #[inline]
+            fn negm(self, m: &$T) -> $T {
+                ModularCoreOps::<&$T, &$T>::negm(&self, m)
+            }
+        }
+        impl ModularOps<&$T, &$T> for $T {
+            #[inline]
             fn powm(self, exp: &$T, m: &$T) -> $T {
                 (&self).powm(exp, &m)
-            }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularOps::<&$T, &$T>::negm(&self, m)
             }
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
@@ -77,7 +81,7 @@ macro_rules! impl_mod_arithm_by_ref {
             }
         }
 
-        impl ModularOps<$T, &$T> for $T {
+        impl ModularCoreOps<$T, &$T> for $T {
             type Output = $T;
             #[inline]
             fn addm(self, rhs: $T, m: &$T) -> $T {
@@ -92,12 +96,14 @@ macro_rules! impl_mod_arithm_by_ref {
                 (&self).mulm(&rhs, &m)
             }
             #[inline]
+            fn negm(self, m: &$T) -> $T {
+                ModularCoreOps::<&$T, &$T>::negm(&self, m)
+            }
+        }
+        impl ModularOps<$T, &$T> for $T {
+            #[inline]
             fn powm(self, exp: $T, m: &$T) -> $T {
                 (&self).powm(&exp, &m)
-            }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularOps::<&$T, &$T>::negm(&self, m)
             }
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
@@ -120,7 +126,7 @@ mod impl_num_bigint {
     use super::*;
     use num_bigint::BigUint;
 
-    impl ModularOps<&BigUint, &BigUint> for &BigUint {
+    impl ModularCoreOps<&BigUint, &BigUint> for &BigUint {
         type Output = BigUint;
 
         #[inline]
@@ -150,11 +156,6 @@ mod impl_num_bigint {
         }
 
         #[inline]
-        fn powm(self, exp: &BigUint, m: &BigUint) -> BigUint {
-            self.modpow(&exp, m)
-        }
-
-        #[inline]
         fn negm(self, m: &BigUint) -> BigUint {
             let x = self % m;
             if x.is_zero() {
@@ -162,6 +163,13 @@ mod impl_num_bigint {
             } else {
                 m - x
             }
+        }
+    }
+
+    impl ModularOps<&BigUint, &BigUint> for &BigUint {
+        #[inline]
+        fn powm(self, exp: &BigUint, m: &BigUint) -> BigUint {
+            self.modpow(&exp, m)
         }
 
         fn invm(self, m: &BigUint) -> Option<Self::Output> {

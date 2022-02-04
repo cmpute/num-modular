@@ -1,5 +1,30 @@
-use crate::ModularOps;
+use crate::{ModularCoreOps, ModularOps};
 use num_integer::Integer;
+
+
+macro_rules! impl_powm_uprim {
+    ($T:ty) => {
+        fn powm(self, exp: $T, m: &$T) -> $T {
+            match exp {
+                1 => self % m,
+                2 => self.mulm(self, m),
+                _ => {
+                    let mut multi = self % m;
+                    let mut exp = exp;
+                    let mut result = 1;
+                    while exp > 0 {
+                        if exp & 1 != 0 {
+                            result = result.mulm(multi, m);
+                        }
+                        multi = multi.mulm(multi, m);
+                        exp >>= 1;
+                    }
+                    result
+                }
+            }
+        }
+    }
+}
 
 macro_rules! impl_jacobi_uprim {
     ($T:ty) => {
@@ -100,7 +125,7 @@ macro_rules! impl_invm_uprim {
 
 macro_rules! impl_mod_arithm_uu {
     ($T:ty, $Tdouble:ty) => {
-        impl ModularOps<$T, &$T> for $T {
+        impl ModularCoreOps<$T, &$T> for $T {
             type Output = $T;
             #[inline]
             fn addm(self, rhs: $T, m: &$T) -> $T {
@@ -119,25 +144,6 @@ macro_rules! impl_mod_arithm_uu {
             fn mulm(self, rhs: $T, m: &$T) -> $T {
                 (((self as $Tdouble) * (rhs as $Tdouble)) % (*m as $Tdouble)) as $T
             }
-            fn powm(self, exp: $T, m: &$T) -> $T {
-                match exp {
-                    1 => self % m,
-                    2 => self.mulm(self, m),
-                    _ => {
-                        let mut multi = self % m;
-                        let mut exp = exp;
-                        let mut result = 1;
-                        while exp > 0 {
-                            if exp & 1 != 0 {
-                                result = result.mulm(multi, m);
-                            }
-                            multi = multi.mulm(multi, m);
-                            exp >>= 1;
-                        }
-                        result
-                    }
-                }
-            }
             #[inline]
             fn negm(self, m: &$T) -> $T {
                 let x = self % m;
@@ -147,6 +153,10 @@ macro_rules! impl_mod_arithm_uu {
                     m - x
                 }
             }
+        }
+
+        impl ModularOps<$T, &$T> for $T {
+            impl_powm_uprim!($T);
             impl_jacobi_uprim!($T);
             impl_invm_uprim!($T);
         }
@@ -159,7 +169,7 @@ impl_mod_arithm_uu!(u32, u64);
 impl_mod_arithm_uu!(u64, u128);
 impl_mod_arithm_uu!(usize, u128);
 
-impl ModularOps<u128, &u128> for u128 {
+impl ModularCoreOps<u128, &u128> for u128 {
     type Output = u128;
 
     // XXX: check if these operations are also faster in u64
@@ -210,25 +220,8 @@ impl ModularOps<u128, &u128> for u128 {
         }
         result
     }
-
-    fn powm(self, exp: u128, m: &u128) -> u128 {
-        if exp == 1 {
-            return self % m;
-        }
-
-        let mut multi = self % m;
-        let mut exp = exp;
-        let mut result = 1;
-        while exp > 0 {
-            if exp & 1 > 0 {
-                result = result.mulm(multi, m);
-            }
-            multi = multi.mulm(multi, m);
-            exp >>= 1;
-        }
-        result
-    }
-
+    
+    #[inline]
     fn negm(self, m: &u128) -> u128 {
         let x = self % m;
         if x == 0 {
@@ -237,14 +230,16 @@ impl ModularOps<u128, &u128> for u128 {
             m - x
         }
     }
-
+}
+impl ModularOps<u128, &u128> for u128 {
+    impl_powm_uprim!(u128);
     impl_jacobi_uprim!(u128);
     impl_invm_uprim!(u128);
 }
 
 macro_rules! impl_mod_arithm_by_deref {
     ($($T:ty)*) => {$(
-        impl ModularOps<$T, &$T> for &$T {
+        impl ModularCoreOps<$T, &$T> for &$T {
             type Output = $T;
             #[inline]
             fn addm(self, rhs: $T, m: &$T) -> $T {
@@ -259,12 +254,14 @@ macro_rules! impl_mod_arithm_by_deref {
                 (*self).mulm(rhs, &m)
             }
             #[inline]
+            fn negm(self, m: &$T) -> $T {
+                ModularCoreOps::<$T, &$T>::negm(*self, m)
+            }
+        }
+        impl ModularOps<$T, &$T> for &$T {
+            #[inline]
             fn powm(self, exp: $T, m: &$T) -> $T {
                 (*self).powm(exp, &m)
-            }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularOps::<$T, &$T>::negm(*self, m)
             }
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
@@ -280,7 +277,7 @@ macro_rules! impl_mod_arithm_by_deref {
             }
         }
 
-        impl ModularOps<&$T, &$T> for $T {
+        impl ModularCoreOps<&$T, &$T> for $T {
             type Output = $T;
             #[inline]
             fn addm(self, rhs: &$T, m: &$T) -> $T {
@@ -295,12 +292,14 @@ macro_rules! impl_mod_arithm_by_deref {
                 self.mulm(*rhs, &m)
             }
             #[inline]
+            fn negm(self, m: &$T) -> $T {
+                ModularCoreOps::<$T, &$T>::negm(self, m)
+            }
+        }
+        impl ModularOps<&$T, &$T> for $T {
+            #[inline]
             fn powm(self, exp: &$T, m: &$T) -> $T {
                 self.powm(*exp, &m)
-            }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularOps::<$T, &$T>::negm(self, m)
             }
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
@@ -316,7 +315,7 @@ macro_rules! impl_mod_arithm_by_deref {
             }
         }
 
-        impl ModularOps<&$T, &$T> for &$T {
+        impl ModularCoreOps<&$T, &$T> for &$T {
             type Output = $T;
             #[inline]
             fn addm(self, rhs: &$T, m: &$T) -> $T {
@@ -331,12 +330,14 @@ macro_rules! impl_mod_arithm_by_deref {
                 (*self).mulm(*rhs, &m)
             }
             #[inline]
+            fn negm(self, m: &$T) -> $T {
+                ModularCoreOps::<$T, &$T>::negm(*self, m)
+            }
+        }
+        impl ModularOps<&$T, &$T> for &$T {
+            #[inline]
             fn powm(self, exp: &$T, m: &$T) -> $T {
                 (*self).powm(*exp, &m)
-            }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularOps::<$T, &$T>::negm(*self, m)
             }
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
