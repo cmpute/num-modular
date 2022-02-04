@@ -128,7 +128,7 @@ macro_rules! impl_mod_arithm_uu {
                         let mut exp = exp;
                         let mut result = 1;
                         while exp > 0 {
-                            if exp & 1 > 0 {
+                            if exp & 1 != 0 {
                                 result = result.mulm(multi, m);
                             }
                             multi = multi.mulm(multi, m);

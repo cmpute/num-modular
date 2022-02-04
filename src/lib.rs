@@ -1,10 +1,16 @@
-//! This crate provides efficient Modular arithmetic operations
-//! for various integer types, including primitive integers and
-//! `num-bigint`. The latter option is enabled optionally.
+//! This crate provides efficient Modular arithmetic operations for various integer types,
+//! including primitive integers and `num-bigint`. The latter option is enabled optionally.
+//! 
+//! To achieve fast modular arithmetics, converting integer to any [ModularInteger]
+//! implementations. [MontgomeryInt] and [MontgomeryBigint] are two builtin implementation
+//! based on the Montgomery form. The former one is for stack allocated integer (like primitive
+//! types) and the latter one is for heap allocated integers (like `num-bigint::BigUint`)
+//! 
 
 use std::ops::{Add, Mul, Neg, Sub};
 
 /// This trait describes modular arithmetic operations
+/// TODO: split this trait into basic ops and extended ops
 pub trait ModularOps<Rhs = Self, Modulus = Self> {
     type Output;
 
@@ -46,6 +52,9 @@ pub trait ModularOps<Rhs = Self, Modulus = Self> {
 
     // TODO: ModularOps sqrt aka Quadratic residue
     // fn sqrtm(self, m: Modulus);
+
+    // TODO: Discrete log aka index
+    // fn logm(self, base: Modulus, m: Modulus);
 }
 
 /// Represents an number defined in a modulo ring ℤ/nℤ
@@ -59,7 +68,6 @@ pub trait ModularInteger:
     + Sub<Self, Output = Self>
     + Neg<Output = Self>
     + Mul<Self, Output = Self>
-    // TODO: impl Pow
 {
     /// The underlying representation type of the integer
     type Base;
@@ -79,7 +87,7 @@ pub trait ModularInteger:
 
 mod monty;
 mod prim;
-pub use monty::{Montgomery, MontgomeryInt};
+pub use monty::{Montgomery, MontgomeryInt, MontgomeryBigint};
 
 #[cfg(feature = "num-bigint")]
 mod bigint;
@@ -89,6 +97,7 @@ mod bigint;
 mod tests {
     use super::*;
     use rand;
+    use num_traits::Pow;
 
     #[cfg(feature = "num-bigint")]
     use num_bigint::BigUint;
@@ -254,6 +263,145 @@ mod tests {
             let mx = MontgomeryInt::new(*x as u64, *m as u64);
             let my = MontgomeryInt::new(*y as u64, *m as u64);
             assert_eq!((mx - my).residue(), *r as u64);
+        }
+    }
+
+    const NEGM_CASES: [(u8, u8, u8); 5] = [
+        // [m, x, rem]: -x = rem (mod m)
+        (5, 0, 0),
+        (5, 2, 3),
+        (5, 1, 4),
+        (5, 5, 0),
+        (5, 12, 3),
+    ];
+
+    #[test]
+    fn negm_test() {
+        for (m, x, r) in NEGM_CASES.iter() {
+            assert_eq!(ModularOps::<&u8>::negm(x, m), *r);
+
+            #[cfg(feature = "num-bigint")]
+            {
+                assert_eq!(
+                    ModularOps::<&BigUint, &BigUint>::negm(BigUint::from(*x), &BigUint::from(*m)),
+                    BigUint::from(*r),
+                );
+            }
+        }
+    }
+    
+    #[test]
+    fn monty_neg_test() {
+        for (m, x, r) in NEGM_CASES.iter() {
+            assert_eq!(MontgomeryInt::new(*x, *m).neg().residue(), *r);
+            assert_eq!(MontgomeryInt::new(*x as u16, *m as u16).neg().residue(), *r as u16);
+            assert_eq!(MontgomeryInt::new(*x as u32, *m as u32).neg().residue(), *r as u32);
+            assert_eq!(MontgomeryInt::new(*x as u64, *m as u64).neg().residue(), *r as u64);
+        }
+    }
+
+    const MULM_CASES: [(u8, u8, u8, u8); 10] = [
+        // [m, x, y, rem]: x*y = rem (mod m)
+        (7, 0, 0, 0),
+        (7, 11, 9, 1),
+        (7, 5, 2, 3),
+        (7, 2, 5, 3),
+        (7, 6, 7, 0),
+        (7, 1, 7, 0),
+        (7, 7, 1, 0),
+        (7, 0, 6, 0),
+        (7, 15, 1, 1),
+        (7, 1, 15, 1),
+    ];
+
+    #[test]
+    fn mulm_test() {
+        for (m, x, y, r) in MULM_CASES.iter() {
+            assert_eq!(x.mulm(y, &m), *r);
+            assert_eq!((*x as u16).mulm(*y as u16, &(*m as u16)), *r as u16);
+            assert_eq!((*x as u32).mulm(*y as u32, &(*m as u32)), *r as u32);
+            assert_eq!((*x as u64).mulm(*y as u64, &(*m as u64)), *r as u64);
+            assert_eq!((*x as u128).mulm(*y as u128, &(*m as u128)), *r as u128);
+
+            #[cfg(feature = "num-bigint")]
+            {
+                assert_eq!(
+                    BigUint::from(*x).mulm(BigUint::from(*y), &BigUint::from(*m)),
+                    BigUint::from(*r),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn monty_mul_test() {
+        for (m, x, y, r) in MULM_CASES.iter() {
+            let mx = MontgomeryInt::new(*x, *m as u8);
+            let my = MontgomeryInt::new(*y, *m as u8);
+            assert_eq!((mx * my).residue(), *r);
+
+            let mx = MontgomeryInt::new(*x as u16, *m as u16);
+            let my = MontgomeryInt::new(*y as u16, *m as u16);
+            assert_eq!((mx * my).residue(), *r as u16);
+
+            let mx = MontgomeryInt::new(*x as u32, *m as u32);
+            let my = MontgomeryInt::new(*y as u32, *m as u32);
+            assert_eq!((mx * my).residue(), *r as u32);
+
+            let mx = MontgomeryInt::new(*x as u64, *m as u64);
+            let my = MontgomeryInt::new(*y as u64, *m as u64);
+            assert_eq!((mx * my).residue(), *r as u64);
+        }
+    }
+
+    const POWM_CASES: [(u8, u8, u8, u8); 10] = [
+        // [m, x, y, rem]: x^y = rem (mod m)
+        (7, 0, 0, 1),
+        (7, 11, 9, 1),
+        (7, 5, 2, 4),
+        (7, 2, 5, 4),
+        (7, 6, 7, 6),
+        (7, 1, 7, 1),
+        (7, 7, 1, 0),
+        (7, 0, 6, 0),
+        (7, 15, 1, 1),
+        (7, 1, 15, 1),
+    ];
+
+    
+    #[test]
+    fn powm_test() {
+        for (m, x, y, r) in POWM_CASES.iter() {
+            assert_eq!(x.powm(y, &m), *r);
+            assert_eq!((*x as u16).powm(*y as u16, &(*m as u16)), *r as u16);
+            assert_eq!((*x as u32).powm(*y as u32, &(*m as u32)), *r as u32);
+            assert_eq!((*x as u64).powm(*y as u64, &(*m as u64)), *r as u64);
+            assert_eq!((*x as u128).powm(*y as u128, &(*m as u128)), *r as u128);
+
+            #[cfg(feature = "num-bigint")]
+            {
+                assert_eq!(
+                    BigUint::from(*x).powm(BigUint::from(*y), &BigUint::from(*m)),
+                    BigUint::from(*r),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn monty_pow_test() {
+        for (m, x, y, r) in POWM_CASES.iter() {
+            let mx = MontgomeryInt::new(*x, *m as u8);
+            assert_eq!(mx.pow(*y).residue(), *r, "x {}, y {}", x, y);
+
+            let mx = MontgomeryInt::new(*x as u16, *m as u16);
+            assert_eq!(mx.pow(*y as u16).residue(), *r as u16);
+
+            let mx = MontgomeryInt::new(*x as u32, *m as u32);
+            assert_eq!(mx.pow(*y as u32).residue(), *r as u32);
+
+            let mx = MontgomeryInt::new(*x as u64, *m as u64);
+            assert_eq!(mx.pow(*y as u64).residue(), *r as u64);
         }
     }
 

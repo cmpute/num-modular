@@ -4,7 +4,7 @@ version = "0.0.3"
 edition = "2018"
 
 repository = "https://github.com/cmpute/num-modular"
-keywords = ["mathematics", "numerics", "number-theory", "bigint", "num"]
+keywords = ["mathematics", "numerics", "number-theory", "modular", "montgomery"]
 categories = ["data-structures", "science", "algorithms"]
 documentation = "https://docs.rs/num-modular"
 license = "Apache-2.0"

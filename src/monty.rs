@@ -1,6 +1,6 @@
 use crate::ModularInteger;
 use num_integer::Integer;
-use num_traits::WrappingNeg;
+use num_traits::Pow;
 use std::borrow::Borrow;
 use std::ops::{Add, Mul, Neg, Sub};
 use std::rc::Rc;
@@ -46,15 +46,7 @@ pub trait Montgomery: Sized {
     fn pow(base: &Self, exp: &Self, m: &Self, minv: &Self::Inv) -> Self;
 }
 
-// TODO: implement Montgomery for u32, u64, biguint
-// REF: https://github.com/uutils/coreutils/blob/main/src/uu/factor/src/numeric/montgomery.rs#L68
-//      https://crates.io/crates/modulo-n-tools
-//      https://docs.rs/ibig/latest/ibig/modular/index.html
-//      https://docs.rs/ring-algorithm/latest/ring_algorithm/
-//      https://github.com/vks/discrete-log/blob/master/src/main.rs
-
-// Entry i contains (2i+1)^(-1) mod 2^8.
-// Reference: https://github.com/coreutils/coreutils/blob/master/src/factor.c#L1859
+// Entry i contains (2i+1)^(-1) mod 256.
 const BINVERT_TABLE: [u8; 128] = [
     0x01, 0xAB, 0xCD, 0xB7, 0x39, 0xA3, 0xC5, 0xEF, 0xF1, 0x1B, 0x3D, 0xA7, 0x29, 0x13, 0x35, 0xDF,
     0xE1, 0x8B, 0xAD, 0x97, 0x19, 0x83, 0xA5, 0xCF, 0xD1, 0xFB, 0x1D, 0x87, 0x09, 0xF3, 0x15, 0xBF,
@@ -68,6 +60,7 @@ const BINVERT_TABLE: [u8; 128] = [
 
 macro_rules! impl_uprim_montgomery {
     () => {
+        #[inline]
         fn transform(target: Self, m: &Self) -> Self {
             (((target as Self::Double) << Self::BITS) % (*m as Self::Double)) as _
         }
@@ -90,13 +83,17 @@ macro_rules! impl_uprim_montgomery {
             }
         }
 
+        #[inline]
         fn add(lhs: &Self, rhs: &Self, m: &Self) -> Self {
-            let m = *m as Self::Double;
-            let sum = *lhs as Self::Double + *rhs as Self::Double;
-            let sum = if sum > m { sum - m } else { sum };
-            sum as Self
+            let (sum, overflow) = lhs.overflowing_add(*rhs);
+            if overflow {
+                sum + m.wrapping_neg()
+            } else {
+                sum
+            }
         }
 
+        #[inline]
         fn sub(lhs: &Self, rhs: &Self, m: &Self) -> Self {
             if lhs >= rhs {
                 lhs - rhs
@@ -105,6 +102,7 @@ macro_rules! impl_uprim_montgomery {
             }
         }
 
+        #[inline]
         fn neg(monty: &Self, m: &Self) -> Self {
             if monty == &0 {
                 0
@@ -113,6 +111,7 @@ macro_rules! impl_uprim_montgomery {
             }
         }
 
+        #[inline]
         fn mul(lhs: &Self, rhs: &Self, m: &Self, minv: &Self::Inv) -> Self {
             Montgomery::reduce((*lhs as Self::Double) * (*rhs as Self::Double), m, minv)
         }
@@ -124,9 +123,9 @@ macro_rules! impl_uprim_montgomery {
                 e => {
                     let mut multi = *base;
                     let mut exp = e;
-                    let mut result = 1;
+                    let mut result = Montgomery::transform(1, m);
                     while exp > 0 {
-                        if exp & 1 > 0 {
+                        if exp & 1 != 0 {
                             result = Montgomery::mul(&result, &multi, m, minv);
                         }
                         multi = Montgomery::mul(&multi, &multi, m, minv);
@@ -192,8 +191,24 @@ impl Montgomery for u64 {
 
 /// An integer represented in Montgomery form, it implements [ModularInteger] interface
 /// and it's generally more efficient than the vanilla integer in modular operations.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct MontgomeryInt<T: Integer + Montgomery> {
+    /// The Montgomery representation of the integer.
+    a: T,
+
+    /// The modulus.
+    m: T,
+
+    /// The negated modular inverse of the modulus mod R
+    mi: T::Inv
+}
+
+/// A big integer represented in Montgomery form, it implements [ModularInteger] interface
+/// and it's generally more efficient than the vanilla integer in modular operations.
+/// 
+/// The modulus is stored in heap to prevent frequent copying
+#[derive(Debug, Clone)]
+pub struct MontgomeryBigint<T: Integer + Montgomery> {
     /// The Montgomery representation of the integer.
     a: T,
 
@@ -205,6 +220,15 @@ pub struct MontgomeryInt<T: Integer + Montgomery> {
 }
 
 impl<T: Integer + Montgomery> MontgomeryInt<T> {
+    #[inline]
+    fn check_modulus_eq(&self, rhs: &Self) {
+        if self.m != rhs.m {
+            panic!("The modulus of two operators should be the same!");
+        }
+    }
+}
+
+impl<T: Integer + Montgomery> MontgomeryBigint<T> {
     #[inline]
     fn check_modulus_eq(&self, rhs: &Self) {
         if Rc::ptr_eq(&self.minv, &rhs.minv) {
@@ -220,10 +244,24 @@ where
     T::Double: From<T>,
 {
     /// Convert n into the modulo ring ℤ/mℤ (i.e. `n % m`)
+    #[inline]
+    pub fn new(n: T, m: T) -> Self {
+        let minv = Montgomery::neginv(&m);
+        let a = Montgomery::transform(n, &m);
+        MontgomeryInt { a, m, mi: minv }
+    }
+}
+
+impl<T: Integer + Montgomery> MontgomeryBigint<T>
+where
+    T::Double: From<T>,
+{
+    /// Convert n into the modulo ring ℤ/mℤ (i.e. `n % m`)
+    #[inline]
     pub fn new(n: T, m: T) -> Self {
         let inv = Montgomery::neginv(&m);
         let a = Montgomery::transform(n, &m);
-        MontgomeryInt {
+        MontgomeryBigint {
             a,
             minv: Rc::new((m, inv)),
         }
@@ -231,6 +269,15 @@ where
 }
 
 impl<T: Integer + Montgomery> PartialEq for MontgomeryInt<T> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.check_modulus_eq(other);
+        self.a == other.a
+    }
+}
+
+impl<T: Integer + Montgomery> PartialEq for MontgomeryBigint<T> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.check_modulus_eq(other);
         self.a == other.a
@@ -240,67 +287,161 @@ impl<T: Integer + Montgomery> PartialEq for MontgomeryInt<T> {
 impl<T: Integer + Montgomery> Add for MontgomeryInt<T> {
     type Output = Self;
 
+    #[inline]
+    fn add(self, rhs: Self) -> Self::Output {
+        self.check_modulus_eq(&rhs);
+        let a = Montgomery::add(&self.a, &rhs.a, &self.m);
+        MontgomeryInt { a, m: self.m, mi: self.mi }
+    }
+}
+
+impl<T: Integer + Montgomery> Add for MontgomeryBigint<T> {
+    type Output = Self;
+
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let m = &Borrow::<(T, T::Inv)>::borrow(&self.minv).0;
         let a = Montgomery::add(&self.a, &rhs.a, m);
-        MontgomeryInt { a, minv: self.minv }
+        MontgomeryBigint { a, minv: self.minv }
     }
 }
 
 impl<T: Integer + Montgomery> Sub for MontgomeryInt<T> {
     type Output = Self;
 
+    #[inline]
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.check_modulus_eq(&rhs);
+        let a = Montgomery::sub(&self.a, &rhs.a, &self.m);
+        MontgomeryInt { a, m: self.m, mi: self.mi }
+    }
+}
+
+impl<T: Integer + Montgomery> Sub for MontgomeryBigint<T> {
+    type Output = Self;
+
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let m = &Borrow::<(T, T::Inv)>::borrow(&self.minv).0;
         let a = Montgomery::sub(&self.a, &rhs.a, m);
-        MontgomeryInt { a, minv: self.minv }
+        MontgomeryBigint { a, minv: self.minv }
     }
 }
 
 impl<T: Integer + Montgomery> Neg for MontgomeryInt<T> {
     type Output = Self;
 
+    #[inline]
+    fn neg(self) -> Self::Output {
+        let a = Montgomery::neg(&self.a, &self.m);
+        MontgomeryInt { a, m: self.m, mi: self.mi }
+    }
+}
+
+impl<T: Integer + Montgomery> Neg for MontgomeryBigint<T> {
+    type Output = Self;
+
+    #[inline]
     fn neg(self) -> Self::Output {
         let m = &Borrow::<(T, T::Inv)>::borrow(&self.minv).0;
         let a = Montgomery::neg(&self.a, m);
-        MontgomeryInt { a, minv: self.minv }
+        MontgomeryBigint { a, minv: self.minv }
     }
 }
 
 impl<T: Integer + Montgomery> Mul for MontgomeryInt<T> {
     type Output = Self;
 
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.check_modulus_eq(&rhs);
+        let a = Montgomery::mul(&self.a, &rhs.a, &self.m, &self.mi);
+        MontgomeryInt { a, m: self.m, mi: self.mi }
+    }
+}
+
+impl<T: Integer + Montgomery> Mul for MontgomeryBigint<T> {
+    type Output = Self;
+
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let minv = Borrow::<(T, T::Inv)>::borrow(&self.minv);
         let a = Montgomery::mul(&self.a, &rhs.a, &minv.0, &minv.1);
-        MontgomeryInt { a, minv: self.minv }
+        MontgomeryBigint { a, minv: self.minv }
     }
 }
 
-impl<T: Integer + Montgomery + Clone> ModularInteger for MontgomeryInt<T>
+impl<T: Integer + Montgomery> Pow<T> for MontgomeryInt<T> {
+    type Output = Self;
+
+    #[inline]
+    fn pow(self, rhs: T) -> Self::Output {
+        let a = Montgomery::pow(&self.a, &rhs, &self.m, &self.mi);
+        MontgomeryInt { a, m: self.m, mi: self.mi }
+    }
+}
+
+impl<T: Integer + Montgomery> Pow<T> for MontgomeryBigint<T> {
+    type Output = Self;
+
+    #[inline]
+    fn pow(self, rhs: T) -> Self::Output {
+        let minv = Borrow::<(T, T::Inv)>::borrow(&self.minv);
+        let a = Montgomery::pow(&self.a, &rhs, &minv.0, &minv.1);
+        MontgomeryBigint { a, minv: self.minv }
+    }
+}
+
+impl<T: Integer + Montgomery + Clone> ModularInteger for MontgomeryBigint<T>
 where
     T::Double: From<T>,
 {
     type Base = T;
 
-    fn modulus(&self) -> &Self::Base {
+    #[inline]
+    fn modulus(&self) -> &T {
         &Borrow::<(T, T::Inv)>::borrow(&self.minv).0
     }
 
-    fn residue(&self) -> Self::Base {
+    #[inline]
+    fn residue(&self) -> T {
         let minv = Borrow::<(T, T::Inv)>::borrow(&self.minv);
         Montgomery::reduce(T::Double::from(self.a.clone()), &minv.0, &minv.1)
     }
 
-    fn new(&self, n: Self::Base) -> Self {
+    #[inline]
+    fn new(&self, n: T) -> Self {
         let m = &Borrow::<(T, T::Inv)>::borrow(&self.minv).0;
         let a = Montgomery::transform(n, &m);
-        MontgomeryInt {
+        MontgomeryBigint {
             a,
             minv: self.minv.clone(),
         }
+    }
+}
+
+impl<T: Integer + Montgomery + Clone> ModularInteger for MontgomeryInt<T>
+where
+    T::Double: From<T>, T::Inv: Clone
+{
+    type Base = T;
+
+    #[inline]
+    fn modulus(&self) -> &T {
+        &self.m
+    }
+
+    #[inline]
+    fn residue(&self) -> T {
+        Montgomery::reduce(T::Double::from(self.a.clone()), &self.m, &self.mi)
+    }
+
+    #[inline]
+    fn new(&self, n: T) -> Self {
+        let a = Montgomery::transform(n, &self.m);
+        MontgomeryInt { a, m: self.m.clone(), mi: self.mi.clone() }
     }
 }
