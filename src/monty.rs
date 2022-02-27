@@ -18,7 +18,8 @@ pub trait Montgomery: Sized {
     /// Montgomery form on multi-precision integer representations.
     type Inv;
 
-    /// The type of integer with doubled width
+    /// The type of integer with double width. It is only used in `reduce()`,
+    /// so it's okay that it's not actually doubled with
     type Double;
 
     /// Calculate -(m^-1) mod R
@@ -156,6 +157,8 @@ impl Montgomery for u16 {
 
     fn neginv(m: &Self) -> Self {
         let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u16;
+        // Newton-Rhapson iteration
+        // See: https://arxiv.org/abs/1303.0328
         i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
     }
 
@@ -168,7 +171,6 @@ impl Montgomery for u32 {
 
     fn neginv(m: &Self) -> Self {
         let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u32;
-        // iteratively i = 2*i - i*i*m;
         let i = 2u32.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
         i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
     }
@@ -189,6 +191,9 @@ impl Montgomery for u64 {
 
     impl_uprim_montgomery!();
 }
+
+// XXX: implement Montgomery for u128 (double type is also u128), which requires efficient implementation of dual word mul_mod.
+// REF: https://github.com/coreutils/coreutils/blob/master/src/factor.c (mulredc2)
 
 /// An integer represented in Montgomery form, it implements [ModularInteger] interface
 /// and it's generally more efficient than the vanilla integer in modular operations.

@@ -21,6 +21,9 @@
 //! ```
 //! 
 
+// XXX: consider implementing lookup table based modulo?
+// REF: https://eprint.iacr.org/2014/040.pdf
+
 use std::ops::{Add, Mul, Neg, Sub};
 
 /// This trait describes core modular arithmetic operations
@@ -54,11 +57,6 @@ pub trait ModularOps<Rhs = Self, Modulus = Self> : ModularCoreOps<Rhs, Modulus> 
 
     /// Calculate Jacobi Symbol (a|n), where a is self
     ///
-    /// Note that we don't provide Legendre symbol function
-    /// here, as it depends on primality test. However, if
-    /// n is surely a prime, this function can be directly used as
-    /// Legendre symbol.
-    ///
     /// # Panics
     /// if n is negative or even
     fn jacobi(self, n: Modulus) -> i8;
@@ -66,10 +64,19 @@ pub trait ModularOps<Rhs = Self, Modulus = Self> : ModularCoreOps<Rhs, Modulus> 
     /// Calculate Kronecker Symbol (a|n), where a is self
     fn kronecker(self, n: Modulus) -> i8;
 
-    // TODO: ModularOps sqrt aka Quadratic residue
+    /// Calculate Legendre Symbol (a|n), where a is self.
+    /// 
+    /// Note that this function doesn't perform primality check, since
+    /// is costly. So if n is not a prime, the result is not reasonable.
+    /// 
+    /// # Panics
+    /// if n is not prime
+    fn legendre(self, n: Modulus) -> i8;
+
+    // TODO: Modular sqrt aka Quadratic residue, follow the behavior of FLINT `n_sqrtmod`
     // fn sqrtm(self, m: Modulus);
 
-    // TODO: Discrete log aka index
+    // TODO: Discrete log aka index, follow the behavior of FLINT `n_discrete_log_bsgs`
     // fn logm(self, base: Modulus, m: Modulus);
 }
 
@@ -101,6 +108,7 @@ pub trait ModularInteger:
     fn new(&self, n: Self::Base) -> Self;
 }
 
+mod barret;
 mod monty;
 mod prim;
 pub use monty::{Montgomery, MontgomeryInt, MontgomeryBigint};
@@ -445,6 +453,49 @@ mod tests {
                 assert_eq!(
                     ModularOps::<&BigUint>::invm(&BigUint::from(*a), &BigUint::from(*m)).unwrap(),
                     BigUint::from(*x)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn legendre_test () {
+        let test_cases: [(u8, u8, i8); 18] = [
+            (0, 11, 0),
+            (1, 11, 1),
+            (2, 11, -1),
+            (4, 11, 1),
+            (7, 11, -1),
+            (10, 11, -1),
+            (0, 17, 0),
+            (1, 17, 1),
+            (2, 17, 1),
+            (4, 17, 1),
+            (9, 17, 1),
+            (10, 17, -1),
+            (0, 101, 0),
+            (1, 101, 1),
+            (2, 101, -1),
+            (4, 101, 1),
+            (9, 101, 1),
+            (10, 101, -1),
+        ];
+
+        for (a, n, res) in test_cases.iter() {
+            assert_eq!(ModularOps::<&u8>::legendre(a, n), *res);
+            assert_eq!(ModularOps::<&u16>::legendre(&(*a as u16), &(*n as u16)), *res);
+            assert_eq!(ModularOps::<&u32>::legendre(&(*a as u32), &(*n as u32)), *res);
+            assert_eq!(ModularOps::<&u64>::legendre(&(*a as u64), &(*n as u64)), *res);
+            assert_eq!(
+                ModularOps::<&u128>::legendre(&(*a as u128), &(*n as u128)),
+                *res
+            );
+
+            #[cfg(feature = "num-bigint")]
+            {
+                assert_eq!(
+                    ModularOps::<&BigUint>::legendre(&(BigUint::from(*a)), &(BigUint::from(*n))),
+                    *res
                 );
             }
         }

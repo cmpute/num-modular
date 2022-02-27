@@ -28,6 +28,13 @@ macro_rules! impl_powm_uprim {
 
 macro_rules! impl_jacobi_uprim {
     ($T:ty) => {
+        #[inline]
+        fn legendre(self, n: &$T) -> i8 {
+            match self.powm((n-1) >> 1, &n) {
+                0 => 0, 1 => 1, x if x == n-1 => -1, _ => panic!("n is not prime!")
+            }
+        }
+
         fn jacobi(self, n: &$T) -> i8 {
             if n % 2 == 0 || n < &0 {
                 panic!("The Jacobi symbol is only defined for non-negative odd integers!")
@@ -268,6 +275,10 @@ macro_rules! impl_mod_arithm_by_deref {
                 ModularOps::<$T, &$T>::invm(*self, m)
             }
             #[inline]
+            fn legendre(self, n: &$T) -> i8 {
+                ModularOps::<$T, &$T>::legendre(*self, n)
+            }
+            #[inline]
             fn jacobi(self, n: &$T) -> i8 {
                 ModularOps::<$T, &$T>::jacobi(*self, n)
             }
@@ -306,6 +317,10 @@ macro_rules! impl_mod_arithm_by_deref {
                 ModularOps::<$T, &$T>::invm(self, m)
             }
             #[inline]
+            fn legendre(self, n: &$T) -> i8 {
+                ModularOps::<$T, &$T>::legendre(self, n)
+            }
+            #[inline]
             fn jacobi(self, n: &$T) -> i8 {
                 ModularOps::<$T, &$T>::jacobi(self, n)
             }
@@ -342,6 +357,10 @@ macro_rules! impl_mod_arithm_by_deref {
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
                 ModularOps::<$T, &$T>::invm(*self, m)
+            }
+            #[inline]
+            fn legendre(self, n: &$T) -> i8 {
+                ModularOps::<$T, &$T>::legendre(*self, n)
             }
             #[inline]
             fn jacobi(self, n: &$T) -> i8 {

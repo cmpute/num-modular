@@ -34,6 +34,10 @@ macro_rules! impl_mod_arithm_by_ref {
                 ModularOps::<&$T, &$T>::invm(self, m)
             }
             #[inline]
+            fn legendre(self, n: &$T) -> i8 {
+                ModularOps::<&$T, &$T>::legendre(self, n)
+            }
+            #[inline]
             fn jacobi(self, n: &$T) -> i8 {
                 ModularOps::<&$T, &$T>::jacobi(self, n)
             }
@@ -72,6 +76,10 @@ macro_rules! impl_mod_arithm_by_ref {
                 ModularOps::<&$T, &$T>::invm(&self, m)
             }
             #[inline]
+            fn legendre(self, n: &$T) -> i8 {
+                ModularOps::<&$T, &$T>::legendre(&self, n)
+            }
+            #[inline]
             fn jacobi(self, n: &$T) -> i8 {
                 ModularOps::<&$T, &$T>::jacobi(&self, n)
             }
@@ -108,6 +116,10 @@ macro_rules! impl_mod_arithm_by_ref {
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
                 ModularOps::<&$T, &$T>::invm(&self, m)
+            }
+            #[inline]
+            fn legendre(self, n: &$T) -> i8 {
+                ModularOps::<&$T, &$T>::legendre(&self, n)
             }
             #[inline]
             fn jacobi(self, n: &$T) -> i8 {
@@ -194,6 +206,15 @@ mod impl_num_bigint {
             } else {
                 Some(last_t)
             }
+        }
+
+        #[inline]
+        fn legendre(self, n: &BigUint) -> i8 {
+            let r = self.powm((n - 1u8) >> 1u8, &n);
+            if r.is_zero() { return 0; }
+            if r.is_one() { return 1; }
+            if &(r + 1u8) == n { return -1; }
+            panic!("n is not prime!")
         }
 
         fn jacobi(self, n: &BigUint) -> i8 {
