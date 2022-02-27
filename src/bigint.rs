@@ -211,9 +211,15 @@ mod impl_num_bigint {
         #[inline]
         fn legendre(self, n: &BigUint) -> i8 {
             let r = self.powm((n - 1u8) >> 1u8, &n);
-            if r.is_zero() { return 0; }
-            if r.is_one() { return 1; }
-            if &(r + 1u8) == n { return -1; }
+            if r.is_zero() {
+                return 0;
+            }
+            if r.is_one() {
+                return 1;
+            }
+            if &(r + 1u8) == n {
+                return -1;
+            }
             panic!("n is not prime!")
         }
 

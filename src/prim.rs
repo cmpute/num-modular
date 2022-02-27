@@ -1,7 +1,6 @@
 use crate::{ModularCoreOps, ModularOps};
 use num_integer::Integer;
 
-
 macro_rules! impl_powm_uprim {
     ($T:ty) => {
         fn powm(self, exp: $T, m: &$T) -> $T {
@@ -23,15 +22,18 @@ macro_rules! impl_powm_uprim {
                 }
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_jacobi_uprim {
     ($T:ty) => {
         #[inline]
         fn legendre(self, n: &$T) -> i8 {
-            match self.powm((n-1) >> 1, &n) {
-                0 => 0, 1 => 1, x if x == n-1 => -1, _ => panic!("n is not prime!")
+            match self.powm((n - 1) >> 1, &n) {
+                0 => 0,
+                1 => 1,
+                x if x == n - 1 => -1,
+                _ => panic!("n is not prime!"),
             }
         }
 
@@ -227,7 +229,7 @@ impl ModularCoreOps<u128, &u128> for u128 {
         }
         result
     }
-    
+
     #[inline]
     fn negm(self, m: &u128) -> u128 {
         let x = self % m;

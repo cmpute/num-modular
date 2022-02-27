@@ -63,7 +63,9 @@ macro_rules! impl_uprim_montgomery {
     () => {
         #[inline]
         fn transform(target: Self, m: &Self) -> Self {
-            if target == 0 { return 0; }
+            if target == 0 {
+                return 0;
+            }
             (((target as Self::Double) << Self::BITS) % (*m as Self::Double)) as _
         }
 
@@ -206,12 +208,12 @@ pub struct MontgomeryInt<T: Integer + Montgomery> {
     m: T,
 
     /// The negated modular inverse of the modulus mod R
-    mi: T::Inv
+    mi: T::Inv,
 }
 
 /// A big integer represented in Montgomery form, it implements [ModularInteger] interface
 /// and it's generally more efficient than the vanilla integer in modular operations.
-/// 
+///
 /// The modulus is stored in heap to prevent frequent copying
 #[derive(Debug, Clone)]
 pub struct MontgomeryBigint<T: Integer + Montgomery> {
@@ -297,7 +299,11 @@ impl<T: Integer + Montgomery> Add for MontgomeryInt<T> {
     fn add(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let a = Montgomery::add(&self.a, &rhs.a, &self.m);
-        MontgomeryInt { a, m: self.m, mi: self.mi }
+        MontgomeryInt {
+            a,
+            m: self.m,
+            mi: self.mi,
+        }
     }
 }
 
@@ -320,7 +326,11 @@ impl<T: Integer + Montgomery> Sub for MontgomeryInt<T> {
     fn sub(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let a = Montgomery::sub(&self.a, &rhs.a, &self.m);
-        MontgomeryInt { a, m: self.m, mi: self.mi }
+        MontgomeryInt {
+            a,
+            m: self.m,
+            mi: self.mi,
+        }
     }
 }
 
@@ -342,7 +352,11 @@ impl<T: Integer + Montgomery> Neg for MontgomeryInt<T> {
     #[inline]
     fn neg(self) -> Self::Output {
         let a = Montgomery::neg(&self.a, &self.m);
-        MontgomeryInt { a, m: self.m, mi: self.mi }
+        MontgomeryInt {
+            a,
+            m: self.m,
+            mi: self.mi,
+        }
     }
 }
 
@@ -364,7 +378,11 @@ impl<T: Integer + Montgomery> Mul for MontgomeryInt<T> {
     fn mul(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let a = Montgomery::mul(&self.a, &rhs.a, &self.m, &self.mi);
-        MontgomeryInt { a, m: self.m, mi: self.mi }
+        MontgomeryInt {
+            a,
+            m: self.m,
+            mi: self.mi,
+        }
     }
 }
 
@@ -386,7 +404,11 @@ impl<T: Integer + Montgomery> Pow<T> for MontgomeryInt<T> {
     #[inline]
     fn pow(self, rhs: T) -> Self::Output {
         let a = Montgomery::pow(&self.a, &rhs, &self.m, &self.mi);
-        MontgomeryInt { a, m: self.m, mi: self.mi }
+        MontgomeryInt {
+            a,
+            m: self.m,
+            mi: self.mi,
+        }
     }
 }
 
@@ -431,7 +453,8 @@ where
 
 impl<T: Integer + Montgomery + Clone> ModularInteger for MontgomeryInt<T>
 where
-    T::Double: From<T>, T::Inv: Clone
+    T::Double: From<T>,
+    T::Inv: Clone,
 {
     type Base = T;
 
@@ -448,6 +471,10 @@ where
     #[inline]
     fn new(&self, n: T) -> Self {
         let a = Montgomery::transform(n, &self.m);
-        MontgomeryInt { a, m: self.m.clone(), mi: self.mi.clone() }
+        MontgomeryInt {
+            a,
+            m: self.m.clone(),
+            mi: self.mi.clone(),
+        }
     }
 }

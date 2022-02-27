@@ -1,25 +1,25 @@
 //! This crate provides efficient Modular arithmetic operations for various integer types,
 //! including primitive integers and `num-bigint`. The latter option is enabled optionally.
-//! 
+//!
 //! To achieve fast modular arithmetics, convert integers to any [ModularInteger] implementation
 //! use static `new()` or associated [ModularInteger::new()]. [MontgomeryInt] and [MontgomeryBigint]
 //! are two builtin implementation based on the Montgomery form. The former one is for stack
 //! allocated integer (like primitive types) and the latter one is for heap allocated integers (like `num-bigint::BigUint`)
-//! 
+//!
 //! Example code:
 //! ```rust
 //! use num_modular::{ModularCoreOps, ModularInteger, MontgomeryInt};
-//! 
+//!
 //! // directly using methods in ModularCoreOps
 //! let (x, y, m) = (12u8, 13u8, 5u8);
 //! assert_eq!(x.mulm(y, &m), x * y % m);
-//! 
+//!
 //! // convert integers into ModularInteger
 //! let mx = MontgomeryInt::new(x, m);
 //! let my = mx.new(y); // faster than static new()
 //! assert_eq!((mx * my).residue(), x * y % m);
 //! ```
-//! 
+//!
 
 // XXX: consider implementing lookup table based modulo?
 // REF: https://eprint.iacr.org/2014/040.pdf
@@ -44,7 +44,7 @@ pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
 }
 
 /// This trait describes modular arithmetic operations
-pub trait ModularOps<Rhs = Self, Modulus = Self> : ModularCoreOps<Rhs, Modulus> {
+pub trait ModularOps<Rhs = Self, Modulus = Self>: ModularCoreOps<Rhs, Modulus> {
     /// Return (self ^ exp) % m
     fn powm(self, exp: Rhs, m: Modulus) -> Self::Output;
 
@@ -65,10 +65,10 @@ pub trait ModularOps<Rhs = Self, Modulus = Self> : ModularCoreOps<Rhs, Modulus> 
     fn kronecker(self, n: Modulus) -> i8;
 
     /// Calculate Legendre Symbol (a|n), where a is self.
-    /// 
+    ///
     /// Note that this function doesn't perform primality check, since
     /// is costly. So if n is not a prime, the result is not reasonable.
-    /// 
+    ///
     /// # Panics
     /// if n is not prime
     fn legendre(self, n: Modulus) -> i8;
@@ -111,7 +111,7 @@ pub trait ModularInteger:
 mod barret;
 mod monty;
 mod prim;
-pub use monty::{Montgomery, MontgomeryInt, MontgomeryBigint};
+pub use monty::{Montgomery, MontgomeryBigint, MontgomeryInt};
 
 #[cfg(feature = "num-bigint")]
 mod bigint;
@@ -120,8 +120,8 @@ mod bigint;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand;
     use num_traits::Pow;
+    use rand;
 
     #[cfg(feature = "num-bigint")]
     use num_bigint::BigUint;
@@ -305,20 +305,32 @@ mod tests {
             #[cfg(feature = "num-bigint")]
             {
                 assert_eq!(
-                    ModularCoreOps::<&BigUint, &BigUint>::negm(BigUint::from(*x), &BigUint::from(*m)),
+                    ModularCoreOps::<&BigUint, &BigUint>::negm(
+                        BigUint::from(*x),
+                        &BigUint::from(*m)
+                    ),
                     BigUint::from(*r),
                 );
             }
         }
     }
-    
+
     #[test]
     fn monty_neg_test() {
         for (m, x, r) in NEGM_CASES.iter() {
             assert_eq!(MontgomeryInt::new(*x, *m).neg().residue(), *r);
-            assert_eq!(MontgomeryInt::new(*x as u16, *m as u16).neg().residue(), *r as u16);
-            assert_eq!(MontgomeryInt::new(*x as u32, *m as u32).neg().residue(), *r as u32);
-            assert_eq!(MontgomeryInt::new(*x as u64, *m as u64).neg().residue(), *r as u64);
+            assert_eq!(
+                MontgomeryInt::new(*x as u16, *m as u16).neg().residue(),
+                *r as u16
+            );
+            assert_eq!(
+                MontgomeryInt::new(*x as u32, *m as u32).neg().residue(),
+                *r as u32
+            );
+            assert_eq!(
+                MontgomeryInt::new(*x as u64, *m as u64).neg().residue(),
+                *r as u64
+            );
         }
     }
 
@@ -390,7 +402,6 @@ mod tests {
         (7, 1, 15, 1),
     ];
 
-    
     #[test]
     fn powm_test() {
         for (m, x, y, r) in POWM_CASES.iter() {
@@ -459,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn legendre_test () {
+    fn legendre_test() {
         let test_cases: [(u8, u8, i8); 18] = [
             (0, 11, 0),
             (1, 11, 1),
@@ -483,9 +494,18 @@ mod tests {
 
         for (a, n, res) in test_cases.iter() {
             assert_eq!(ModularOps::<&u8>::legendre(a, n), *res);
-            assert_eq!(ModularOps::<&u16>::legendre(&(*a as u16), &(*n as u16)), *res);
-            assert_eq!(ModularOps::<&u32>::legendre(&(*a as u32), &(*n as u32)), *res);
-            assert_eq!(ModularOps::<&u64>::legendre(&(*a as u64), &(*n as u64)), *res);
+            assert_eq!(
+                ModularOps::<&u16>::legendre(&(*a as u16), &(*n as u16)),
+                *res
+            );
+            assert_eq!(
+                ModularOps::<&u32>::legendre(&(*a as u32), &(*n as u32)),
+                *res
+            );
+            assert_eq!(
+                ModularOps::<&u64>::legendre(&(*a as u64), &(*n as u64)),
+                *res
+            );
             assert_eq!(
                 ModularOps::<&u128>::legendre(&(*a as u128), &(*n as u128)),
                 *res
