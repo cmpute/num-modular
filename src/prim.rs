@@ -59,7 +59,7 @@ macro_rules! impl_jacobi_uprim {
                         t *= -1;
                     }
                 }
-                std::mem::swap(&mut a, &mut n);
+                core::mem::swap(&mut a, &mut n);
                 if (a & 3) == 3 && (n & 3) == 3 {
                     t *= -1;
                 }

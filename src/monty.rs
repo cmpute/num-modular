@@ -1,8 +1,10 @@
 use crate::ModularInteger;
 use num_integer::Integer;
 use num_traits::Pow;
-use std::borrow::Borrow;
-use std::ops::{Add, Mul, Neg, Sub};
+use core::borrow::Borrow;
+use core::ops::{Add, Mul, Neg, Sub};
+
+#[cfg(std)]
 use std::rc::Rc;
 
 /// Operations of a integer represented in Montgomery form. This data type can
@@ -216,6 +218,7 @@ pub struct MontgomeryInt<T: Integer + Montgomery> {
 ///
 /// The modulus is stored in heap to prevent frequent copying
 #[derive(Debug, Clone)]
+#[cfg(std)]
 pub struct MontgomeryBigint<T: Integer + Montgomery> {
     /// The Montgomery representation of the integer.
     a: T,
@@ -236,6 +239,7 @@ impl<T: Integer + Montgomery> MontgomeryInt<T> {
     }
 }
 
+#[cfg(std)]
 impl<T: Integer + Montgomery> MontgomeryBigint<T> {
     #[inline]
     fn check_modulus_eq(&self, rhs: &Self) {
@@ -260,6 +264,7 @@ where
     }
 }
 
+#[cfg(std)]
 impl<T: Integer + Montgomery> MontgomeryBigint<T>
 where
     T::Double: From<T>,
@@ -284,6 +289,7 @@ impl<T: Integer + Montgomery> PartialEq for MontgomeryInt<T> {
     }
 }
 
+#[cfg(std)]
 impl<T: Integer + Montgomery> PartialEq for MontgomeryBigint<T> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -307,6 +313,7 @@ impl<T: Integer + Montgomery> Add for MontgomeryInt<T> {
     }
 }
 
+#[cfg(std)]
 impl<T: Integer + Montgomery> Add for MontgomeryBigint<T> {
     type Output = Self;
 
@@ -334,6 +341,7 @@ impl<T: Integer + Montgomery> Sub for MontgomeryInt<T> {
     }
 }
 
+#[cfg(std)]
 impl<T: Integer + Montgomery> Sub for MontgomeryBigint<T> {
     type Output = Self;
 
@@ -360,6 +368,7 @@ impl<T: Integer + Montgomery> Neg for MontgomeryInt<T> {
     }
 }
 
+#[cfg(std)]
 impl<T: Integer + Montgomery> Neg for MontgomeryBigint<T> {
     type Output = Self;
 
@@ -386,6 +395,7 @@ impl<T: Integer + Montgomery> Mul for MontgomeryInt<T> {
     }
 }
 
+#[cfg(std)]
 impl<T: Integer + Montgomery> Mul for MontgomeryBigint<T> {
     type Output = Self;
 
@@ -412,6 +422,7 @@ impl<T: Integer + Montgomery> Pow<T> for MontgomeryInt<T> {
     }
 }
 
+#[cfg(std)]
 impl<T: Integer + Montgomery> Pow<T> for MontgomeryBigint<T> {
     type Output = Self;
 
@@ -420,34 +431,6 @@ impl<T: Integer + Montgomery> Pow<T> for MontgomeryBigint<T> {
         let minv = Borrow::<(T, T::Inv)>::borrow(&self.minv);
         let a = Montgomery::pow(&self.a, &rhs, &minv.0, &minv.1);
         MontgomeryBigint { a, minv: self.minv }
-    }
-}
-
-impl<T: Integer + Montgomery + Clone> ModularInteger for MontgomeryBigint<T>
-where
-    T::Double: From<T>,
-{
-    type Base = T;
-
-    #[inline]
-    fn modulus(&self) -> &T {
-        &Borrow::<(T, T::Inv)>::borrow(&self.minv).0
-    }
-
-    #[inline]
-    fn residue(&self) -> T {
-        let minv = Borrow::<(T, T::Inv)>::borrow(&self.minv);
-        Montgomery::reduce(T::Double::from(self.a.clone()), &minv.0, &minv.1)
-    }
-
-    #[inline]
-    fn new(&self, n: T) -> Self {
-        let m = &Borrow::<(T, T::Inv)>::borrow(&self.minv).0;
-        let a = Montgomery::transform(n, &m);
-        MontgomeryBigint {
-            a,
-            minv: self.minv.clone(),
-        }
     }
 }
 
@@ -475,6 +458,35 @@ where
             a,
             m: self.m.clone(),
             mi: self.mi.clone(),
+        }
+    }
+}
+
+#[cfg(std)]
+impl<T: Integer + Montgomery + Clone> ModularInteger for MontgomeryBigint<T>
+where
+    T::Double: From<T>,
+{
+    type Base = T;
+
+    #[inline]
+    fn modulus(&self) -> &T {
+        &Borrow::<(T, T::Inv)>::borrow(&self.minv).0
+    }
+
+    #[inline]
+    fn residue(&self) -> T {
+        let minv = Borrow::<(T, T::Inv)>::borrow(&self.minv);
+        Montgomery::reduce(T::Double::from(self.a.clone()), &minv.0, &minv.1)
+    }
+
+    #[inline]
+    fn new(&self, n: T) -> Self {
+        let m = &Borrow::<(T, T::Inv)>::borrow(&self.minv).0;
+        let a = Montgomery::transform(n, &m);
+        MontgomeryBigint {
+            a,
+            minv: self.minv.clone(),
         }
     }
 }

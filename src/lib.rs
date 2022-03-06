@@ -24,7 +24,9 @@
 // XXX: consider implementing lookup table based modulo?
 // REF: https://eprint.iacr.org/2014/040.pdf
 
-use std::ops::{Add, Mul, Neg, Sub};
+#![cfg_attr(not(std), no_std)]
+
+use core::ops::{Add, Mul, Neg, Sub};
 
 /// This trait describes core modular arithmetic operations
 pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
@@ -111,7 +113,9 @@ pub trait ModularInteger:
 mod barret;
 mod monty;
 mod prim;
-pub use monty::{Montgomery, MontgomeryBigint, MontgomeryInt};
+pub use monty::{Montgomery, MontgomeryInt};
+#[cfg(std)]
+pub use monty::MontgomeryBigint;
 
 #[cfg(feature = "num-bigint")]
 mod bigint;

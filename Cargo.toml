@@ -29,3 +29,6 @@ rand = "0.8.4"
 
 [package.metadata.docs.rs]
 all-features = true
+
+[features]
+std = []
