@@ -5,4 +5,4 @@ A generic implementation of modular arithmetics in Rust. It provide basic operat
 Note that this crate supports `[no_std]`. To enable `std` related functionalities, enable the `std` feature of the crate.
 
 <!-- TODO for v0.2: support ibig-rs -->
-<!-- TODO for v1: no_std, signed integers -->
+<!-- TODO for v1: const functions -->

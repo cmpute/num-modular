@@ -1,6 +1,10 @@
 use crate::{ModularCoreOps, ModularOps};
 use num_integer::Integer;
 
+// TODO: implement the modular functions as const: https://github.com/rust-lang/rust/pull/68847
+// TODO: provide utility functions to convert signed integers to unsigned during modular operation
+// (especially negm and absm)
+
 macro_rules! impl_powm_uprim {
     ($T:ty) => {
         fn powm(self, exp: $T, m: &$T) -> $T {

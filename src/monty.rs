@@ -13,6 +13,7 @@ use std::rc::Rc;
 /// The generic type T represents the underlying integer representation, and
 /// R=2^B will be used as the auxiliary modulus, where B is automatically selected
 /// based on the size of T.
+// TODO: finalize API after we got the big integer Montgomery implemented
 pub trait Montgomery: Sized {
     /// The type for inversion of the modulus.
     ///
@@ -71,8 +72,8 @@ macro_rules! impl_uprim_montgomery {
             (((target as Self::Double) << Self::BITS) % (*m as Self::Double)) as _
         }
 
+        // REDC algorithm
         fn reduce(monty: Self::Double, m: &Self, minv: &Self::Inv) -> Self {
-            // REDC algorithm
             debug_assert!(monty < ((*m as Self::Double) << Self::BITS));
 
             let tm = (monty as Self).wrapping_mul(*minv);
@@ -129,7 +130,7 @@ macro_rules! impl_uprim_montgomery {
                 e => {
                     let mut multi = *base;
                     let mut exp = e;
-                    let mut result = Montgomery::transform(1, m);
+                    let mut result = Montgomery::transform(1, m); // TODO: subtract exp by 1 and use base?
                     while exp > 0 {
                         if exp & 1 != 0 {
                             result = Montgomery::mul(&result, &multi, m, minv);
@@ -198,6 +199,7 @@ impl Montgomery for u64 {
 
 // XXX: implement Montgomery for u128 (double type is also u128), which requires efficient implementation of dual word mul_mod.
 // REF: https://github.com/coreutils/coreutils/blob/master/src/factor.c (mulredc2)
+// We can implement it efficiently with carrying_mul and widening_mul implemented (rust#85532)
 
 /// An integer represented in Montgomery form, it implements [ModularInteger] interface
 /// and it's generally more efficient than the vanilla integer in modular operations.
@@ -229,6 +231,14 @@ pub struct MontgomeryBigint<T: Integer + Montgomery> {
     /// quick checking of the equity of two moduli.
     minv: Rc<(T, T::Inv)>,
 }
+
+/// A word-size integer in Montgomery form with fixed modulus
+// TODO: implement after we have const implementation of invm
+#[derive(Debug, Clone, Copy)]
+struct MontgomeryWord<const M: usize> (usize);
+
+// XXX: we can also implement MontgomeryMersenne<const M: usize> to support Montgomery form
+// with (Pseudo) Mersenne prime as modulo. REF: https://eprint.iacr.org/2018/1038.pdf
 
 impl<T: Integer + Montgomery> MontgomeryInt<T> {
     #[inline]

@@ -4,8 +4,8 @@ version = "0.1.1"
 edition = "2018"
 
 repository = "https://github.com/cmpute/num-modular"
-keywords = ["mathematics", "numerics", "number-theory", "modular", "montgomery"]
-categories = ["data-structures", "science", "algorithms"]
+keywords = ["mathematics", "numeric", "number-theory", "modular", "montgomery"]
+categories = ["mathematics", "algorithms", "no-std"]
 documentation = "https://docs.rs/num-modular"
 license = "Apache-2.0"
 description = """
