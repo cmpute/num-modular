@@ -24,7 +24,9 @@
 // XXX: consider implementing lookup table based modulo?
 // REF: https://eprint.iacr.org/2014/040.pdf
 
-#![cfg_attr(not(std), no_std)]
+#![no_std]
+#[cfg(any(feature = "std", test))]
+extern crate std;
 
 use core::ops::{Add, Mul, Neg, Sub};
 
@@ -111,8 +113,11 @@ pub trait ModularInteger:
 }
 
 mod barret;
+mod double;
 mod monty;
 mod prim;
+
+pub use double::{umax, udouble};
 pub use monty::{Montgomery, MontgomeryInt};
 #[cfg(std)]
 pub use monty::MontgomeryBigint;
