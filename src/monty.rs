@@ -1,4 +1,4 @@
-use crate::ModularInteger;
+use crate::{ModularInteger, udouble};
 use num_integer::Integer;
 use num_traits::Pow;
 use core::borrow::Borrow;
@@ -62,7 +62,7 @@ const BINVERT_TABLE: [u8; 128] = [
     0x21, 0xCB, 0xED, 0xD7, 0x59, 0xC3, 0xE5, 0x0F, 0x11, 0x3B, 0x5D, 0xC7, 0x49, 0x33, 0x55, 0xFF,
 ];
 
-macro_rules! impl_uprim_montgomery {
+macro_rules! impl_uprim_montgomery_core {
     () => {
         #[inline]
         fn transform(target: Self, m: &Self) -> Self {
@@ -91,6 +91,14 @@ macro_rules! impl_uprim_montgomery {
         }
 
         #[inline]
+        fn mul(lhs: &Self, rhs: &Self, m: &Self, minv: &Self::Inv) -> Self {
+            Montgomery::reduce((*lhs as Self::Double) * (*rhs as Self::Double), m, minv)
+        }
+    }
+}
+macro_rules! impl_uprim_montgomery {
+    () => {
+        #[inline]
         fn add(lhs: &Self, rhs: &Self, m: &Self) -> Self {
             let (sum, overflow) = lhs.overflowing_add(*rhs);
             if overflow {
@@ -116,11 +124,6 @@ macro_rules! impl_uprim_montgomery {
             } else {
                 m - monty
             }
-        }
-
-        #[inline]
-        fn mul(lhs: &Self, rhs: &Self, m: &Self, minv: &Self::Inv) -> Self {
-            Montgomery::reduce((*lhs as Self::Double) * (*rhs as Self::Double), m, minv)
         }
 
         fn pow(base: &Self, exp: &Self, m: &Self, minv: &Self::Inv) -> Self {
@@ -149,43 +152,48 @@ impl Montgomery for u8 {
     type Inv = u8;
     type Double = u16;
 
+    impl_uprim_montgomery_core!();
+    impl_uprim_montgomery!();
+
     fn neginv(m: &Self) -> Self {
         BINVERT_TABLE[((m >> 1) & 0x7F) as usize].wrapping_neg()
     }
-
-    impl_uprim_montgomery!();
 }
 
 impl Montgomery for u16 {
     type Inv = u16;
     type Double = u32;
 
+    impl_uprim_montgomery_core!();
+    impl_uprim_montgomery!();
+
     fn neginv(m: &Self) -> Self {
         let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u16;
-        // Newton-Rhapson iteration
-        // See: https://arxiv.org/abs/1303.0328
+        // Newton-Rhapson iteration (hensel lifting), see https://arxiv.org/abs/1303.0328
         i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
     }
-
-    impl_uprim_montgomery!();
 }
 
 impl Montgomery for u32 {
     type Inv = u32;
     type Double = u64;
 
+    impl_uprim_montgomery_core!();
+    impl_uprim_montgomery!();
+
     fn neginv(m: &Self) -> Self {
         let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u32;
         let i = 2u32.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
         i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
     }
-
-    impl_uprim_montgomery!();
 }
 
 impl Montgomery for u64 {
     type Inv = u64;
     type Double = u128;
+
+    impl_uprim_montgomery_core!();
+    impl_uprim_montgomery!();
 
     fn neginv(m: &Self) -> Self {
         let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u64;
@@ -193,13 +201,56 @@ impl Montgomery for u64 {
         let i = 2u64.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
         i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
     }
-
-    impl_uprim_montgomery!();
 }
 
 // XXX: implement Montgomery for u128 (double type is also u128), which requires efficient implementation of dual word mul_mod.
 // REF: https://github.com/coreutils/coreutils/blob/master/src/factor.c (mulredc2)
-// We can implement it efficiently with carrying_mul and widening_mul implemented (rust#85532)
+
+impl Montgomery for u128 {
+    type Inv = u128;
+    type Double = udouble;
+
+    fn neginv(m: &Self) -> Self {
+        let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u128;
+        let i = 2u128.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
+        let i = 2u128.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
+        let i = 2u128.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
+        i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
+    }
+    
+    #[inline]
+    fn transform(target: Self, m: &Self) -> Self {
+        if target == 0 {
+            return 0;
+        }
+        let r = udouble { hi: target, lo: 0 } % udouble::from(*m);
+        r.lo
+    }
+
+    // REDC algorithm
+    fn reduce(monty: Self::Double, m: &Self, minv: &Self::Inv) -> Self {
+        debug_assert!(monty < udouble { hi: *m, lo: 0 });
+
+        let tm = monty.lo.wrapping_mul(*minv);
+        let (t, overflow) = monty.overflowing_add(udouble::widening_mul(tm, *m));
+
+        // in case of overflow, we need to add another `R mod m` = `R - m`
+        let t = if overflow { t.hi + m.wrapping_neg() } else { t.hi };
+
+        if &t >= m {
+            return t - m;
+        } else {
+            return t;
+        }
+    }
+
+    #[inline]
+    fn mul(lhs: &Self, rhs: &Self, m: &Self, minv: &Self::Inv) -> Self {
+        Montgomery::reduce(udouble::widening_mul(*lhs, *rhs), m, minv)
+    }
+
+    impl_uprim_montgomery!();
+}
 
 /// An integer represented in Montgomery form, it implements [ModularInteger] interface
 /// and it's generally more efficient than the vanilla integer in modular operations.

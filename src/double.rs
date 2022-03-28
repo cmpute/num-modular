@@ -1,8 +1,7 @@
 //! This module implements a double width integer type based on the largest built-in integer (u128)
 
-use core::ops::{Add, Rem, Shl, Shr, ShlAssign, ShrAssign, AddAssign, Sub, SubAssign};
+use core::ops::{Add, Rem, Shl, Shr, ShlAssign, ShrAssign, AddAssign, Sub, SubAssign, Mul, Div};
 use num_traits::Zero;
-use num_traits::ops::overflowing::OverflowingAdd;
 
 /// Alias of the builtin integer type with max width
 #[allow(non_camel_case_types)]
@@ -26,7 +25,7 @@ impl udouble {
     }
 
     /// Calculate multiplication of two [umax] integers with result represented in double width integer
-    // equivalent to umul_ppmm
+    // equivalent to umul_ppmm, can be implemented efficiently with carrying_mul and widening_mul implemented (rust#85532)
     pub fn widening_mul(lhs: umax, rhs: umax) -> Self {
         const HALF_BITS: u32 = umax::BITS >> 1;
         let halves = |x| (x >> HALF_BITS, x & !(0 as umax) >> HALF_BITS);
@@ -35,6 +34,24 @@ impl udouble {
         let (z1, c1) = (x1 * y0).overflowing_add(x0 * y1);
         let (lo, c0) = umax::overflowing_add(z0, z1 << HALF_BITS);
         Self { hi: z2 + (z1 >> HALF_BITS) + c0 as umax + ((c1 as umax) << HALF_BITS), lo }
+    }
+
+    pub fn overflowing_add(&self, rhs: Self) -> (Self, bool) {
+        let (lo, carry) = self.lo.overflowing_add(rhs.lo);
+        let (hi, of1) = self.hi.overflowing_add(rhs.hi);
+        let (hi, of2) = hi.overflowing_add(carry as umax);
+        (Self { lo, hi }, of1 || of2)
+    }
+
+    pub fn overflowing_mul(&self, rhs: Self) -> (Self, bool) {
+        let c2 = self.hi != 0 && rhs.hi != 0;
+        let Self {lo: z0, hi: c0} = Self::widening_mul(self.lo, rhs.lo);
+        let (z1x, c1x) = u128::overflowing_mul(self.lo, rhs.hi);
+        let (z1y, c1y) = u128::overflowing_mul(self.hi, rhs.lo);
+        let (z1z, c1z) = u128::overflowing_add(z1x, z1y);
+        let (z1, cs1) = z1z.overflowing_add(c0);
+        let (z1, cs2) = z1.overflowing_add(c1z as umax);
+        (Self { hi: z1, lo: z0 }, c1x | c1y | cs1 | cs2 | c2)
     }
 }
 
@@ -77,15 +94,6 @@ impl AddAssign<umax> for udouble {
         let (lo, carry) = self.lo.overflowing_add(rhs);
         self.lo = lo;
         if carry { self.hi += 1 }
-    }
-}
-
-impl OverflowingAdd for udouble {
-    fn overflowing_add(&self, rhs: &Self) -> (Self, bool) {
-        let (lo, carry) = self.lo.overflowing_add(rhs.lo);
-        let (hi, of1) = self.hi.overflowing_add(rhs.hi);
-        let (hi, of2) = hi.overflowing_add(carry as umax);
-        (Self { lo, hi }, of1 || of2)
     }
 }
 
@@ -194,9 +202,6 @@ impl udouble {
         }
     }
 
-    // REF:
-    // https://docs.rs/u256/0.1.0/src/u256/lib.rs.html#165-199
-    // https://github.com/coreutils/coreutils/blob/master/src/factor.c#L284-L304
     // similar to udiv_qrnnd
     pub fn div_rem(self, other: Self) -> (Self, Self) {
         let mut n = self; // numerator
@@ -205,9 +210,7 @@ impl udouble {
 
         let nbits = 2 * umax::BITS - n.leading_zeros();
         let dbits = 2 * umax::BITS - d.leading_zeros();
-
-        // Check for division by 0
-        assert!(dbits != 0);
+        assert!(dbits != 0, "division by zero");
 
         // Early return in case we are dividing by a larger number than us
         if nbits < dbits {
@@ -217,16 +220,41 @@ impl udouble {
         // Bitwise long division
         let mut shift = nbits - dbits;
         d <<= shift;
-        while shift > 0 {
+        loop {
             if n >= d {
                 q += 1;
                 n -= d;
             }
+            if shift == 0 { break; }
+
             d >>= 1;
             q <<= 1;
             shift -= 1;
         }
         (q, n)
+    }
+}
+
+impl Mul for udouble {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        let (m, overflow) = self.overflowing_mul(rhs);
+        assert!(!overflow, "multiplication overflow!");
+        m
+    }
+}
+
+impl Div for udouble {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        self.div_rem(rhs).0
+    }
+}
+
+impl Rem for udouble {
+    type Output = Self;
+    fn rem(self, rhs: Self) -> Self::Output {
+        self.div_rem(rhs).1
     }
 }
 
@@ -253,6 +281,7 @@ mod tests {
     #[test]
     fn test_ops() {
         const ONE: udouble = udouble { hi: 0, lo: 1 };
+        const TWO: udouble = udouble { hi: 0, lo: 2 };
         const MAX: udouble = udouble { hi: 0, lo: umax::MAX };
         const ONEZERO: udouble = udouble { hi: 1, lo: 0 };
         const ONEMAX: udouble = udouble { hi: 1, lo: umax::MAX };
@@ -269,6 +298,25 @@ mod tests {
         assert_eq!((MAX << 1) + 1, ONEMAX);
         assert_eq!(ONEZERO >> umax::BITS, ONE);
         assert_eq!(ONEMAX >> 1, MAX);
+
+        assert_eq!(ONE * MAX, MAX);
+        assert_eq!(ONE * ONEMAX, ONEMAX);
+        assert_eq!(TWO * ONEMAX, ONEMAX + ONEMAX);
+        assert_eq!(MAX / ONE, MAX);
+        assert_eq!(MAX / MAX, ONE);
+        assert_eq!(ONE / MAX, udouble::zero());
+        assert_eq!(ONEMAX / ONE, ONEMAX);
+        assert_eq!(ONEMAX / ONEMAX, ONE);
+        assert_eq!(ONEMAX / MAX, TWO);
+        assert_eq!(ONEMAX / TWO, MAX);
+        assert_eq!(ONE % MAX, ONE);
+        assert_eq!(TWO % MAX, TWO);
+        assert_eq!(ONEMAX % MAX, ONE);
+        assert_eq!(ONEMAX % TWO, ONE);
+
+        let (m, overflow) = ONEMAX.overflowing_mul(MAX);
+        assert_eq!(m, udouble { lo: 1, hi: umax::MAX - 2});
+        assert!(overflow);
     }
 
     #[test]
