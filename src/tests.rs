@@ -47,6 +47,11 @@ fn monty_int_basic_test() {
     let m = rand::random::<u64>();
     let m = m >> m.trailing_zeros();
     assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
+
+    let a = rand::random::<u128>();
+    let m = rand::random::<u128>();
+    let m = m >> m.trailing_zeros();
+    assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
 }
 
 const ADDM_CASES: [(u8, u8, u8, u8); 10] = [
@@ -105,6 +110,10 @@ fn monty_add_test() {
         let mx = MontgomeryInt::new(*x as u64, *m as u64);
         let my = MontgomeryInt::new(*y as u64, *m as u64);
         assert_eq!((mx + my).residue(), *r as u64);
+        
+        let mx = MontgomeryInt::new(*x as u128, *m as u128);
+        let my = MontgomeryInt::new(*y as u128, *m as u128);
+        assert_eq!((mx + my).residue(), *r as u128);
     }
 }
 
@@ -164,6 +173,10 @@ fn monty_sub_test() {
         let mx = MontgomeryInt::new(*x as u64, *m as u64);
         let my = MontgomeryInt::new(*y as u64, *m as u64);
         assert_eq!((mx - my).residue(), *r as u64);
+
+        let mx = MontgomeryInt::new(*x as u128, *m as u128);
+        let my = MontgomeryInt::new(*y as u128, *m as u128);
+        assert_eq!((mx - my).residue(), *r as u128);
     }
 }
 
@@ -209,6 +222,10 @@ fn monty_neg_test() {
         assert_eq!(
             MontgomeryInt::new(*x as u64, *m as u64).neg().residue(),
             *r as u64
+        );
+        assert_eq!(
+            MontgomeryInt::new(*x as u128, *m as u128).neg().residue(),
+            *r as u128
         );
     }
 }
@@ -264,6 +281,10 @@ fn monty_mul_test() {
         let mx = MontgomeryInt::new(*x as u64, *m as u64);
         let my = MontgomeryInt::new(*y as u64, *m as u64);
         assert_eq!((mx * my).residue(), *r as u64);
+
+        let mx = MontgomeryInt::new(*x as u128, *m as u128);
+        let my = MontgomeryInt::new(*y as u128, *m as u128);
+        assert_eq!((mx * my).residue(), *r as u128);
     }
 }
 
@@ -314,6 +335,9 @@ fn monty_pow_test() {
 
         let mx = MontgomeryInt::new(*x as u64, *m as u64);
         assert_eq!(mx.pow(*y as u64).residue(), *r as u64);
+        
+        let mx = MontgomeryInt::new(*x as u128, *m as u128);
+        assert_eq!(mx.pow(*y as u128).residue(), *r as u128);
     }
 }
 

@@ -31,6 +31,7 @@ impl udouble {
         let halves = |x| (x >> HALF_BITS, x & !(0 as umax) >> HALF_BITS);
         let ((x1, x0), (y1, y0)) = (halves(lhs), halves(rhs));
         let (z2, z0) = (x1 * y1, x0 * y0);
+        // it's possible to use Karatsuba multiplication, but overflow checking is much easier here
         let (z1, c1) = (x1 * y0).overflowing_add(x0 * y1);
         let (lo, c0) = umax::overflowing_add(z0, z1 << HALF_BITS);
         Self { hi: z2 + (z1 >> HALF_BITS) + c0 as umax + ((c1 as umax) << HALF_BITS), lo }

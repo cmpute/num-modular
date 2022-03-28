@@ -1,7 +1,7 @@
 use crate::{ModularCoreOps, ModularOps};
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
-use std::convert::TryInto;
+use core::convert::TryInto;
 
 macro_rules! impl_mod_arithm_by_ref {
     ($T:ty) => {
@@ -247,7 +247,7 @@ mod impl_num_bigint {
                         t *= -1;
                     }
                 }
-                std::mem::swap(&mut a, &mut n);
+                core::mem::swap(&mut a, &mut n);
                 if (&a & &three) == three && (&n & &three) == three {
                     t *= -1;
                 }
