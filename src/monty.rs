@@ -1,7 +1,7 @@
-use crate::{ModularInteger, udouble};
+use crate::{udouble, ModularInteger};
+use core::ops::{Add, Mul, Neg, Sub};
 use num_integer::Integer;
 use num_traits::Pow;
-use core::ops::{Add, Mul, Neg, Sub};
 
 #[cfg(std)]
 use std::rc::Rc;
@@ -92,7 +92,7 @@ macro_rules! impl_uprim_montgomery_core {
         fn mul(lhs: &Self, rhs: &Self, m: &Self, minv: &Self::Inv) -> Self {
             Montgomery::reduce((*lhs as Self::Double) * (*rhs as Self::Double), m, minv)
         }
-    }
+    };
 }
 macro_rules! impl_uprim_montgomery {
     () => {
@@ -212,7 +212,7 @@ impl Montgomery for u128 {
         let i = 2u128.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
         i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
     }
-    
+
     #[inline]
     fn transform(target: Self, m: &Self) -> Self {
         if target == 0 {
@@ -230,7 +230,11 @@ impl Montgomery for u128 {
         let (t, overflow) = monty.overflowing_add(udouble::widening_mul(tm, *m));
 
         // in case of overflow, we need to add another `R mod m` = `R - m`
-        let t = if overflow { t.hi + m.wrapping_neg() } else { t.hi };
+        let t = if overflow {
+            t.hi + m.wrapping_neg()
+        } else {
+            t.hi
+        };
 
         if &t >= m {
             return t - m;
@@ -264,7 +268,7 @@ pub struct MontgomeryInt<T: Integer + Montgomery> {
 /// A word-size integer in Montgomery form with fixed modulus
 // TODO: implement after we have const implementation of invm
 #[derive(Debug, Clone, Copy)]
-struct MontgomeryWord<const M: usize> (usize);
+struct MontgomeryWord<const M: usize>(usize);
 
 // XXX: we can also implement MontgomeryMersenne<const M: usize> to support Montgomery form
 // with (Pseudo) Mersenne prime as modulo. REF: https://eprint.iacr.org/2018/1038.pdf

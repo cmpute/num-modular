@@ -1,7 +1,7 @@
 use crate::{ModularCoreOps, ModularOps};
+use core::convert::TryInto;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
-use core::convert::TryInto;
 
 macro_rules! impl_mod_arithm_by_ref {
     ($T:ty) => {

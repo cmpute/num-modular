@@ -110,7 +110,7 @@ fn monty_add_test() {
         let mx = MontgomeryInt::new(*x as u64, *m as u64);
         let my = MontgomeryInt::new(*y as u64, *m as u64);
         assert_eq!((mx + my).residue(), *r as u64);
-        
+
         let mx = MontgomeryInt::new(*x as u128, *m as u128);
         let my = MontgomeryInt::new(*y as u128, *m as u128);
         assert_eq!((mx + my).residue(), *r as u128);
@@ -197,10 +197,7 @@ fn negm_test() {
         #[cfg(feature = "num-bigint")]
         {
             assert_eq!(
-                ModularCoreOps::<&BigUint, &BigUint>::negm(
-                    BigUint::from(*x),
-                    &BigUint::from(*m)
-                ),
+                ModularCoreOps::<&BigUint, &BigUint>::negm(BigUint::from(*x), &BigUint::from(*m)),
                 BigUint::from(*r),
             );
         }
@@ -335,7 +332,7 @@ fn monty_pow_test() {
 
         let mx = MontgomeryInt::new(*x as u64, *m as u64);
         assert_eq!(mx.pow(*y as u64).residue(), *r as u64);
-        
+
         let mx = MontgomeryInt::new(*x as u128, *m as u128);
         assert_eq!(mx.pow(*y as u128).residue(), *r as u128);
     }

@@ -2,9 +2,8 @@
 //! including primitive integers and `num-bigint`. The latter option is enabled optionally.
 //!
 //! To achieve fast modular arithmetics, convert integers to any [ModularInteger] implementation
-//! use static `new()` or associated [ModularInteger::new()]. [MontgomeryInt] and [MontgomeryBigint]
-//! are two builtin implementation based on the Montgomery form. The former one is for stack
-//! allocated integer (like primitive types) and the latter one is for heap allocated integers (like `num-bigint::BigUint`)
+//! use static `new()` or associated [ModularInteger::new()]. [MontgomeryInt] is a builtin implementation
+//! of [ModularInteger] based on the Montgomery form.
 //!
 //! Example code:
 //! ```rust
@@ -47,6 +46,7 @@ pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
     fn negm(self, m: Modulus) -> Self::Output;
 }
 
+// TODO: checked_invm, checked_jacobi, checked_kronecker, checked_legendre
 /// This trait describes modular arithmetic operations
 pub trait ModularOps<Rhs = Self, Modulus = Self>: ModularCoreOps<Rhs, Modulus> {
     /// Return (self ^ exp) % m
@@ -117,13 +117,14 @@ mod double;
 mod monty;
 mod prim;
 
-pub use double::{umax, udouble};
-pub use monty::{Montgomery, MontgomeryInt};
+pub use double::{udouble, umax};
 #[cfg(std)]
 pub use monty::MontgomeryBigint;
+pub use monty::{Montgomery, MontgomeryInt};
 
 #[cfg(feature = "num-bigint")]
 mod bigint;
 
 // tests for ModularOps goes here
-#[cfg(test)] mod tests;
+#[cfg(test)]
+mod tests;

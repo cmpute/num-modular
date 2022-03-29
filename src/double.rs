@@ -1,7 +1,7 @@
 //! This module implements a double width integer type based on the largest built-in integer (u128)
 
-use core::ops::{Add, Rem, Shl, Shr, ShlAssign, ShrAssign, AddAssign, Sub, SubAssign, Mul, Div};
-use num_traits::Zero;
+use core::ops::{Add, AddAssign, Div, Mul, Rem, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign};
+use num_traits::{One, Zero};
 
 /// Alias of the builtin integer type with max width
 #[allow(non_camel_case_types)]
@@ -9,19 +9,23 @@ pub type umax = u128;
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-/// A double width integer type based on the largest built-in integer (u128)
-/// 
-/// It's used to support double-width operations on u128. Although it can be considered as u256,
-/// it's not as feature-rich as other crates since it's only designed to support this crate.
+/// A double width integer type based on the largest built-in integer (u128).
+/// It's used to support double-width operations on u128.
+///
+/// Although it can be regarded as u256, it's not as feature-rich as in other crates
+/// since it's only designed to support this crate.
 pub struct udouble {
     pub hi: umax,
-    pub lo: umax
+    pub lo: umax,
 }
 
 impl udouble {
     pub fn widening_add(lhs: umax, rhs: umax) -> Self {
         let (sum, carry) = lhs.overflowing_add(rhs);
-        udouble { hi: carry as umax, lo: sum }
+        udouble {
+            hi: carry as umax,
+            lo: sum,
+        }
     }
 
     /// Calculate multiplication of two [umax] integers with result represented in double width integer
@@ -34,7 +38,10 @@ impl udouble {
         // it's possible to use Karatsuba multiplication, but overflow checking is much easier here
         let (z1, c1) = (x1 * y0).overflowing_add(x0 * y1);
         let (lo, c0) = umax::overflowing_add(z0, z1 << HALF_BITS);
-        Self { hi: z2 + (z1 >> HALF_BITS) + c0 as umax + ((c1 as umax) << HALF_BITS), lo }
+        Self {
+            hi: z2 + (z1 >> HALF_BITS) + c0 as umax + ((c1 as umax) << HALF_BITS),
+            lo,
+        }
     }
 
     pub fn overflowing_add(&self, rhs: Self) -> (Self, bool) {
@@ -46,13 +53,29 @@ impl udouble {
 
     pub fn overflowing_mul(&self, rhs: Self) -> (Self, bool) {
         let c2 = self.hi != 0 && rhs.hi != 0;
-        let Self {lo: z0, hi: c0} = Self::widening_mul(self.lo, rhs.lo);
+        let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs.lo);
         let (z1x, c1x) = u128::overflowing_mul(self.lo, rhs.hi);
         let (z1y, c1y) = u128::overflowing_mul(self.hi, rhs.lo);
         let (z1z, c1z) = u128::overflowing_add(z1x, z1y);
         let (z1, cs1) = z1z.overflowing_add(c0);
         let (z1, cs2) = z1.overflowing_add(c1z as umax);
         (Self { hi: z1, lo: z0 }, c1x | c1y | cs1 | cs2 | c2)
+    }
+
+    pub fn checked_shl(self, rhs: u32) -> Option<Self> {
+        if rhs < umax::BITS * 2 {
+            Some(self << rhs)
+        } else {
+            None
+        }
+    }
+
+    pub fn checked_shr(self, rhs: u32) -> Option<Self> {
+        if rhs < umax::BITS * 2 {
+            Some(self >> rhs)
+        } else {
+            None
+        }
     }
 }
 
@@ -94,7 +117,9 @@ impl AddAssign<umax> for udouble {
     fn add_assign(&mut self, rhs: umax) {
         let (lo, carry) = self.lo.overflowing_add(rhs);
         self.lo = lo;
-        if carry { self.hi += 1 }
+        if carry {
+            self.hi += 1
+        }
     }
 }
 
@@ -118,11 +143,17 @@ impl SubAssign for udouble {
 
 impl Zero for udouble {
     fn zero() -> Self {
-        Self { lo: 0, hi: 0}
+        Self { lo: 0, hi: 0 }
     }
 
     fn is_zero(&self) -> bool {
         self.lo == 0 && self.hi == 0
+    }
+}
+
+impl One for udouble {
+    fn one() -> Self {
+        Self { lo: 1, hi: 0 }
     }
 }
 
@@ -138,7 +169,7 @@ impl Shl<u32> for udouble {
             s => Self {
                 lo: self.lo << s,
                 hi: (self.hi << s) | (self.lo >> (umax::BITS - s)),
-            }
+            },
         }
     }
 }
@@ -146,11 +177,11 @@ impl Shl<u32> for udouble {
 impl ShlAssign<u32> for udouble {
     fn shl_assign(&mut self, rhs: u32) {
         match rhs {
-            0 => {},
+            0 => {}
             s if s >= umax::BITS => {
                 self.hi = self.lo << (s - umax::BITS);
                 self.lo = 0;
-            },
+            }
             s => {
                 self.hi <<= s;
                 self.hi |= self.lo >> (umax::BITS - s);
@@ -172,7 +203,7 @@ impl Shr<u32> for udouble {
             s => Self {
                 hi: self.hi >> s,
                 lo: (self.lo >> s) | (self.hi << (umax::BITS - s)),
-            }
+            },
         }
     }
 }
@@ -180,11 +211,11 @@ impl Shr<u32> for udouble {
 impl ShrAssign<u32> for udouble {
     fn shr_assign(&mut self, rhs: u32) {
         match rhs {
-            0 => {},
+            0 => {}
             s if s >= umax::BITS => {
                 self.lo = self.hi >> (rhs - umax::BITS);
                 self.hi = 0;
-            },
+            }
             s => {
                 self.lo >>= s;
                 self.lo |= self.hi << (umax::BITS - s);
@@ -226,7 +257,9 @@ impl udouble {
                 q += 1;
                 n -= d;
             }
-            if shift == 0 { break; }
+            if shift == 0 {
+                break;
+            }
 
             d >>= 1;
             q <<= 1;
