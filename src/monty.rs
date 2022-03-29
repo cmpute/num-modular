@@ -131,7 +131,7 @@ macro_rules! impl_uprim_montgomery {
                 e => {
                     let mut multi = *base;
                     let mut exp = e;
-                    let mut result = Montgomery::transform(1, m); // TODO: subtract exp by 1 and use base?
+                    let mut result = Montgomery::transform(1, m);
                     while exp > 0 {
                         if exp & 1 != 0 {
                             result = Montgomery::mul(&result, &multi, m, minv);

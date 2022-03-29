@@ -193,6 +193,7 @@ const NEGM_CASES: [(u8, u8, u8); 5] = [
 fn negm_test() {
     for (m, x, r) in NEGM_CASES.iter() {
         assert_eq!(ModularCoreOps::<&u8>::negm(x, m), *r);
+        assert_eq!((*x as i8).neg().absm(m), *r);
 
         #[cfg(feature = "num-bigint")]
         {

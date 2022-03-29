@@ -1,9 +1,7 @@
-use crate::{ModularCoreOps, ModularOps};
+use crate::{ModularCoreOps, ModularOps, ModularAbs};
 use num_integer::Integer;
 
 // TODO: implement the modular functions as const: https://github.com/rust-lang/rust/pull/68847
-// TODO: provide utility functions to convert signed integers to unsigned during modular operation
-// (especially negm and absm)
 
 macro_rules! impl_powm_uprim {
     ($T:ty) => {
@@ -210,8 +208,8 @@ impl ModularCoreOps<u128, &u128> for u128 {
         }
     }
 
-    // TODO: benchmark against http://www.janfeitsma.nl/math/psp2/expmod
-    // TODO: benchmark against udouble implementation
+    // XXX: benchmark against http://www.janfeitsma.nl/math/psp2/expmod
+    // XXX: benchmark against udouble implementation
     fn mulm(self, rhs: u128, m: &u128) -> u128 {
         if let Some(ab) = self.checked_mul(rhs) {
             return ab % m;
@@ -382,3 +380,21 @@ macro_rules! impl_mod_arithm_by_deref {
 }
 
 impl_mod_arithm_by_deref!(u8 u16 u32 u64 u128 usize);
+
+macro_rules! impl_absm_for_prim {
+    ($($signed:ty => $unsigned:ty;)*) => {$(
+        impl ModularAbs<$unsigned> for $signed {
+            fn absm(self, m: &$unsigned) -> $unsigned {
+                if self >= 0 {
+                    (self as $unsigned) % m
+                } else {
+                    ModularCoreOps::<$unsigned>::negm(&(-self as $unsigned), m)
+                }
+            }
+        }
+    )*};
+}
+
+impl_absm_for_prim! {
+    i8 => u8; i16 => u16; i32 => u32; i64 => u64; i128 => u128; isize => usize;
+}

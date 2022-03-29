@@ -46,7 +46,7 @@ pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
     fn negm(self, m: Modulus) -> Self::Output;
 }
 
-// TODO: checked_invm, checked_jacobi, checked_kronecker, checked_legendre
+// TODO (v0.3): checked_invm, checked_jacobi, checked_kronecker, checked_legendre
 /// This trait describes modular arithmetic operations
 pub trait ModularOps<Rhs = Self, Modulus = Self>: ModularCoreOps<Rhs, Modulus> {
     /// Return (self ^ exp) % m
@@ -82,6 +82,12 @@ pub trait ModularOps<Rhs = Self, Modulus = Self>: ModularCoreOps<Rhs, Modulus> {
 
     // TODO: Discrete log aka index, follow the behavior of FLINT `n_discrete_log_bsgs`
     // fn logm(self, base: Modulus, m: Modulus);
+}
+
+/// Provides a utility function to convert signed integers into unsigned modular form
+pub trait ModularAbs<Modulus> {
+    /// Return |self| % m
+    fn absm(self, m: &Modulus) -> Modulus;
 }
 
 /// Represents an number defined in a modulo ring ℤ/nℤ

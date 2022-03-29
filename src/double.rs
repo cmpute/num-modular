@@ -1,6 +1,6 @@
 //! This module implements a double width integer type based on the largest built-in integer (u128)
 
-use core::ops::{Add, AddAssign, Div, Mul, Rem, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign};
+use core::ops::*;
 use num_traits::{One, Zero};
 
 /// Alias of the builtin integer type with max width
@@ -15,7 +15,9 @@ pub type umax = u128;
 /// Although it can be regarded as u256, it's not as feature-rich as in other crates
 /// since it's only designed to support this crate.
 pub struct udouble {
+    /// Most significant part
     pub hi: umax,
+    /// Least significant part
     pub lo: umax,
 }
 
@@ -222,6 +224,55 @@ impl ShrAssign<u32> for udouble {
                 self.hi >>= s;
             }
         }
+    }
+}
+
+impl BitAnd for udouble {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self { lo: self.lo & rhs.lo, hi: self.hi & rhs.hi }
+    }
+}
+
+impl BitAndAssign for udouble {
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.lo &= rhs.lo;
+        self.hi &= rhs.hi;
+    }
+}
+
+impl BitOr for udouble {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self { lo: self.lo | rhs.lo, hi: self.hi | rhs.hi }
+    }
+}
+
+impl BitOrAssign for udouble {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.lo |= rhs.lo;
+        self.hi |= rhs.hi;
+    }
+}
+
+impl BitXor for udouble {
+    type Output = Self;
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self { lo: self.lo ^ rhs.lo, hi: self.hi ^ rhs.hi }
+    }
+}
+
+impl BitXorAssign for udouble {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.lo ^= rhs.lo;
+        self.hi ^= rhs.hi;
+    }
+}
+
+impl Not for udouble {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        Self { lo: !self.lo, hi: !self.hi }
     }
 }
 
