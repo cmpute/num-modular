@@ -122,6 +122,7 @@ mod barret;
 mod double;
 mod monty;
 mod prim;
+mod mersenne;
 
 pub use double::{udouble, umax};
 #[cfg(std)]

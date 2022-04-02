@@ -265,14 +265,6 @@ pub struct MontgomeryInt<T: Integer + Montgomery> {
     mi: T::Inv,
 }
 
-/// A word-size integer in Montgomery form with fixed modulus
-// TODO: implement after we have const implementation of invm
-#[derive(Debug, Clone, Copy)]
-struct MontgomeryWord<const M: usize>(usize);
-
-// XXX: we can also implement MontgomeryMersenne<const M: usize> to support Montgomery form
-// with (Pseudo) Mersenne prime as modulo. REF: https://eprint.iacr.org/2018/1038.pdf
-
 impl<T: Integer + Montgomery> MontgomeryInt<T> {
     #[inline]
     fn check_modulus_eq(&self, rhs: &Self) {

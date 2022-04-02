@@ -59,9 +59,16 @@ impl udouble {
         let (z1x, c1x) = u128::overflowing_mul(self.lo, rhs.hi);
         let (z1y, c1y) = u128::overflowing_mul(self.hi, rhs.lo);
         let (z1z, c1z) = u128::overflowing_add(z1x, z1y);
-        let (z1, cs1) = z1z.overflowing_add(c0);
-        let (z1, cs2) = z1.overflowing_add(c1z as umax);
-        (Self { hi: z1, lo: z0 }, c1x | c1y | cs1 | cs2 | c2)
+        let (z1, c1) = z1z.overflowing_add(c0);
+        (Self { hi: z1, lo: z0 }, c1x | c1y | c1z | c1 | c2)
+    }
+
+    /// Multiplication of double width and single width
+    pub fn overflowing_muls(&self, rhs: umax) -> (Self, bool) {
+        let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs);
+        let (z1, c1) = u128::overflowing_mul(self.hi, rhs);
+        let (z1, cs1) = z1.overflowing_add(c0);
+        (Self { hi: z1, lo: z0 }, c1 | c1 | cs1)
     }
 
     pub fn checked_shl(self, rhs: u32) -> Option<Self> {
@@ -323,6 +330,7 @@ impl udouble {
 impl Mul for udouble {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
+        // TODO: use checked_mul instead of overflowing_mul
         let (m, overflow) = self.overflowing_mul(rhs);
         assert!(!overflow, "multiplication overflow!");
         m
@@ -343,6 +351,15 @@ impl Rem for udouble {
     }
 }
 
+impl Mul<umax> for udouble {
+    type Output = Self;
+    fn mul(self, rhs: umax) -> Self::Output {
+        let (m, overflow) = self.overflowing_muls(rhs);
+        assert!(!overflow, "multiplication overflow!");
+        m
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,6 +369,7 @@ mod tests {
     fn test_construction() {
         // construct zero
         assert!(udouble { lo: 0, hi: 0 }.is_zero());
+        assert!(udouble { lo: 1, hi: 0 }.is_one());
 
         // from widening operators
         assert_eq!(udouble { hi: 0, lo: 2 }, udouble::widening_add(1, 1));
@@ -381,6 +399,7 @@ mod tests {
 
         assert_eq!(ONE << umax::BITS, ONEZERO);
         assert_eq!((MAX << 1) + 1, ONEMAX);
+        assert_eq!(ONE << 200, udouble { lo: 0, hi: 1 << (200 - umax::BITS) });
         assert_eq!(ONEZERO >> umax::BITS, ONE);
         assert_eq!(ONEMAX >> 1, MAX);
 
@@ -401,6 +420,9 @@ mod tests {
 
         let (m, overflow) = ONEMAX.overflowing_mul(MAX);
         assert_eq!(m, udouble { lo: 1, hi: umax::MAX - 2});
+        assert!(overflow);
+        let (m, overflow) = TWOZERO.overflowing_mul(MAX);
+        assert_eq!(m, udouble { lo: 0, hi: umax::MAX - 1});
         assert!(overflow);
     }
 
