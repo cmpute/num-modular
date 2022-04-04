@@ -1,0 +1,21 @@
+[package]
+name = "num-modular-bench"
+version = "0.0.0"
+publish = false
+edition = "2018"
+
+[[bench]]
+name = "modops"
+harness = false
+
+# [[bench]]
+# name = "double"
+# harness = false
+
+[dependencies]
+num-integer = "0.1.0"
+num-traits = "0.2.0"
+num-modular = { path = ".." }
+criterion = "0.3"
+ethnum = { version = "1.1.1", optional = true }
+primitive-types = { version = "0.11", optional = true }

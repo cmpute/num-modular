@@ -109,6 +109,7 @@ macro_rules! impl_jacobi_uprim {
 macro_rules! impl_invm_uprim {
     ($T:ty) => {
         fn invm(self, m: &$T) -> Option<Self::Output> {
+            // TODO: optimize using https://eprint.iacr.org/2020/972.pdf
             let x = if &self >= m { self % m } else { self.clone() };
 
             let (mut last_r, mut r) = (m.clone(), x);

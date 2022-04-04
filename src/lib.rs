@@ -46,7 +46,7 @@ pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
     fn negm(self, m: Modulus) -> Self::Output;
 }
 
-// TODO (v0.3): checked_invm, checked_jacobi, checked_kronecker, checked_legendre
+// TODO (v0.3): checked_jacobi, checked_kronecker, checked_legendre
 /// This trait describes modular arithmetic operations
 pub trait ModularOps<Rhs = Self, Modulus = Self>: ModularCoreOps<Rhs, Modulus> {
     /// Return (self ^ exp) % m
@@ -54,7 +54,8 @@ pub trait ModularOps<Rhs = Self, Modulus = Self>: ModularCoreOps<Rhs, Modulus> {
 
     /// Calculate modular inverse (x such that self*x = 1 mod m).
     ///
-    /// This operation is only available for integer that is coprime to `m`
+    /// This operation is only available for integer that is coprime to `m`. If not,
+    /// the result will be [None].
     fn invm(self, m: Modulus) -> Option<Self::Output>
     where
         Self: Sized;
@@ -128,6 +129,7 @@ pub use double::{udouble, umax};
 #[cfg(std)]
 pub use monty::MontgomeryBigint;
 pub use monty::{Montgomery, MontgomeryInt};
+pub use mersenne::MersenneInt;
 
 #[cfg(feature = "num-bigint")]
 mod bigint;
