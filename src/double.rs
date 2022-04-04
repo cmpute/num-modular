@@ -176,143 +176,79 @@ impl One for udouble {
     }
 }
 
-// TODO: support only Shr/Shl<u8> and <u16>
-
-impl Shl<u8> for udouble {
-    type Output = Self;
-    fn shl(self, rhs: u8) -> Self::Output {
-        match rhs {
-            0 => self,
-            s if s >= umax::BITS as u8 => Self {
-                hi: self.lo << (s - umax::BITS as u8),
-                lo: 0,
-            },
-            s => Self {
-                lo: self.lo << s,
-                hi: (self.hi << s) | (self.lo >> (umax::BITS as u8 - s)),
-            },
-        }
-    }
-}
-
-impl Shl<u32> for udouble {
-    type Output = Self;
-    fn shl(self, rhs: u32) -> Self::Output {
-        match rhs {
-            0 => self,
-            s if s >= umax::BITS => Self {
-                hi: self.lo << (s - umax::BITS),
-                lo: 0,
-            },
-            s => Self {
-                lo: self.lo << s,
-                hi: (self.hi << s) | (self.lo >> (umax::BITS - s)),
-            },
-        }
-    }
-}
-
-impl ShlAssign<u8> for udouble {
-    fn shl_assign(&mut self, rhs: u8) {
-        match rhs {
-            0 => {}
-            s if s >= umax::BITS as u8 => {
-                self.hi = self.lo << (s - umax::BITS as u8);
-                self.lo = 0;
-            }
-            s => {
-                self.hi <<= s;
-                self.hi |= self.lo >> (umax::BITS as u8 - s);
-                self.lo <<= s;
+macro_rules! impl_shops {
+    ($t:ty) => {
+        impl Shl<$t> for udouble {
+            type Output = Self;
+            fn shl(self, rhs: $t) -> Self::Output {
+                match rhs {
+                    0 => self,
+                    s if s >= umax::BITS as $t => Self {
+                        hi: self.lo << (s - umax::BITS as $t),
+                        lo: 0,
+                    },
+                    s => Self {
+                        lo: self.lo << s,
+                        hi: (self.hi << s) | (self.lo >> (umax::BITS as $t - s)),
+                    },
+                }
             }
         }
-    }
-}
-
-impl ShlAssign<u32> for udouble {
-    fn shl_assign(&mut self, rhs: u32) {
-        match rhs {
-            0 => {}
-            s if s >= umax::BITS => {
-                self.hi = self.lo << (s - umax::BITS);
-                self.lo = 0;
-            }
-            s => {
-                self.hi <<= s;
-                self.hi |= self.lo >> (umax::BITS - s);
-                self.lo <<= s;
-            }
-        }
-    }
-}
-
-impl Shr<u8> for udouble {
-    type Output = Self;
-    fn shr(self, rhs: u8) -> Self::Output {
-        match rhs {
-            0 => self,
-            s if s >= umax::BITS as u8 => Self {
-                lo: self.hi >> (rhs - umax::BITS as u8),
-                hi: 0,
-            },
-            s => Self {
-                hi: self.hi >> s,
-                lo: (self.lo >> s) | (self.hi << (umax::BITS as u8 - s)),
-            },
-        }
-    }
-}
-
-impl Shr<u32> for udouble {
-    type Output = Self;
-    fn shr(self, rhs: u32) -> Self::Output {
-        match rhs {
-            0 => self,
-            s if s >= umax::BITS => Self {
-                lo: self.hi >> (rhs - umax::BITS),
-                hi: 0,
-            },
-            s => Self {
-                hi: self.hi >> s,
-                lo: (self.lo >> s) | (self.hi << (umax::BITS - s)),
-            },
-        }
-    }
-}
-
-impl ShrAssign<u8> for udouble {
-    fn shr_assign(&mut self, rhs: u8) {
-        match rhs {
-            0 => {}
-            s if s >= umax::BITS as u8 => {
-                self.lo = self.hi >> (rhs - umax::BITS as u8);
-                self.hi = 0;
-            }
-            s => {
-                self.lo >>= s;
-                self.lo |= self.hi << (umax::BITS as u8 - s);
-                self.hi >>= s;
+        impl ShlAssign<$t> for udouble {
+            fn shl_assign(&mut self, rhs: $t) {
+                match rhs {
+                    0 => {}
+                    s if s >= umax::BITS as $t => {
+                        self.hi = self.lo << (s - umax::BITS as $t);
+                        self.lo = 0;
+                    }
+                    s => {
+                        self.hi <<= s;
+                        self.hi |= self.lo >> (umax::BITS as $t - s);
+                        self.lo <<= s;
+                    }
+                }
             }
         }
-    }
-}
-
-impl ShrAssign<u32> for udouble {
-    fn shr_assign(&mut self, rhs: u32) {
-        match rhs {
-            0 => {}
-            s if s >= umax::BITS => {
-                self.lo = self.hi >> (rhs - umax::BITS);
-                self.hi = 0;
-            }
-            s => {
-                self.lo >>= s;
-                self.lo |= self.hi << (umax::BITS - s);
-                self.hi >>= s;
+        impl Shr<$t> for udouble {
+            type Output = Self;
+            fn shr(self, rhs: $t) -> Self::Output {
+                match rhs {
+                    0 => self,
+                    s if s >= umax::BITS as $t => Self {
+                        lo: self.hi >> (rhs - umax::BITS as $t),
+                        hi: 0,
+                    },
+                    s => Self {
+                        hi: self.hi >> s,
+                        lo: (self.lo >> s) | (self.hi << (umax::BITS as $t - s)),
+                    },
+                }
             }
         }
-    }
+        impl ShrAssign<$t> for udouble {
+            fn shr_assign(&mut self, rhs: $t) {
+                match rhs {
+                    0 => {}
+                    s if s >= umax::BITS as $t => {
+                        self.lo = self.hi >> (rhs - umax::BITS as $t);
+                        self.hi = 0;
+                    }
+                    s => {
+                        self.lo >>= s;
+                        self.lo |= self.hi << (umax::BITS as $t - s);
+                        self.hi >>= s;
+                    }
+                }
+            }
+        }
+    };
 }
+
+// only implement most useful ones, so that we don't need to optimize so many variants
+impl_shops!(u8);
+impl_shops!(u16);
+impl_shops!(u32);
 
 impl BitAnd for udouble {
     type Output = Self;
@@ -378,8 +314,8 @@ impl udouble {
         let mut d = other; // denominator
         let mut q = Self::zero(); // quotient
 
-        let nbits = (2 * umax::BITS - n.leading_zeros()) as u8; // assuming umax = u128
-        let dbits = (2 * umax::BITS - d.leading_zeros()) as u8;
+        let nbits = (2 * umax::BITS - n.leading_zeros()) as u16; // assuming umax = u128
+        let dbits = (2 * umax::BITS - d.leading_zeros()) as u16;
         assert!(dbits != 0, "division by zero");
 
         // Early return in case we are dividing by a larger number than us

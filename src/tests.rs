@@ -48,6 +48,12 @@ fn monty_int_basic_test() {
     let m = m >> m.trailing_zeros();
     assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
 
+    // a deterministic test case
+    let a = (0x81u128 << 120) - 1;
+    let m = (0x81u128 << 119) - 1;
+    let m = m >> m.trailing_zeros();
+    assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
+
     let a = rand::random::<u128>();
     let m = rand::random::<u128>();
     let m = m >> m.trailing_zeros();

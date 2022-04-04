@@ -1,6 +1,6 @@
-use crate::{ModularInteger, udouble, umax};
+use crate::{ModularInteger, udouble, umax, ModularOps};
 use core::ops::*;
-use num_traits::Pow;
+use num_traits::{Pow, Inv};
 
 // TODO(v0.2.2): static_assert check P <= 127, K < 2^(P-1)
 // TODO: use unchecked operators to speed up calculation
@@ -151,15 +151,30 @@ impl<const P: u8, const K: umax> Pow<umax> for MersenneInt<P, K> {
     }
 }
 
-// TODO: implement inverse and division using a^-1 = a^(p-2) mod p, assuming p is prime
-// We can explicitly check cases for K < 3 using static assertion
-// It seems that extended gcd is faster
-// To improve inverse speed, reference to https://eprint.iacr.org/2018/1038.pdf
-
 impl<const P: u8, const K: umax> Neg for MersenneInt<P, K> {
     type Output = Self;
     fn neg(self) -> Self::Output {
         Self(Self::MODULUS - self.0)
+    }
+}
+
+impl<const P: u8, const K: umax> Inv for MersenneInt<P, K> {
+    type Output = Self;
+    fn inv(self) -> Self::Output {
+        // It seems that extended gcd is faster than using fermat's theorem a^-1 = a^(p-2) mod p
+        // For faster inverse using fermat theorem, refer to https://eprint.iacr.org/2018/1038.pdf (haven't benchmarked with this)
+        if (P as u32) < usize::BITS {
+            Self(ModularOps::<usize>::invm(&(self.0 as usize), &(Self::MODULUS as usize)).expect("the modulus shoud be a prime") as umax)
+        } else {
+            Self(ModularOps::<umax>::invm(&self.0, &Self::MODULUS).expect("the modulus shoud be a prime"))
+        }
+    }
+}
+
+impl<const P: u8, const K: umax> Div for MersenneInt<P, K> {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        self * rhs.inv()
     }
 }
 

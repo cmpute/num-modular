@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate criterion;
 use criterion::Criterion;
-use num_traits::Pow;
+use num_traits::{Pow, Inv};
 use num_modular::{ModularCoreOps, ModularOps, MersenneInt};
 
 pub fn bench_modinv(c: &mut Criterion) {
@@ -20,6 +20,13 @@ pub fn bench_modinv(c: &mut Criterion) {
             (100u64..400u64)
                 .map(|n| n.powm(M1-2, &M1))
                 .reduce(|a, b| a.addm(b, &M1))
+        })
+    });
+    group.bench_function("mersenne + extended gcd", |b| {
+        b.iter(|| {
+            (100u64..400u64)
+                .map(|n| MersenneInt::<56, 5>::new(n as u128).inv())
+                .reduce(|a, b| a + b)
         })
     });
     group.bench_function("mersenne + fermat theorem", |b| {
@@ -47,6 +54,13 @@ pub fn bench_modinv(c: &mut Criterion) {
             (1_000_000_000u128..1_000_000_300u128)
                 .map(|n| n.powm(M2-2, &M2))
                 .reduce(|a, b| a.addm(b, &M2))
+        })
+    });
+    group.bench_function("mersenne +  + extended gcd", |b| {
+        b.iter(|| {
+            (1_000_000_000u128..1_000_000_300u128)
+                .map(|n| MersenneInt::<94, 3>::new(n).inv())
+                .reduce(|a, b| a + b)
         })
     });
     group.bench_function("mersenne + fermat theorem", |b| {
