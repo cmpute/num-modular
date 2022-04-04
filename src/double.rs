@@ -29,7 +29,7 @@ pub struct udouble {
 //       https://docs.rs/bigint/latest/bigint/uint/struct.U256.html
 //       https://trussed-dev.github.io/trussed/crypto_bigint/type.U256.html
 //       https://crates.io/crates/crypto-bigint
-// TODO(v0.3): remove excessive APIs that are not (likely) used
+// TODO(v0.3): remove excessive APIs that are not (likely) used (to reduce optimization burden)
 
 impl udouble {
     pub fn widening_add(lhs: umax, rhs: umax) -> Self {
@@ -176,6 +176,25 @@ impl One for udouble {
     }
 }
 
+// TODO: support only Shr/Shl<u8> and <u16>
+
+impl Shl<u8> for udouble {
+    type Output = Self;
+    fn shl(self, rhs: u8) -> Self::Output {
+        match rhs {
+            0 => self,
+            s if s >= umax::BITS as u8 => Self {
+                hi: self.lo << (s - umax::BITS as u8),
+                lo: 0,
+            },
+            s => Self {
+                lo: self.lo << s,
+                hi: (self.hi << s) | (self.lo >> (umax::BITS as u8 - s)),
+            },
+        }
+    }
+}
+
 impl Shl<u32> for udouble {
     type Output = Self;
     fn shl(self, rhs: u32) -> Self::Output {
@@ -189,6 +208,23 @@ impl Shl<u32> for udouble {
                 lo: self.lo << s,
                 hi: (self.hi << s) | (self.lo >> (umax::BITS - s)),
             },
+        }
+    }
+}
+
+impl ShlAssign<u8> for udouble {
+    fn shl_assign(&mut self, rhs: u8) {
+        match rhs {
+            0 => {}
+            s if s >= umax::BITS as u8 => {
+                self.hi = self.lo << (s - umax::BITS as u8);
+                self.lo = 0;
+            }
+            s => {
+                self.hi <<= s;
+                self.hi |= self.lo >> (umax::BITS as u8 - s);
+                self.lo <<= s;
+            }
         }
     }
 }
@@ -210,6 +246,23 @@ impl ShlAssign<u32> for udouble {
     }
 }
 
+impl Shr<u8> for udouble {
+    type Output = Self;
+    fn shr(self, rhs: u8) -> Self::Output {
+        match rhs {
+            0 => self,
+            s if s >= umax::BITS as u8 => Self {
+                lo: self.hi >> (rhs - umax::BITS as u8),
+                hi: 0,
+            },
+            s => Self {
+                hi: self.hi >> s,
+                lo: (self.lo >> s) | (self.hi << (umax::BITS as u8 - s)),
+            },
+        }
+    }
+}
+
 impl Shr<u32> for udouble {
     type Output = Self;
     fn shr(self, rhs: u32) -> Self::Output {
@@ -223,6 +276,23 @@ impl Shr<u32> for udouble {
                 hi: self.hi >> s,
                 lo: (self.lo >> s) | (self.hi << (umax::BITS - s)),
             },
+        }
+    }
+}
+
+impl ShrAssign<u8> for udouble {
+    fn shr_assign(&mut self, rhs: u8) {
+        match rhs {
+            0 => {}
+            s if s >= umax::BITS as u8 => {
+                self.lo = self.hi >> (rhs - umax::BITS as u8);
+                self.hi = 0;
+            }
+            s => {
+                self.lo >>= s;
+                self.lo |= self.hi << (umax::BITS as u8 - s);
+                self.hi >>= s;
+            }
         }
     }
 }
@@ -294,7 +364,7 @@ impl Not for udouble {
 }
 
 impl udouble {
-    pub fn leading_zeros(self) -> u32 {
+    pub const fn leading_zeros(self) -> u32 {
         if self.hi == 0 {
             self.lo.leading_zeros() + umax::BITS
         } else {
@@ -308,8 +378,8 @@ impl udouble {
         let mut d = other; // denominator
         let mut q = Self::zero(); // quotient
 
-        let nbits = 2 * umax::BITS - n.leading_zeros();
-        let dbits = 2 * umax::BITS - d.leading_zeros();
+        let nbits = (2 * umax::BITS - n.leading_zeros()) as u8; // assuming umax = u128
+        let dbits = (2 * umax::BITS - d.leading_zeros()) as u8;
         assert!(dbits != 0, "division by zero");
 
         // Early return in case we are dividing by a larger number than us
@@ -329,8 +399,8 @@ impl udouble {
                 break;
             }
 
-            d >>= 1;
-            q <<= 1;
+            d >>= 1u8;
+            q <<= 1u8;
             shift -= 1;
         }
         (q, n)
@@ -408,10 +478,10 @@ mod tests {
         assert_eq!(TWOZERO - ONEMAX, ONE);
 
         assert_eq!(ONE << umax::BITS, ONEZERO);
-        assert_eq!((MAX << 1) + 1, ONEMAX);
-        assert_eq!(ONE << 200, udouble { lo: 0, hi: 1 << (200 - umax::BITS) });
+        assert_eq!((MAX << 1u8) + 1, ONEMAX);
+        assert_eq!(ONE << 200u8, udouble { lo: 0, hi: 1 << (200 - umax::BITS) });
         assert_eq!(ONEZERO >> umax::BITS, ONE);
-        assert_eq!(ONEMAX >> 1, MAX);
+        assert_eq!(ONEMAX >> 1u8, MAX);
 
         assert_eq!(ONE * MAX, MAX);
         assert_eq!(ONE * ONEMAX, ONEMAX);

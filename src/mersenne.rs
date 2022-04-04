@@ -41,12 +41,6 @@ impl<const P: u8, const K: umax> From<umax> for MersenneInt<P, K> {
     }
 }
 
-impl<const P: u8, const K: umax> From<i128> for MersenneInt<P, K> {
-    fn from(v: i128) -> Self {
-        unimplemented!() // TODO: implement
-    }
-}
-
 impl<const P: u8, const K: umax> From<MersenneInt<P, K>> for umax {
     fn from(v: MersenneInt<P, K>) -> Self {
         v.0
@@ -81,30 +75,55 @@ impl<const P: u8, const K: umax> Sub for MersenneInt<P, K> {
 impl<const P: u8, const K: umax> Mul for MersenneInt<P, K> {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
-        let prod = udouble::widening_mul(self.0, rhs.0);
-        
-        // reduce modulo
-        let mut lo = prod.lo & Self::BITMASK;
-        let mut hi = prod >> P.into();
-        while hi.hi > 0 { // first reduce until high bits fit in umax
-            let sum = if K == 1 { hi + lo } else { hi * K + lo };
-            lo = sum.lo & Self::BITMASK;
-            hi = sum >> P.into();
-        }
+        if (P as u32) < usize::BITS {
+            // optimized branch for small modulo
 
-        let mut hi = hi.lo;
-        while hi > 0 { // then reduce the smaller high bits
-            let sum = if K == 1 { hi + lo } else { hi * K + lo };
-            lo = sum & Self::BITMASK;
-            hi = sum >> P;
-        }
+            #[cfg(target_pointer_width = "32")]
+            type DOUBLESIZE = u64;
+            #[cfg(target_pointer_width = "64")]
+            type DOUBLESIZE = u128;
+            let prod = self.0 as DOUBLESIZE * rhs.0 as DOUBLESIZE;
 
-        let v = if K == 1 {
-            lo
+            // reduce modulo
+            let mut lo: DOUBLESIZE = prod & Self::BITMASK as DOUBLESIZE;
+            let mut hi: DOUBLESIZE = prod >> P;
+            while hi > 0 {
+                let sum = if K == 1 { hi + lo } else { hi * K + lo };
+                lo = sum & Self::BITMASK;
+                hi = sum >> P;
+            }
+
+            let v = if K == 1 {
+                lo
+            } else {
+                if lo > Self::MODULUS { lo - Self::MODULUS } else { lo }
+            };
+            Self(v as umax)
         } else {
-            if lo > Self::MODULUS { lo - Self::MODULUS } else { lo }
-        };
-        Self(v)
+            let prod = udouble::widening_mul(self.0, rhs.0);
+        
+            // reduce modulo
+            let mut lo = prod.lo & Self::BITMASK;
+            let mut hi = prod >> P;
+            while hi.hi > 0 { // first reduce until high bits fit in umax
+                let sum = if K == 1 { hi + lo } else { hi * K + lo };
+                lo = sum.lo & Self::BITMASK;
+                hi = sum >> P;
+            }
+    
+            let mut hi = hi.lo;
+            while hi > 0 { // then reduce the smaller high bits
+                let sum = if K == 1 { hi + lo } else { hi * K + lo };
+                lo = sum & Self::BITMASK;
+                hi = sum >> P;
+            }
+    
+            Self(if K == 1 {
+                lo
+            } else {
+                if lo > Self::MODULUS { lo - Self::MODULUS } else { lo }
+            })
+        }
     }
 }
 
