@@ -200,7 +200,36 @@ impl<const P: u8, const K: umax> ModularInteger for MersenneInt<P, K> {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
-    // TODO: add tests
+    use super::*;
+    use crate::ModularCoreOps;
+    use rand::random;
+
+    const P1: u128 = (1 << 31) - 1;
+
+    #[test]
+    fn creation_test() {
+        // random creation test
+        for _ in 0..10 {
+            // mod 2^31-1
+            let a = random::<u128>();
+            assert_eq!(MersenneInt::<31, 1>::new(a).residue(), a % P1);
+        }
+    }
+
+    #[test]
+    fn binary_op_tests() {
+        // TODO(v0.3): test more operations and more primes
+        for _ in 0..10 {
+            // mod 2^31-1
+            let (a, b) = (random::<u128>(), random::<u128>());
+            let am = MersenneInt::<31, 1>::new(a);
+            let bm = MersenneInt::<31, 1>::new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &P1));
+            assert_eq!((am - bm).residue(), a.subm(b, &P1));
+            assert_eq!((am * bm).residue(), a.mulm(b, &P1));
+        }
+    }
 }

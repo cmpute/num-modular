@@ -1,3 +1,5 @@
+//! Implementations for modular operations on primitive integers
+
 use crate::{ModularCoreOps, ModularOps, ModularAbs};
 use num_integer::Integer;
 
@@ -398,4 +400,223 @@ macro_rules! impl_absm_for_prim {
 
 impl_absm_for_prim! {
     i8 => u8; i16 => u16; i32 => u32; i64 => u64; i128 => u128; isize => usize;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::random;
+    use core::ops::Neg;
+
+    const ADDM_CASES: [(u8, u8, u8, u8); 10] = [
+        // [m, x, y, rem]: x + y = rem (mod m)
+        (5, 0, 0, 0),
+        (5, 1, 2, 3),
+        (5, 2, 1, 3),
+        (5, 2, 2, 4),
+        (5, 3, 2, 0),
+        (5, 2, 3, 0),
+        (5, 6, 1, 2),
+        (5, 1, 6, 2),
+        (5, 11, 7, 3),
+        (5, 7, 11, 3),
+    ];
+
+    #[test]
+    fn addm_test() {
+        // fixed cases
+        for &(m, x, y, r) in ADDM_CASES.iter() {
+            assert_eq!(x.addm(y, &m), r);
+            assert_eq!((x as u16).addm(y as u16, &(m as _)), r as _);
+            assert_eq!((x as u32).addm(y as u32, &(m as _)), r as _);
+            assert_eq!((x as u64).addm(y as u64, &(m as _)), r as _);
+            assert_eq!((x as u128).addm(y as u128, &(m as _)), r as _);
+        }
+
+        // random cases for u64 and u128
+        for _ in 0..10 {
+            let a = random::<u32>() as u64;
+            let b = random::<u32>() as u64;
+            let m = random::<u32>() as u64;
+            assert_eq!(a.addm(b, &m), (a + b) % m);
+            assert_eq!(a.addm(b, &(1u64 << 32)) as u32, (a as u32).wrapping_add(b as u32));
+            
+            let a = random::<u64>() as u128;
+            let b = random::<u64>() as u128;
+            let m = random::<u64>() as u128;
+            assert_eq!(a.addm(b, &m), (a + b) % m);
+            assert_eq!(a.addm(b, &(1u128 << 64)) as u64, (a as u64).wrapping_add(b as u64));
+        }
+    }
+
+    const SUBM_CASES: [(u8, u8, u8, u8); 10] = [
+        // [m, x, y, rem]: x - y = rem (mod m)
+        (7, 0, 0, 0),
+        (7, 11, 9, 2),
+        (7, 5, 2, 3),
+        (7, 2, 5, 4),
+        (7, 6, 7, 6),
+        (7, 1, 7, 1),
+        (7, 7, 1, 6),
+        (7, 0, 6, 1),
+        (7, 15, 1, 0),
+        (7, 1, 15, 0),
+    ];
+
+    #[test]
+    fn subm_test() {
+        // fixed cases
+        for &(m, x, y, r) in SUBM_CASES.iter() {
+            assert_eq!(x.subm(y, &m), r);
+            assert_eq!((x as u16).subm(y as u16, &(m as _)), r as _);
+            assert_eq!((x as u32).subm(y as u32, &(m as _)), r as _);
+            assert_eq!((x as u64).subm(y as u64, &(m as _)), r as _);
+            assert_eq!((x as u128).subm(y as u128, &(m as _)), r as _);
+        }
+        
+        // random cases for u64 and u128
+        for _ in 0..10 {
+            let a = random::<u32>() as u64;
+            let b = random::<u32>() as u64;
+            let m = random::<u32>() as u64;
+            assert_eq!(a.subm(b, &m), (a as i64 - b as i64).rem_euclid(m as i64) as u64);
+            assert_eq!(a.subm(b, &(1u64 << 32)) as u32, (a as u32).wrapping_sub(b as u32));
+            
+            let a = random::<u64>() as u128;
+            let b = random::<u64>() as u128;
+            let m = random::<u64>() as u128;
+            assert_eq!(a.subm(b, &m), (a as i128 - b as i128).rem_euclid(m as i128) as u128);
+            assert_eq!(a.subm(b, &(1u128 << 64)) as u64, (a as u64).wrapping_sub(b as u64));
+        }
+    }
+    
+    const NEGM_CASES: [(u8, u8, u8); 5] = [
+        // [m, x, rem]: -x = rem (mod m)
+        (5, 0, 0),
+        (5, 2, 3),
+        (5, 1, 4),
+        (5, 5, 0),
+        (5, 12, 3),
+    ];
+
+    #[test]
+    fn negm_and_absm_test() {
+        // fixed cases
+        for &(m, x, r) in NEGM_CASES.iter() {
+            assert_eq!(ModularCoreOps::<&u8>::negm(&x, &m), r);
+            assert_eq!((x as i8).neg().absm(&m), r);
+            assert_eq!(ModularCoreOps::<&u16>::negm(&(x as _), &(m as _)), r as _);
+            assert_eq!((x as i16).neg().absm(&(m as u16)), r as _);
+            assert_eq!(ModularCoreOps::<&u32>::negm(&(x as _), &(m as _)), r as _);
+            assert_eq!((x as i32).neg().absm(&(m as u32)), r as _);
+            assert_eq!(ModularCoreOps::<&u64>::negm(&(x as _), &(m as _)), r as _);
+            assert_eq!((x as i64).neg().absm(&(m as u64)), r as _);
+            assert_eq!(ModularCoreOps::<&u128>::negm(&(x as _), &(m as _)), r as _);
+            assert_eq!((x as i128).neg().absm(&(m as u128)), r as _);
+        }
+
+        // random cases for u64 and u128
+        for _ in 0..10 {
+            let a = random::<u32>() as u64;
+            let m = random::<u32>() as u64;
+            assert_eq!(ModularCoreOps::<&u64>::negm(&a, &m), (a as i64).neg().rem_euclid(m as i64) as u64);
+            assert_eq!(ModularCoreOps::<&u64>::negm(&a, &(1u64 << 32)) as u32, (a as u32).wrapping_neg());
+            
+            let a = random::<u64>() as u128;
+            let m = random::<u64>() as u128;
+            assert_eq!(ModularCoreOps::<&u128>::negm(&a, &m), (a as i128).neg().rem_euclid(m as i128) as u128);
+            assert_eq!(ModularCoreOps::<&u128>::negm(&a, &(1u128 << 64)) as u64, (a as u64).wrapping_neg());
+        }
+    }
+
+    const MULM_CASES: [(u8, u8, u8, u8); 10] = [
+        // [m, x, y, rem]: x*y = rem (mod m)
+        (7, 0, 0, 0),
+        (7, 11, 9, 1),
+        (7, 5, 2, 3),
+        (7, 2, 5, 3),
+        (7, 6, 7, 0),
+        (7, 1, 7, 0),
+        (7, 7, 1, 0),
+        (7, 0, 6, 0),
+        (7, 15, 1, 1),
+        (7, 1, 15, 1),
+    ];
+
+    #[test]
+    fn mulm_test() {
+        // fixed cases
+        for &(m, x, y, r) in MULM_CASES.iter() {
+            assert_eq!(x.mulm(y, &m), r);
+            assert_eq!((x as u16).mulm(y as u16, &(m as _)), r as _);
+            assert_eq!((x as u32).mulm(y as u32, &(m as _)), r as _);
+            assert_eq!((x as u64).mulm(y as u64, &(m as _)), r as _);
+            assert_eq!((x as u128).mulm(y as u128, &(m as _)), r as _);
+        }
+
+        // random cases for u64 and u128
+        for _ in 0..10 {
+            let a = random::<u32>() as u64;
+            let b = random::<u32>() as u64;
+            let m = random::<u32>() as u64;
+            assert_eq!(a.mulm(b, &m), (a * b) % m);
+            assert_eq!(a.mulm(b, &(1u64 << 32)) as u32, (a as u32).wrapping_mul(b as u32));
+            
+            let a = random::<u64>() as u128;
+            let b = random::<u64>() as u128;
+            let m = random::<u64>() as u128;
+            assert_eq!(a.mulm(b, &m), (a * b) % m);
+            assert_eq!(a.mulm(b, &(1u128 << 32)) as u32, (a as u32).wrapping_mul(b as u32));
+        }
+    }
+
+    const POWM_CASES: [(u8, u8, u8, u8); 10] = [
+        // [m, x, y, rem]: x^y = rem (mod m)
+        (7, 0, 0, 1),
+        (7, 11, 9, 1),
+        (7, 5, 2, 4),
+        (7, 2, 5, 4),
+        (7, 6, 7, 6),
+        (7, 1, 7, 1),
+        (7, 7, 1, 0),
+        (7, 0, 6, 0),
+        (7, 15, 1, 1),
+        (7, 1, 15, 1),
+    ];
+
+    #[test]
+    fn powm_test() {
+        // fixed cases
+        for &(m, x, y, r) in POWM_CASES.iter() {
+            assert_eq!(x.powm(y, &m), r);
+            assert_eq!((x as u16).powm(y as u16, &(m as _)), r as _);
+            assert_eq!((x as u32).powm(y as u32, &(m as _)), r as _);
+            assert_eq!((x as u64).powm(y as u64, &(m as _)), r as _);
+            assert_eq!((x as u128).powm(y as u128, &(m as _)), r as _);
+        }
+    }
+
+    const INVM_CASES: [(u64, u64, u64); 8] = [
+        // [a, m, x] s.t. a*x = 1 (mod m) is satisfied
+        (5, 11, 9),
+        (8, 11, 7),
+        (10, 11, 10),
+        (3, 5000, 1667),
+        (1667, 5000, 3),
+        (999, 5000, 3999),
+        (999, 9_223_372_036_854_775_807, 3_619_181_019_466_538_655),
+        (
+            9_223_372_036_854_775_804,
+            9_223_372_036_854_775_807,
+            3_074_457_345_618_258_602,
+        ),
+    ];
+    
+    #[test]
+    fn invm_test() {
+        // fixed cases
+        for &(a, m, x) in INVM_CASES.iter() {
+            assert_eq!(ModularOps::<&u64>::invm(&a, &m).unwrap(), x);
+        }
+    }
 }

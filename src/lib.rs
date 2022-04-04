@@ -46,6 +46,9 @@ pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
     fn negm(self, m: Modulus) -> Self::Output;
 }
 
+// TODO (v0.3): split negm, invm and sqrtm to ModularUnaryOps
+// and split powm and logm to ModularPow
+
 // TODO (v0.3): checked_jacobi, checked_kronecker, checked_legendre
 /// This trait describes modular arithmetic operations
 pub trait ModularOps<Rhs = Self, Modulus = Self>: ModularCoreOps<Rhs, Modulus> {

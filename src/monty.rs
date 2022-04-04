@@ -24,7 +24,7 @@ pub trait Montgomery: Sized {
     type Double;
 
     /// Calculate -(m^-1) mod R
-    fn neginv(m: &Self) -> Self::Inv;
+    fn neginv(m: &Self) -> Self::Inv; // TODO: return Option<Self::Inv>, return None if m is even
 
     /// Transform a normal integer into Montgomery form (compute `target*R mod m`)
     fn transform(target: Self, m: &Self) -> Self;
@@ -386,12 +386,97 @@ where
     }
 
     #[inline]
-    fn new(&self, n: T) -> Self {
+    fn new(&self, n: T) -> Self { // TODO(v0.3): rename to convert
         let a = Montgomery::transform(n, &self.m);
         MontgomeryInt {
             a,
             m: self.m.clone(),
             mi: self.mi.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ModularCoreOps;
+    use rand::random;
+
+    #[test]
+    fn creation_test() {
+        // a deterministic test case for u128
+        let a = (0x81u128 << 120) - 1;
+        let m = (0x81u128 << 119) - 1;
+        let m = m >> m.trailing_zeros();
+        assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
+
+        // random creation test
+        for _ in 0..10 {
+            let a = random::<u8>();
+            let m = random::<u8>() | 1;
+            assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
+    
+            let a = random::<u16>();
+            let m = random::<u16>() | 1;
+            assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
+    
+            let a = random::<u32>();
+            let m = random::<u32>() | 1;
+            assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
+    
+            let a = random::<u64>();
+            let m = random::<u64>() | 1;
+            assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
+    
+            let a = random::<u128>();
+            let m = random::<u128>() | 1;
+            assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
+        }
+    }
+
+    #[test]
+    fn binary_op_tests() {
+        // TODO(v0.3): test more operations
+        for _ in 0..10 {
+            let m = random::<u8>() | 1;
+            let (a, b) = (random::<u8>(), random::<u8>());
+            let am = MontgomeryInt::new(a, m);
+            let bm = am.new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &m));
+            assert_eq!((am - bm).residue(), a.subm(b, &m));
+            assert_eq!((am * bm).residue(), a.mulm(b, &m));
+
+            let m = random::<u16>() | 1;
+            let (a, b) = (random::<u16>(), random::<u16>());
+            let am = MontgomeryInt::new(a, m);
+            let bm = am.new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &m));
+            assert_eq!((am - bm).residue(), a.subm(b, &m));
+            assert_eq!((am * bm).residue(), a.mulm(b, &m));
+    
+            let m = random::<u32>() | 1;
+            let (a, b) = (random::<u32>(), random::<u32>());
+            let am = MontgomeryInt::new(a, m);
+            let bm = am.new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &m));
+            assert_eq!((am - bm).residue(), a.subm(b, &m));
+            assert_eq!((am * bm).residue(), a.mulm(b, &m));
+
+            let m = random::<u64>() | 1;
+            let (a, b) = (random::<u64>(), random::<u64>());
+            let am = MontgomeryInt::new(a, m);
+            let bm = am.new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &m));
+            assert_eq!((am - bm).residue(), a.subm(b, &m));
+            assert_eq!((am * bm).residue(), a.mulm(b, &m));
+    
+            let m = random::<u128>() | 1;
+            let (a, b) = (random::<u128>(), random::<u128>());
+            let am = MontgomeryInt::new(a, m);
+            let bm = am.new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &m));
+            assert_eq!((am - bm).residue(), a.subm(b, &m));
+            assert_eq!((am * bm).residue(), a.mulm(b, &m));
         }
     }
 }
