@@ -56,7 +56,7 @@ pub fn bench_modinv(c: &mut Criterion) {
                 .reduce(|a, b| a.addm(b, &M2))
         })
     });
-    group.bench_function("mersenne +  + extended gcd", |b| {
+    group.bench_function("mersenne + extended gcd", |b| {
         b.iter(|| {
             (1_000_000_000u128..1_000_000_300u128)
                 .map(|n| MersenneInt::<94, 3>::new(n).inv())

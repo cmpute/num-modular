@@ -2,13 +2,11 @@ use crate::{ModularInteger, udouble, umax, ModularOps};
 use core::ops::*;
 use num_traits::{Pow, Inv};
 
-// TODO(v0.2.2): static_assert check P <= 127, K < 2^(P-1)
 // TODO: use unchecked operators to speed up calculation
-/// An unsigned integer modulo (pseudo) Mersenne primes `2^P-K`, it supports P up to 127 and K < 2^(P-1)
+/// An unsigned integer modulo (pseudo) Mersenne primes `2^P - K`, it supports P up to 127 and `K < 2^(P-1)`
 /// 
-/// IMPORTANT NOTE: this class assumes that `2^P-K` is a prime. We don't do compile time check
-/// on the primality of `2^P-K`. If it's not a prime, then the modular division and inverse
-/// will panic.
+/// IMPORTANT NOTE: this class assumes that `2^P-K` is a prime. During compliation, we don't do full check
+/// of the primality of `2^P-K`. If it's not a prime, then the modular division and inverse will panic.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct MersenneInt<const P: u8, const K: umax>(umax); // the underlying integer is in the inclusive range [0, 2^P-K]
 
@@ -16,8 +14,14 @@ impl<const P: u8, const K: umax> MersenneInt<P, K> {
     const BITMASK: umax = (1 << P) - 1;
     const MODULUS: umax = (1 << P) - K;
 
+    /// Create a new MersenneInt instance from a normal integer (by modulo `2^P-K`)
     #[inline]
     pub const fn new(n: umax) -> Self {
+        // FIXME: use compile time checks, maybe after https://github.com/rust-lang/rust/issues/76560
+        assert!(P <= 127);
+        assert!(K > 0 && K < 2u128.pow(P as u32 - 1));
+        assert!(Self::MODULUS % 2 != 0 && Self::MODULUS % 3 != 0 && Self::MODULUS % 5 != 0 && Self::MODULUS % 7 != 0); // error on easy composites
+
         let mut lo = n & Self::BITMASK;
         let mut hi = n >> P;
         while hi > 0 {

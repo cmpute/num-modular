@@ -24,7 +24,7 @@ pub trait Montgomery: Sized {
     type Double;
 
     /// Calculate -(m^-1) mod R
-    fn neginv(m: &Self) -> Self::Inv; // TODO: return Option<Self::Inv>, return None if m is even
+    fn neginv(m: &Self) -> Self::Inv; // TODO(v0.3): return Option<Self::Inv>, return None if m is even
 
     /// Transform a normal integer into Montgomery form (compute `target*R mod m`)
     fn transform(target: Self, m: &Self) -> Self;
@@ -251,8 +251,7 @@ impl Montgomery for u128 {
     impl_uprim_montgomery!();
 }
 
-/// An integer represented in Montgomery form, it implements [ModularInteger] interface
-/// and it's generally more efficient than the vanilla integer in modular operations.
+/// An integer represented in [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form).
 #[derive(Debug, Clone, Copy)]
 pub struct MontgomeryInt<T: Integer + Montgomery> {
     /// The Montgomery representation of the integer.

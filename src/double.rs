@@ -3,13 +3,13 @@
 use core::ops::*;
 use num_traits::{One, Zero};
 
-/// Alias of the builtin integer type with max width
+/// Alias of the builtin integer type with max width (currently [u128])
 #[allow(non_camel_case_types)]
 pub type umax = u128;
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-/// A double width integer type based on the largest built-in integer (currently u128) and
+/// A double width integer type based on the largest built-in integer type [umax] (currently [u128]), and
 /// to support double-width operations on it is the only goal for this type.
 ///
 /// Although it can be regarded as u256, it's not as feature-rich as in other crates
@@ -23,13 +23,8 @@ pub struct udouble {
 
 // TODO: port optimizations from and benchmark against
 //       https://github.com/nlordell/ethnum-rs
-//       https://github.com/0xProject/OpenZKP/tree/master/algebra/u256
-//       https://github.com/paritytech/parity-common/blob/master/uint
-// TODO(v0.2.2): further benchmark against
-//       https://docs.rs/bigint/latest/bigint/uint/struct.U256.html
-//       https://trussed-dev.github.io/trussed/crypto_bigint/type.U256.html
-//       https://crates.io/crates/crypto-bigint
 // TODO(v0.3): remove excessive APIs that are not (likely) used (to reduce optimization burden)
+// if we found that we have complex requirements for mul and div, migrate to use ethnum
 
 impl udouble {
     pub fn widening_add(lhs: umax, rhs: umax) -> Self {
