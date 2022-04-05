@@ -29,7 +29,9 @@ extern crate std;
 
 use core::ops::{Add, Mul, Neg, Sub};
 
-/// This trait describes core modular arithmetic operations
+/// This trait describes core modular arithmetic operations.
+///
+/// Note that all functions will panic if the modulus is zero.
 pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
     type Output;
 
@@ -89,7 +91,8 @@ pub trait ModularSymbols<Modulus = Self> {
     /// if n is negative or even
     #[inline]
     fn jacobi(&self, n: Modulus) -> i8 {
-        self.checked_jacobi(n).expect("the Jacobi symbol is only defined for non-negative odd integers")
+        self.checked_jacobi(n)
+            .expect("the Jacobi symbol is only defined for non-negative odd integers")
     }
 
     /// Checked version of [jacobi], return [None] if n is negative or even

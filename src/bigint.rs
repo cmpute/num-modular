@@ -1,4 +1,4 @@
-use crate::{ModularCoreOps, ModularPow, ModularUnaryOps, ModularSymbols};
+use crate::{ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps};
 use core::convert::TryInto;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
@@ -217,11 +217,7 @@ mod _num_bigint {
                 }
                 a %= &n;
             }
-            Some(if n.is_one() {
-                t
-            } else {
-                0
-            })
+            Some(if n.is_one() { t } else { 0 })
         }
 
         #[inline]
@@ -260,15 +256,52 @@ mod _num_bigint {
         use super::*;
         use rand::random;
 
+        const NRANDOM: u32 = 10; // number of random tests to run
+
         #[test]
-        fn biguint_basic_mod_test() {
-            let a = random::<u128>();
-            let ra = &BigUint::from(a);
-            let m = random::<u128>();
-            let rm = &BigUint::from(m);
-            assert_eq!(ra.addm(ra, rm), (ra + ra) % rm);
-            assert_eq!(ra.mulm(ra, rm), (ra * ra) % rm);
-            assert_eq!(ra.powm(BigUint::from(3u8), rm), ra.pow(3) % rm);
+        fn basic_tests() {
+            for _ in 0..NRANDOM {
+                let a = random::<u128>();
+                let ra = &BigUint::from(a);
+                let b = random::<u128>();
+                let rb = &BigUint::from(b);
+                let m = random::<u128>() | 1;
+                let rm = &BigUint::from(m);
+                assert_eq!(ra.addm(rb, rm), (ra + rb) % rm);
+                assert_eq!(ra.mulm(rb, rm), (ra * rb) % rm);
+
+                let a = random::<u8>();
+                let ra = &BigUint::from(a);
+                let e = random::<u8>();
+                let re = &BigUint::from(e);
+                let m = random::<u128>() | 1;
+                let rm = &BigUint::from(m);
+                assert_eq!(ra.powm(re, rm), ra.pow(e as u32) % rm);
+            }
+        }
+
+        #[test]
+        fn test_against_prim() {
+            for _ in 0..NRANDOM {
+                let a = random::<u128>();
+                let ra = &BigUint::from(a);
+                let b = random::<u128>();
+                let rb = &BigUint::from(b);
+                let m = random::<u128>();
+                let rm = &BigUint::from(m);
+                assert_eq!(ra.addm(rb, rm), a.addm(b, &m).into());
+                assert_eq!(ra.subm(rb, rm), a.subm(b, &m).into());
+                assert_eq!(ra.mulm(rb, rm), a.mulm(b, &m).into());
+                assert_eq!(ra.negm(rm), a.negm(&m).into());
+                assert_eq!(ra.invm(rm), a.invm(&m).map(|v| v.into()));
+                assert_eq!(ra.checked_legendre(rm), a.checked_legendre(&m));
+                assert_eq!(ra.checked_jacobi(rm), a.checked_jacobi(&m));
+                assert_eq!(ra.kronecker(rm), a.kronecker(&m));
+
+                let e = random::<u8>();
+                let re = &BigUint::from(e);
+                assert_eq!(ra.powm(re, rm), a.powm(e as u128, &m).into());
+            }
         }
     }
 }

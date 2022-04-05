@@ -358,24 +358,26 @@ mod tests {
     use core::ops::Neg;
     use rand::random;
 
-    const ADDM_CASES: [(u8, u8, u8, u8); 10] = [
-        // [m, x, y, rem]: x + y = rem (mod m)
-        (5, 0, 0, 0),
-        (5, 1, 2, 3),
-        (5, 2, 1, 3),
-        (5, 2, 2, 4),
-        (5, 3, 2, 0),
-        (5, 2, 3, 0),
-        (5, 6, 1, 2),
-        (5, 1, 6, 2),
-        (5, 11, 7, 3),
-        (5, 7, 11, 3),
-    ];
+    const NRANDOM: u32 = 10; // number of random tests to run
 
     #[test]
     fn addm_test() {
         // fixed cases
-        for &(m, x, y, r) in ADDM_CASES.iter() {
+        const CASES: [(u8, u8, u8, u8); 10] = [
+            // [m, x, y, rem]: x + y = rem (mod m)
+            (5, 0, 0, 0),
+            (5, 1, 2, 3),
+            (5, 2, 1, 3),
+            (5, 2, 2, 4),
+            (5, 3, 2, 0),
+            (5, 2, 3, 0),
+            (5, 6, 1, 2),
+            (5, 1, 6, 2),
+            (5, 11, 7, 3),
+            (5, 7, 11, 3),
+        ];
+
+        for &(m, x, y, r) in CASES.iter() {
             assert_eq!(x.addm(y, &m), r);
             assert_eq!((x as u16).addm(y as u16, &(m as _)), r as _);
             assert_eq!((x as u32).addm(y as u32, &(m as _)), r as _);
@@ -384,7 +386,7 @@ mod tests {
         }
 
         // random cases for u64 and u128
-        for _ in 0..10 {
+        for _ in 0..NRANDOM {
             let a = random::<u32>() as u64;
             let b = random::<u32>() as u64;
             let m = random::<u32>() as u64;
@@ -405,24 +407,24 @@ mod tests {
         }
     }
 
-    const SUBM_CASES: [(u8, u8, u8, u8); 10] = [
-        // [m, x, y, rem]: x - y = rem (mod m)
-        (7, 0, 0, 0),
-        (7, 11, 9, 2),
-        (7, 5, 2, 3),
-        (7, 2, 5, 4),
-        (7, 6, 7, 6),
-        (7, 1, 7, 1),
-        (7, 7, 1, 6),
-        (7, 0, 6, 1),
-        (7, 15, 1, 0),
-        (7, 1, 15, 0),
-    ];
-
     #[test]
     fn subm_test() {
         // fixed cases
-        for &(m, x, y, r) in SUBM_CASES.iter() {
+        const CASES: [(u8, u8, u8, u8); 10] = [
+            // [m, x, y, rem]: x - y = rem (mod m)
+            (7, 0, 0, 0),
+            (7, 11, 9, 2),
+            (7, 5, 2, 3),
+            (7, 2, 5, 4),
+            (7, 6, 7, 6),
+            (7, 1, 7, 1),
+            (7, 7, 1, 6),
+            (7, 0, 6, 1),
+            (7, 15, 1, 0),
+            (7, 1, 15, 0),
+        ];
+
+        for &(m, x, y, r) in CASES.iter() {
             assert_eq!(x.subm(y, &m), r);
             assert_eq!((x as u16).subm(y as u16, &(m as _)), r as _);
             assert_eq!((x as u32).subm(y as u32, &(m as _)), r as _);
@@ -431,7 +433,7 @@ mod tests {
         }
 
         // random cases for u64 and u128
-        for _ in 0..10 {
+        for _ in 0..NRANDOM {
             let a = random::<u32>() as u64;
             let b = random::<u32>() as u64;
             let m = random::<u32>() as u64;
@@ -458,19 +460,19 @@ mod tests {
         }
     }
 
-    const NEGM_CASES: [(u8, u8, u8); 5] = [
-        // [m, x, rem]: -x = rem (mod m)
-        (5, 0, 0),
-        (5, 2, 3),
-        (5, 1, 4),
-        (5, 5, 0),
-        (5, 12, 3),
-    ];
-
     #[test]
     fn negm_and_absm_test() {
         // fixed cases
-        for &(m, x, r) in NEGM_CASES.iter() {
+        const CASES: [(u8, u8, u8); 5] = [
+            // [m, x, rem]: -x = rem (mod m)
+            (5, 0, 0),
+            (5, 2, 3),
+            (5, 1, 4),
+            (5, 5, 0),
+            (5, 12, 3),
+        ];
+
+        for &(m, x, r) in CASES.iter() {
             assert_eq!(x.negm(&m), r);
             assert_eq!((x as i8).neg().absm(&m), r);
             assert_eq!((x as u16).negm(&(m as _)), r as _);
@@ -484,7 +486,7 @@ mod tests {
         }
 
         // random cases for u64 and u128
-        for _ in 0..10 {
+        for _ in 0..NRANDOM {
             let a = random::<u32>() as u64;
             let m = random::<u32>() as u64;
             assert_eq!(a.negm(&m), (a as i64).neg().rem_euclid(m as i64) as u64);
@@ -497,24 +499,24 @@ mod tests {
         }
     }
 
-    const MULM_CASES: [(u8, u8, u8, u8); 10] = [
-        // [m, x, y, rem]: x*y = rem (mod m)
-        (7, 0, 0, 0),
-        (7, 11, 9, 1),
-        (7, 5, 2, 3),
-        (7, 2, 5, 3),
-        (7, 6, 7, 0),
-        (7, 1, 7, 0),
-        (7, 7, 1, 0),
-        (7, 0, 6, 0),
-        (7, 15, 1, 1),
-        (7, 1, 15, 1),
-    ];
-
     #[test]
     fn mulm_test() {
         // fixed cases
-        for &(m, x, y, r) in MULM_CASES.iter() {
+        const CASES: [(u8, u8, u8, u8); 10] = [
+            // [m, x, y, rem]: x*y = rem (mod m)
+            (7, 0, 0, 0),
+            (7, 11, 9, 1),
+            (7, 5, 2, 3),
+            (7, 2, 5, 3),
+            (7, 6, 7, 0),
+            (7, 1, 7, 0),
+            (7, 7, 1, 0),
+            (7, 0, 6, 0),
+            (7, 15, 1, 1),
+            (7, 1, 15, 1),
+        ];
+
+        for &(m, x, y, r) in CASES.iter() {
             assert_eq!(x.mulm(y, &m), r);
             assert_eq!((x as u16).mulm(y as u16, &(m as _)), r as _);
             assert_eq!((x as u32).mulm(y as u32, &(m as _)), r as _);
@@ -523,7 +525,7 @@ mod tests {
         }
 
         // random cases for u64 and u128
-        for _ in 0..10 {
+        for _ in 0..NRANDOM {
             let a = random::<u32>() as u64;
             let b = random::<u32>() as u64;
             let m = random::<u32>() as u64;
@@ -544,24 +546,26 @@ mod tests {
         }
     }
 
-    const POWM_CASES: [(u8, u8, u8, u8); 10] = [
-        // [m, x, y, rem]: x^y = rem (mod m)
-        (7, 0, 0, 1),
-        (7, 11, 9, 1),
-        (7, 5, 2, 4),
-        (7, 2, 5, 4),
-        (7, 6, 7, 6),
-        (7, 1, 7, 1),
-        (7, 7, 1, 0),
-        (7, 0, 6, 0),
-        (7, 15, 1, 1),
-        (7, 1, 15, 1),
-    ];
-
     #[test]
     fn powm_test() {
         // fixed cases
-        for &(m, x, y, r) in POWM_CASES.iter() {
+        const CASES: [(u8, u8, u8, u8); 12] = [
+            // [m, x, y, rem]: x^y = rem (mod m)
+            (7, 0, 0, 1),
+            (7, 11, 9, 1),
+            (7, 5, 2, 4),
+            (7, 2, 5, 4),
+            (7, 6, 7, 6),
+            (7, 1, 7, 1),
+            (7, 7, 1, 0),
+            (7, 0, 6, 0),
+            (7, 15, 1, 1),
+            (7, 1, 15, 1),
+            (7, 255, 255, 6),
+            (10, 255, 255, 5),
+        ];
+
+        for &(m, x, y, r) in CASES.iter() {
             assert_eq!(x.powm(y, &m), r);
             assert_eq!((x as u16).powm(y as u16, &(m as _)), r as _);
             assert_eq!((x as u32).powm(y as u32, &(m as _)), r as _);
@@ -570,27 +574,42 @@ mod tests {
         }
     }
 
-    const INVM_CASES: [(u64, u64, u64); 8] = [
-        // [a, m, x] s.t. a*x = 1 (mod m) is satisfied
-        (5, 11, 9),
-        (8, 11, 7),
-        (10, 11, 10),
-        (3, 5000, 1667),
-        (1667, 5000, 3),
-        (999, 5000, 3999),
-        (999, 9_223_372_036_854_775_807, 3_619_181_019_466_538_655),
-        (
-            9_223_372_036_854_775_804,
-            9_223_372_036_854_775_807,
-            3_074_457_345_618_258_602,
-        ),
-    ];
-
     #[test]
     fn invm_test() {
         // fixed cases
-        for &(a, m, x) in INVM_CASES.iter() {
+        const CASES: [(u64, u64, u64); 8] = [
+            // [a, m, x] s.t. a*x = 1 (mod m) is satisfied
+            (5, 11, 9),
+            (8, 11, 7),
+            (10, 11, 10),
+            (3, 5000, 1667),
+            (1667, 5000, 3),
+            (999, 5000, 3999),
+            (999, 9_223_372_036_854_775_807, 3_619_181_019_466_538_655),
+            (
+                9_223_372_036_854_775_804,
+                9_223_372_036_854_775_807,
+                3_074_457_345_618_258_602,
+            ),
+        ];
+
+        for &(a, m, x) in CASES.iter() {
             assert_eq!(a.invm(&m).unwrap(), x);
+        }
+
+        // random cases for u64 and u128
+        for _ in 0..NRANDOM {
+            let a = random::<u32>() as u64;
+            let m = random::<u32>() as u64;
+            if let Some(ia) = a.invm(&m) {
+                assert_eq!(a.mulm(ia, &m), 1);
+            }
+
+            let a = random::<u64>() as u128;
+            let m = random::<u64>() as u128;
+            if let Some(ia) = a.invm(&m) {
+                assert_eq!(a.mulm(ia, &m), 1);
+            }
         }
     }
 
