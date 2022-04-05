@@ -122,7 +122,7 @@ macro_rules! impl_symbols_uprim {
     ($($T:ty)*) => ($(
         impl ModularSymbols<&$T> for $T {
             #[inline]
-            fn checked_legendre(self, n: &$T) -> Option<i8> {
+            fn checked_legendre(&self, n: &$T) -> Option<i8> {
                 match self.powm((n - 1) >> 1, &n) {
                     0 => Some(0),
                     1 => Some(1),
@@ -130,20 +130,16 @@ macro_rules! impl_symbols_uprim {
                     _ => None,
                 }
             }
-            #[inline]
-            fn legendre(self, n: &$T) -> i8 {
-                self.checked_legendre(n).expect("n is not prime!")
-            }
 
             #[inline]
-            fn checked_jacobi(self, n: &$T) -> Option<i8> {
+            fn checked_jacobi(&self, n: &$T) -> Option<i8> {
                 if n % 2 == 0 || n < &0 {
                     return None;
                 }
-                if self == 0 {
+                if self == &0 {
                     return Some(0);
                 }
-                if self == 1 {
+                if self == &1 {
                     return Some(1);
                 }
 
@@ -169,16 +165,12 @@ macro_rules! impl_symbols_uprim {
                     0
                 })
             }
-            #[inline]
-            fn jacobi(self, n: &$T) -> i8 {
-                self.checked_jacobi(n).expect("the Jacobi symbol is only defined for non-negative odd integers")
-            }
 
             #[inline]
-            fn kronecker(self, n: &$T) -> i8 {
+            fn kronecker(&self, n: &$T) -> i8 {
                 match n {
                     0 => {
-                        if self == 1 {
+                        if self == &1 {
                             1
                         } else {
                             0
@@ -251,7 +243,7 @@ macro_rules! impl_unary_uprim {
 }
 impl_unary_uprim!(u8 u16 u32 u64 u128 usize);
 
-// forward modular arith ops on reference to value
+// forward modular operations to valye by value
 macro_rules! impl_mod_ops_by_deref {
     ($($T:ty)*) => {$(
         // core ops
@@ -324,7 +316,7 @@ macro_rules! impl_mod_ops_by_deref {
             }
         }
 
-        // unary ops and symbols
+        // unary ops
         impl ModularUnaryOps<&$T> for &$T {
             type Output = $T;
 
@@ -335,28 +327,6 @@ macro_rules! impl_mod_ops_by_deref {
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
                 ModularUnaryOps::<&$T>::invm(*self, m)
-            }
-        }
-        impl ModularSymbols<&$T> for &$T {
-            #[inline]
-            fn legendre(self, n: &$T) -> i8 {
-                ModularSymbols::<&$T>::legendre(*self, n)
-            }
-            #[inline]
-            fn checked_legendre(self, n: &$T) -> Option<i8> {
-                ModularSymbols::<&$T>::checked_legendre(*self, n)
-            }
-            #[inline]
-            fn jacobi(self, n: &$T) -> i8 {
-                ModularSymbols::<&$T>::jacobi(*self, n)
-            }
-            #[inline]
-            fn checked_jacobi(self, n: &$T) -> Option<i8> {
-                ModularSymbols::<&$T>::checked_jacobi(*self, n)
-            }
-            #[inline]
-            fn kronecker(self, n: &$T) -> i8 {
-                ModularSymbols::<&$T>::kronecker(*self, n)
             }
         }
     )*};

@@ -1,10 +1,12 @@
-use crate::{ModularCoreOps, ModularOps};
+use crate::{ModularCoreOps, ModularPow, ModularUnaryOps, ModularSymbols};
 use core::convert::TryInto;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
 
-macro_rules! impl_mod_arithm_by_ref {
+// Forward modular operations to ref by ref
+macro_rules! impl_mod_ops_by_ref {
     ($T:ty) => {
+        // core ops
         impl ModularCoreOps<$T, &$T> for &$T {
             type Output = $T;
             #[inline]
@@ -19,34 +21,7 @@ macro_rules! impl_mod_arithm_by_ref {
             fn mulm(self, rhs: $T, m: &$T) -> $T {
                 self.mulm(&rhs, &m)
             }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularCoreOps::<&$T, &$T>::negm(self, m)
-            }
         }
-        impl ModularOps<$T, &$T> for &$T {
-            #[inline]
-            fn powm(self, exp: $T, m: &$T) -> $T {
-                self.powm(&exp, &m)
-            }
-            #[inline]
-            fn invm(self, m: &$T) -> Option<$T> {
-                ModularOps::<&$T, &$T>::invm(self, m)
-            }
-            #[inline]
-            fn legendre(self, n: &$T) -> i8 {
-                ModularOps::<&$T, &$T>::legendre(self, n)
-            }
-            #[inline]
-            fn jacobi(self, n: &$T) -> i8 {
-                ModularOps::<&$T, &$T>::jacobi(self, n)
-            }
-            #[inline]
-            fn kronecker(self, n: &$T) -> i8 {
-                ModularOps::<&$T, &$T>::kronecker(self, n)
-            }
-        }
-
         impl ModularCoreOps<&$T, &$T> for $T {
             type Output = $T;
             #[inline]
@@ -61,34 +36,7 @@ macro_rules! impl_mod_arithm_by_ref {
             fn mulm(self, rhs: &$T, m: &$T) -> $T {
                 (&self).mulm(rhs, &m)
             }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularCoreOps::<&$T, &$T>::negm(&self, m)
-            }
         }
-        impl ModularOps<&$T, &$T> for $T {
-            #[inline]
-            fn powm(self, exp: &$T, m: &$T) -> $T {
-                (&self).powm(exp, &m)
-            }
-            #[inline]
-            fn invm(self, m: &$T) -> Option<$T> {
-                ModularOps::<&$T, &$T>::invm(&self, m)
-            }
-            #[inline]
-            fn legendre(self, n: &$T) -> i8 {
-                ModularOps::<&$T, &$T>::legendre(&self, n)
-            }
-            #[inline]
-            fn jacobi(self, n: &$T) -> i8 {
-                ModularOps::<&$T, &$T>::jacobi(&self, n)
-            }
-            #[inline]
-            fn kronecker(self, n: &$T) -> i8 {
-                ModularOps::<&$T, &$T>::kronecker(&self, n)
-            }
-        }
-
         impl ModularCoreOps<$T, &$T> for $T {
             type Output = $T;
             #[inline]
@@ -103,38 +51,48 @@ macro_rules! impl_mod_arithm_by_ref {
             fn mulm(self, rhs: $T, m: &$T) -> $T {
                 (&self).mulm(&rhs, &m)
             }
+        }
+
+        // pow
+        impl ModularPow<$T, &$T> for &$T {
+            type Output = $T;
             #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularCoreOps::<&$T, &$T>::negm(&self, m)
+            fn powm(self, exp: $T, m: &$T) -> $T {
+                self.powm(&exp, &m)
             }
         }
-        impl ModularOps<$T, &$T> for $T {
+        impl ModularPow<&$T, &$T> for $T {
+            type Output = $T;
+            #[inline]
+            fn powm(self, exp: &$T, m: &$T) -> $T {
+                (&self).powm(exp, &m)
+            }
+        }
+        impl ModularPow<$T, &$T> for $T {
+            type Output = $T;
             #[inline]
             fn powm(self, exp: $T, m: &$T) -> $T {
                 (&self).powm(&exp, &m)
             }
+        }
+
+        // unary ops and symbols
+        impl ModularUnaryOps<&$T> for $T {
+            type Output = $T;
+            #[inline]
+            fn negm(self, m: &$T) -> $T {
+                ModularUnaryOps::<&$T>::negm(&self, m)
+            }
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
-                ModularOps::<&$T, &$T>::invm(&self, m)
-            }
-            #[inline]
-            fn legendre(self, n: &$T) -> i8 {
-                ModularOps::<&$T, &$T>::legendre(&self, n)
-            }
-            #[inline]
-            fn jacobi(self, n: &$T) -> i8 {
-                ModularOps::<&$T, &$T>::jacobi(&self, n)
-            }
-            #[inline]
-            fn kronecker(self, n: &$T) -> i8 {
-                ModularOps::<&$T, &$T>::kronecker(&self, n)
+                ModularUnaryOps::<&$T>::invm(&self, m)
             }
         }
     };
 }
 
 #[cfg(feature = "num-bigint")]
-mod impl_num_bigint {
+mod _num_bigint {
     use super::*;
     use num_bigint::BigUint;
 
@@ -166,7 +124,10 @@ mod impl_num_bigint {
 
             (a * b) % m
         }
+    }
 
+    impl ModularUnaryOps<&BigUint> for &BigUint {
+        type Output = BigUint;
         #[inline]
         fn negm(self, m: &BigUint) -> BigUint {
             let x = self % m;
@@ -175,13 +136,6 @@ mod impl_num_bigint {
             } else {
                 m - x
             }
-        }
-    }
-
-    impl ModularOps<&BigUint, &BigUint> for &BigUint {
-        #[inline]
-        fn powm(self, exp: &BigUint, m: &BigUint) -> BigUint {
-            self.modpow(&exp, m)
         }
 
         fn invm(self, m: &BigUint) -> Option<Self::Output> {
@@ -207,30 +161,40 @@ mod impl_num_bigint {
                 Some(last_t)
             }
         }
+    }
 
+    impl ModularPow<&BigUint, &BigUint> for &BigUint {
+        type Output = BigUint;
         #[inline]
-        fn legendre(self, n: &BigUint) -> i8 {
+        fn powm(self, exp: &BigUint, m: &BigUint) -> BigUint {
+            self.modpow(&exp, m)
+        }
+    }
+
+    impl ModularSymbols<&BigUint> for BigUint {
+        #[inline]
+        fn checked_legendre(&self, n: &BigUint) -> Option<i8> {
             let r = self.powm((n - 1u8) >> 1u8, &n);
             if r.is_zero() {
-                return 0;
+                Some(0)
+            } else if r.is_one() {
+                Some(1)
+            } else if &(r + 1u8) == n {
+                Some(-1)
+            } else {
+                None
             }
-            if r.is_one() {
-                return 1;
-            }
-            if &(r + 1u8) == n {
-                return -1;
-            }
-            panic!("n is not prime!")
         }
 
-        fn jacobi(self, n: &BigUint) -> i8 {
-            debug_assert!(n.is_odd());
-
+        fn checked_jacobi(&self, n: &BigUint) -> Option<i8> {
+            if n.is_even() {
+                return None;
+            }
             if self.is_zero() {
-                return 0;
+                return Some(0);
             }
             if self.is_one() {
-                return 1;
+                return Some(1);
             }
 
             let three = BigUint::from(3u8);
@@ -253,15 +217,15 @@ mod impl_num_bigint {
                 }
                 a %= &n;
             }
-            if n.is_one() {
+            Some(if n.is_one() {
                 t
             } else {
                 0
-            }
+            })
         }
 
         #[inline]
-        fn kronecker(self, n: &BigUint) -> i8 {
+        fn kronecker(&self, n: &BigUint) -> i8 {
             if n.is_zero() {
                 return if self.is_one() { 1 } else { 0 };
             }
@@ -283,25 +247,28 @@ mod impl_num_bigint {
 
             let f = n.trailing_zeros().unwrap_or(0);
             let n = n >> f;
-            let t1 = ModularOps::<&BigUint, &BigUint>::kronecker(self, &BigUint::from(2u8));
-            let t2 = ModularOps::<&BigUint, &BigUint>::jacobi(self, &n);
+            let t1 = self.kronecker(&BigUint::from(2u8));
+            let t2 = self.jacobi(&n);
             t1.pow(f.try_into().unwrap()) * t2
         }
     }
 
-    impl_mod_arithm_by_ref!(BigUint);
-}
+    impl_mod_ops_by_ref!(BigUint);
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn biguint_basic_mod_test() {
-        let a = rand::random::<u128>();
-        let ra = &BigUint::from(a);
-        let m = rand::random::<u128>();
-        let rm = &BigUint::from(m);
-        assert_eq!(ra.addm(ra, rm), (ra + ra) % rm);
-        assert_eq!(ra.mulm(ra, rm), (ra * ra) % rm);
-        assert_eq!(ra.powm(BigUint::from(3u8), rm), ra.pow(3) % rm);
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use rand::random;
+
+        #[test]
+        fn biguint_basic_mod_test() {
+            let a = random::<u128>();
+            let ra = &BigUint::from(a);
+            let m = random::<u128>();
+            let rm = &BigUint::from(m);
+            assert_eq!(ra.addm(ra, rm), (ra + ra) % rm);
+            assert_eq!(ra.mulm(ra, rm), (ra * ra) % rm);
+            assert_eq!(ra.powm(BigUint::from(3u8), rm), ra.pow(3) % rm);
+        }
     }
 }

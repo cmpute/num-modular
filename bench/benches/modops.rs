@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate criterion;
 use criterion::Criterion;
-use num_modular::{MersenneInt, ModularCoreOps, ModularOps};
+use num_modular::{MersenneInt, ModularCoreOps, ModularPow, ModularUnaryOps};
 use num_traits::{Inv, Pow};
 
 pub fn bench_modinv(c: &mut Criterion) {
@@ -11,7 +11,7 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("extended gcd", |b| {
         b.iter(|| {
             (100u64..400u64)
-                .map(|n| ModularOps::<u64>::invm(&n, &M1).unwrap())
+                .map(|n| n.invm(&M1).unwrap())
                 .reduce(|a, b| a.addm(b, &M1))
         })
     });
@@ -45,7 +45,7 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("extended gcd", |b| {
         b.iter(|| {
             (1_000_000_000u128..1_000_000_300u128)
-                .map(|n| ModularOps::<u128>::invm(&n, &M2).unwrap())
+                .map(|n| n.invm(&M2).unwrap())
                 .reduce(|a, b| a.addm(b, &M2))
         })
     });

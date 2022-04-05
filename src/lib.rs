@@ -75,22 +75,28 @@ pub trait ModularSymbols<Modulus = Self> {
     ///
     /// # Panics
     /// if n is not prime
-    fn legendre(self, n: Modulus) -> i8;
+    #[inline]
+    fn legendre(&self, n: Modulus) -> i8 {
+        self.checked_legendre(n).expect("n shoud be a prime")
+    }
 
     /// Checked version of [legendre], return [None] if n is not prime
-    fn checked_legendre(self, n: Modulus) -> Option<i8>;
+    fn checked_legendre(&self, n: Modulus) -> Option<i8>;
 
     /// Calculate Jacobi Symbol (a|n), where a is self
     ///
     /// # Panics
     /// if n is negative or even
-    fn jacobi(self, n: Modulus) -> i8;
+    #[inline]
+    fn jacobi(&self, n: Modulus) -> i8 {
+        self.checked_jacobi(n).expect("the Jacobi symbol is only defined for non-negative odd integers")
+    }
 
     /// Checked version of [jacobi], return [None] if n is negative or even
-    fn checked_jacobi(self, n: Modulus) -> Option<i8>;
+    fn checked_jacobi(&self, n: Modulus) -> Option<i8>;
 
     /// Calculate Kronecker Symbol (a|n), where a is self
-    fn kronecker(self, n: Modulus) -> i8;
+    fn kronecker(&self, n: Modulus) -> i8;
 }
 
 // TODO: Discrete log aka index, follow the behavior of FLINT `n_discrete_log_bsgs`
