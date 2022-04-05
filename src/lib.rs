@@ -85,7 +85,7 @@ pub trait ModularSymbols<Modulus = Self> {
     /// # Panics
     /// if n is negative or even
     fn jacobi(self, n: Modulus) -> i8;
-    
+
     /// Checked version of [jacobi], return [None] if n is negative or even
     fn checked_jacobi(self, n: Modulus) -> Option<i8>;
 
@@ -101,11 +101,16 @@ pub trait ModularOps<Rhs = Self, Modulus = Self>:
     ModularCoreOps<Rhs, Modulus>
     + ModularUnaryOps<Modulus>
     + ModularPow<Rhs, Modulus>
-    + ModularSymbols<Modulus> {}
-impl<T, Rhs, Modulus> ModularOps<Rhs, Modulus> for T where T: ModularCoreOps<Rhs, Modulus>
-    + ModularUnaryOps<Modulus>
-    + ModularPow<Rhs, Modulus>
-    + ModularSymbols<Modulus> {}
+    + ModularSymbols<Modulus>
+{
+}
+impl<T, Rhs, Modulus> ModularOps<Rhs, Modulus> for T where
+    T: ModularCoreOps<Rhs, Modulus>
+        + ModularUnaryOps<Modulus>
+        + ModularPow<Rhs, Modulus>
+        + ModularSymbols<Modulus>
+{
+}
 
 /// Provides a utility function to convert signed integers into unsigned modular form
 pub trait ModularAbs<Modulus> {
@@ -143,15 +148,15 @@ pub trait ModularInteger:
 
 mod barret;
 mod double;
+mod mersenne;
 mod monty;
 mod prim;
-mod mersenne;
 
 pub use double::{udouble, umax};
+pub use mersenne::MersenneInt;
 #[cfg(std)]
 pub use monty::MontgomeryBigint;
 pub use monty::{Montgomery, MontgomeryInt};
-pub use mersenne::MersenneInt;
 
 #[cfg(feature = "num-bigint")]
 mod bigint;

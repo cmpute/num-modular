@@ -1,6 +1,6 @@
 //! Implementations for modular operations on primitive integers
 
-use crate::{ModularCoreOps, ModularUnaryOps, ModularAbs, ModularPow, ModularSymbols};
+use crate::{ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps};
 use num_integer::Integer;
 
 // TODO: implement the modular functions as const: https://github.com/rust-lang/rust/pull/68847
@@ -29,12 +29,12 @@ macro_rules! impl_core_ops_uu {
         }
     )*);
 }
-impl_core_ops_uu!{ u8 => u16; u16 => u32; u32 => u64; u64 => u128; }
+impl_core_ops_uu! { u8 => u16; u16 => u32; u32 => u64; u64 => u128; }
 
 #[cfg(target_pointer_width = "32")]
-impl_core_ops_uu!{ usize => u64; }
+impl_core_ops_uu! { usize => u64; }
 #[cfg(target_pointer_width = "64")]
-impl_core_ops_uu!{ usize => u128; }
+impl_core_ops_uu! { usize => u128; }
 
 impl ModularCoreOps<u128, &u128> for u128 {
     type Output = u128;
@@ -134,7 +134,7 @@ macro_rules! impl_symbols_uprim {
             fn legendre(self, n: &$T) -> i8 {
                 self.checked_legendre(n).expect("n is not prime!")
             }
-    
+
             #[inline]
             fn checked_jacobi(self, n: &$T) -> Option<i8> {
                 if n % 2 == 0 || n < &0 {
@@ -146,7 +146,7 @@ macro_rules! impl_symbols_uprim {
                 if self == 1 {
                     return Some(1);
                 }
-    
+
                 let mut a = self % n;
                 let mut n = n.clone();
                 let mut t = 1;
@@ -173,7 +173,7 @@ macro_rules! impl_symbols_uprim {
             fn jacobi(self, n: &$T) -> i8 {
                 self.checked_jacobi(n).expect("the Jacobi symbol is only defined for non-negative odd integers")
             }
-    
+
             #[inline]
             fn kronecker(self, n: &$T) -> i8 {
                 match n {
@@ -225,20 +225,20 @@ macro_rules! impl_unary_uprim {
             fn invm(self, m: &$T) -> Option<$T> {
                 // TODO: optimize using https://eprint.iacr.org/2020/972.pdf
                 let x = if &self >= m { self % m } else { self.clone() };
-    
+
                 let (mut last_r, mut r) = (m.clone(), x);
                 let (mut last_t, mut t) = (0, 1);
-    
+
                 while r > 0 {
                     let (quo, rem) = last_r.div_rem(&r);
                     last_r = r;
                     r = rem;
-    
+
                     let new_t = last_t.subm(quo.mulm(t, m), m);
                     last_t = t;
                     t = new_t;
                 }
-    
+
                 // if r = gcd(self, m) > 1, then inverse doesn't exist
                 if last_r > 1 {
                     None
@@ -385,8 +385,8 @@ impl_absm_for_prim! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::random;
     use core::ops::Neg;
+    use rand::random;
 
     const ADDM_CASES: [(u8, u8, u8, u8); 10] = [
         // [m, x, y, rem]: x + y = rem (mod m)
@@ -419,13 +419,19 @@ mod tests {
             let b = random::<u32>() as u64;
             let m = random::<u32>() as u64;
             assert_eq!(a.addm(b, &m), (a + b) % m);
-            assert_eq!(a.addm(b, &(1u64 << 32)) as u32, (a as u32).wrapping_add(b as u32));
-            
+            assert_eq!(
+                a.addm(b, &(1u64 << 32)) as u32,
+                (a as u32).wrapping_add(b as u32)
+            );
+
             let a = random::<u64>() as u128;
             let b = random::<u64>() as u128;
             let m = random::<u64>() as u128;
             assert_eq!(a.addm(b, &m), (a + b) % m);
-            assert_eq!(a.addm(b, &(1u128 << 64)) as u64, (a as u64).wrapping_add(b as u64));
+            assert_eq!(
+                a.addm(b, &(1u128 << 64)) as u64,
+                (a as u64).wrapping_add(b as u64)
+            );
         }
     }
 
@@ -453,23 +459,35 @@ mod tests {
             assert_eq!((x as u64).subm(y as u64, &(m as _)), r as _);
             assert_eq!((x as u128).subm(y as u128, &(m as _)), r as _);
         }
-        
+
         // random cases for u64 and u128
         for _ in 0..10 {
             let a = random::<u32>() as u64;
             let b = random::<u32>() as u64;
             let m = random::<u32>() as u64;
-            assert_eq!(a.subm(b, &m), (a as i64 - b as i64).rem_euclid(m as i64) as u64);
-            assert_eq!(a.subm(b, &(1u64 << 32)) as u32, (a as u32).wrapping_sub(b as u32));
-            
+            assert_eq!(
+                a.subm(b, &m),
+                (a as i64 - b as i64).rem_euclid(m as i64) as u64
+            );
+            assert_eq!(
+                a.subm(b, &(1u64 << 32)) as u32,
+                (a as u32).wrapping_sub(b as u32)
+            );
+
             let a = random::<u64>() as u128;
             let b = random::<u64>() as u128;
             let m = random::<u64>() as u128;
-            assert_eq!(a.subm(b, &m), (a as i128 - b as i128).rem_euclid(m as i128) as u128);
-            assert_eq!(a.subm(b, &(1u128 << 64)) as u64, (a as u64).wrapping_sub(b as u64));
+            assert_eq!(
+                a.subm(b, &m),
+                (a as i128 - b as i128).rem_euclid(m as i128) as u128
+            );
+            assert_eq!(
+                a.subm(b, &(1u128 << 64)) as u64,
+                (a as u64).wrapping_sub(b as u64)
+            );
         }
     }
-    
+
     const NEGM_CASES: [(u8, u8, u8); 5] = [
         // [m, x, rem]: -x = rem (mod m)
         (5, 0, 0),
@@ -501,7 +519,7 @@ mod tests {
             let m = random::<u32>() as u64;
             assert_eq!(a.negm(&m), (a as i64).neg().rem_euclid(m as i64) as u64);
             assert_eq!(a.negm(&(1u64 << 32)) as u32, (a as u32).wrapping_neg());
-            
+
             let a = random::<u64>() as u128;
             let m = random::<u64>() as u128;
             assert_eq!(a.negm(&m), (a as i128).neg().rem_euclid(m as i128) as u128);
@@ -540,13 +558,19 @@ mod tests {
             let b = random::<u32>() as u64;
             let m = random::<u32>() as u64;
             assert_eq!(a.mulm(b, &m), (a * b) % m);
-            assert_eq!(a.mulm(b, &(1u64 << 32)) as u32, (a as u32).wrapping_mul(b as u32));
-            
+            assert_eq!(
+                a.mulm(b, &(1u64 << 32)) as u32,
+                (a as u32).wrapping_mul(b as u32)
+            );
+
             let a = random::<u64>() as u128;
             let b = random::<u64>() as u128;
             let m = random::<u64>() as u128;
             assert_eq!(a.mulm(b, &m), (a * b) % m);
-            assert_eq!(a.mulm(b, &(1u128 << 32)) as u32, (a as u32).wrapping_mul(b as u32));
+            assert_eq!(
+                a.mulm(b, &(1u128 << 32)) as u32,
+                (a as u32).wrapping_mul(b as u32)
+            );
         }
     }
 
@@ -591,7 +615,7 @@ mod tests {
             3_074_457_345_618_258_602,
         ),
     ];
-    
+
     #[test]
     fn invm_test() {
         // fixed cases
@@ -600,7 +624,6 @@ mod tests {
         }
     }
 
-    
     #[test]
     fn legendre_test() {
         const CASES: [(u8, u8, i8); 18] = [
@@ -626,25 +649,13 @@ mod tests {
 
         for &(a, n, res) in CASES.iter() {
             assert_eq!(a.legendre(&n), res);
-            assert_eq!(
-                (a as u16).legendre(&(n as u16)),
-                res
-            );
-            assert_eq!(
-                (a as u32).legendre(&(n as u32)),
-                res
-            );
-            assert_eq!(
-                (a as u64).legendre(&(n as u64)),
-                res
-            );
-            assert_eq!(
-                (a as u128).legendre(&(n as u128)),
-                res
-            );
+            assert_eq!((a as u16).legendre(&(n as u16)), res);
+            assert_eq!((a as u32).legendre(&(n as u32)), res);
+            assert_eq!((a as u64).legendre(&(n as u64)), res);
+            assert_eq!((a as u128).legendre(&(n as u128)), res);
         }
     }
-    
+
     #[test]
     fn jacobi_test() {
         const CASES: [(u8, u8, i8); 15] = [
@@ -674,7 +685,6 @@ mod tests {
         }
     }
 
-    
     #[test]
     fn kronecker_test() {
         const CASES: [(u8, u8, i8); 18] = [

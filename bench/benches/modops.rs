@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate criterion;
 use criterion::Criterion;
-use num_traits::{Pow, Inv};
-use num_modular::{ModularCoreOps, ModularOps, MersenneInt};
+use num_modular::{MersenneInt, ModularCoreOps, ModularOps};
+use num_traits::{Inv, Pow};
 
 pub fn bench_modinv(c: &mut Criterion) {
     const M1: u64 = (1 << 56) - 5;
@@ -18,7 +18,7 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("fermat theorem", |b| {
         b.iter(|| {
             (100u64..400u64)
-                .map(|n| n.powm(M1-2, &M1))
+                .map(|n| n.powm(M1 - 2, &M1))
                 .reduce(|a, b| a.addm(b, &M1))
         })
     });
@@ -52,7 +52,7 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("fermat theorem", |b| {
         b.iter(|| {
             (1_000_000_000u128..1_000_000_300u128)
-                .map(|n| n.powm(M2-2, &M2))
+                .map(|n| n.powm(M2 - 2, &M2))
                 .reduce(|a, b| a.addm(b, &M2))
         })
     });
@@ -66,7 +66,7 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("mersenne + fermat theorem", |b| {
         b.iter(|| {
             (1_000_000_000u128..1_000_000_300u128)
-                .map(|n| MersenneInt::<94, 3>::new(n).pow(M2-2))
+                .map(|n| MersenneInt::<94, 3>::new(n).pow(M2 - 2))
                 .reduce(|a, b| a + b)
         })
     });
