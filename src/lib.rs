@@ -36,42 +36,38 @@ pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
     /// Return (self + rhs) % m
     fn addm(self, rhs: Rhs, m: Modulus) -> Self::Output;
 
-    /// Return (self + rhs) % m
+    /// Return (self - rhs) % m
     fn subm(self, rhs: Rhs, m: Modulus) -> Self::Output;
 
     /// Return (self * rhs) % m
     fn mulm(self, rhs: Rhs, m: Modulus) -> Self::Output;
+}
+
+pub trait ModularUnaryOps<Modulus = Self> {
+    type Output;
 
     /// Return (-self) % m and make sure the result is normalized in range [0,m)
     fn negm(self, m: Modulus) -> Self::Output;
-}
-
-// TODO (v0.3): split negm, invm and sqrtm to ModularUnaryOps
-// and split powm and logm to ModularPow
-
-// TODO (v0.3): checked_jacobi, checked_kronecker, checked_legendre
-/// This trait describes modular arithmetic operations
-pub trait ModularOps<Rhs = Self, Modulus = Self>: ModularCoreOps<Rhs, Modulus> {
-    /// Return (self ^ exp) % m
-    fn powm(self, exp: Rhs, m: Modulus) -> Self::Output;
 
     /// Calculate modular inverse (x such that self*x = 1 mod m).
     ///
     /// This operation is only available for integer that is coprime to `m`. If not,
     /// the result will be [None].
-    fn invm(self, m: Modulus) -> Option<Self::Output>
-    where
-        Self: Sized;
+    fn invm(self, m: Modulus) -> Option<Self::Output>;
 
-    /// Calculate Jacobi Symbol (a|n), where a is self
-    ///
-    /// # Panics
-    /// if n is negative or even
-    fn jacobi(self, n: Modulus) -> i8;
+    // TODO: Modular sqrt aka Quadratic residue, follow the behavior of FLINT `n_sqrtmod`
+    // fn sqrtm(self, m: Modulus) -> Option<Self::Output>;
+    // REF: https://stackoverflow.com/questions/6752374/cube-root-modulo-p-how-do-i-do-this
+}
 
-    /// Calculate Kronecker Symbol (a|n), where a is self
-    fn kronecker(self, n: Modulus) -> i8;
+pub trait ModularPow<Exp = Self, Modulus = Self> {
+    type Output;
 
+    /// Return (self ^ exp) % m
+    fn powm(self, exp: Exp, m: Modulus) -> Self::Output;
+}
+
+pub trait ModularSymbols<Modulus = Self> {
     /// Calculate Legendre Symbol (a|n), where a is self.
     ///
     /// Note that this function doesn't perform primality check, since
@@ -81,12 +77,35 @@ pub trait ModularOps<Rhs = Self, Modulus = Self>: ModularCoreOps<Rhs, Modulus> {
     /// if n is not prime
     fn legendre(self, n: Modulus) -> i8;
 
-    // TODO: Modular sqrt aka Quadratic residue, follow the behavior of FLINT `n_sqrtmod`
-    // fn sqrtm(self, m: Modulus);
+    /// Checked version of [legendre], return [None] if n is not prime
+    fn checked_legendre(self, n: Modulus) -> Option<i8>;
 
-    // TODO: Discrete log aka index, follow the behavior of FLINT `n_discrete_log_bsgs`
-    // fn logm(self, base: Modulus, m: Modulus);
+    /// Calculate Jacobi Symbol (a|n), where a is self
+    ///
+    /// # Panics
+    /// if n is negative or even
+    fn jacobi(self, n: Modulus) -> i8;
+    
+    /// Checked version of [jacobi], return [None] if n is negative or even
+    fn checked_jacobi(self, n: Modulus) -> Option<i8>;
+
+    /// Calculate Kronecker Symbol (a|n), where a is self
+    fn kronecker(self, n: Modulus) -> i8;
 }
+
+// TODO: Discrete log aka index, follow the behavior of FLINT `n_discrete_log_bsgs`
+// fn logm(self, base: Modulus, m: Modulus);
+
+/// Collection of common modular arithmetic operations
+pub trait ModularOps<Rhs = Self, Modulus = Self>:
+    ModularCoreOps<Rhs, Modulus>
+    + ModularUnaryOps<Modulus>
+    + ModularPow<Rhs, Modulus>
+    + ModularSymbols<Modulus> {}
+impl<T, Rhs, Modulus> ModularOps<Rhs, Modulus> for T where T: ModularCoreOps<Rhs, Modulus>
+    + ModularUnaryOps<Modulus>
+    + ModularPow<Rhs, Modulus>
+    + ModularSymbols<Modulus> {}
 
 /// Provides a utility function to convert signed integers into unsigned modular form
 pub trait ModularAbs<Modulus> {
@@ -136,7 +155,3 @@ pub use mersenne::MersenneInt;
 
 #[cfg(feature = "num-bigint")]
 mod bigint;
-
-// tests for ModularOps goes here
-#[cfg(test)]
-mod tests;

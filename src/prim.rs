@@ -1,144 +1,12 @@
 //! Implementations for modular operations on primitive integers
 
-use crate::{ModularCoreOps, ModularOps, ModularAbs};
+use crate::{ModularCoreOps, ModularUnaryOps, ModularAbs, ModularPow, ModularSymbols};
 use num_integer::Integer;
 
 // TODO: implement the modular functions as const: https://github.com/rust-lang/rust/pull/68847
 
-macro_rules! impl_powm_uprim {
-    ($T:ty) => {
-        fn powm(self, exp: $T, m: &$T) -> $T {
-            match exp {
-                1 => self % m,
-                2 => self.mulm(self, m),
-                _ => {
-                    let mut multi = self % m;
-                    let mut exp = exp;
-                    let mut result = 1;
-                    while exp > 0 {
-                        if exp & 1 != 0 {
-                            result = result.mulm(multi, m);
-                        }
-                        multi = multi.mulm(multi, m);
-                        exp >>= 1;
-                    }
-                    result
-                }
-            }
-        }
-    };
-}
-
-macro_rules! impl_jacobi_uprim {
-    ($T:ty) => {
-        #[inline]
-        fn legendre(self, n: &$T) -> i8 {
-            match self.powm((n - 1) >> 1, &n) {
-                0 => 0,
-                1 => 1,
-                x if x == n - 1 => -1,
-                _ => panic!("n is not prime!"),
-            }
-        }
-
-        fn jacobi(self, n: &$T) -> i8 {
-            if n % 2 == 0 || n < &0 {
-                panic!("The Jacobi symbol is only defined for non-negative odd integers!")
-            }
-
-            if self == 0 {
-                return 0;
-            }
-            if self == 1 {
-                return 1;
-            }
-
-            let mut a = self % n;
-            let mut n = n.clone();
-            let mut t = 1;
-            while a > 0 {
-                while (a & 1) == 0 {
-                    a = a / 2;
-                    if n & 7 == 3 || n & 7 == 5 {
-                        t *= -1;
-                    }
-                }
-                core::mem::swap(&mut a, &mut n);
-                if (a & 3) == 3 && (n & 3) == 3 {
-                    t *= -1;
-                }
-                a = a % n;
-            }
-            if n == 1 {
-                t
-            } else {
-                0
-            }
-        }
-
-        #[inline]
-        fn kronecker(self, n: &$T) -> i8 {
-            match n {
-                0 => {
-                    if self == 1 {
-                        1
-                    } else {
-                        0
-                    }
-                }
-                1 => 1,
-                2 => {
-                    if self & 1 == 0 {
-                        0
-                    } else if self & 7 == 1 || self & 7 == 7 {
-                        1
-                    } else {
-                        -1
-                    }
-                }
-                _ => {
-                    let f = n.trailing_zeros();
-                    let n = n >> f;
-                    ModularOps::<&$T, &$T>::kronecker(self, &2).pow(f)
-                        * ModularOps::<&$T, &$T>::jacobi(self, &n)
-                }
-            }
-        }
-    };
-}
-
-// implement inverse mod using extended euclidean algorithm
-macro_rules! impl_invm_uprim {
-    ($T:ty) => {
-        fn invm(self, m: &$T) -> Option<Self::Output> {
-            // TODO: optimize using https://eprint.iacr.org/2020/972.pdf
-            let x = if &self >= m { self % m } else { self.clone() };
-
-            let (mut last_r, mut r) = (m.clone(), x);
-            let (mut last_t, mut t) = (0, 1);
-
-            while r > 0 {
-                let (quo, rem) = last_r.div_rem(&r);
-                last_r = r;
-                r = rem;
-
-                let new_t = last_t.subm(quo.mulm(t, m), m);
-                last_t = t;
-                t = new_t;
-            }
-
-            // if r = gcd(self, m) > 1, then inverse doesn't exist
-            if last_r > 1 {
-                None
-            } else {
-                Some(last_t)
-            }
-        }
-    };
-}
-
-macro_rules! impl_mod_arithm_uu {
-    ($T:ty, $Tdouble:ty) => {
+macro_rules! impl_core_ops_uu {
+    ($($T:ty => $Tdouble:ty;)*) => ($(
         impl ModularCoreOps<$T, &$T> for $T {
             type Output = $T;
             #[inline]
@@ -158,30 +26,15 @@ macro_rules! impl_mod_arithm_uu {
             fn mulm(self, rhs: $T, m: &$T) -> $T {
                 (((self as $Tdouble) * (rhs as $Tdouble)) % (*m as $Tdouble)) as $T
             }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                let x = self % m;
-                if x == 0 {
-                    0
-                } else {
-                    m - x
-                }
-            }
         }
-
-        impl ModularOps<$T, &$T> for $T {
-            impl_powm_uprim!($T);
-            impl_jacobi_uprim!($T);
-            impl_invm_uprim!($T);
-        }
-    };
+    )*);
 }
+impl_core_ops_uu!{ u8 => u16; u16 => u32; u32 => u64; u64 => u128; }
 
-impl_mod_arithm_uu!(u8, u16);
-impl_mod_arithm_uu!(u16, u32);
-impl_mod_arithm_uu!(u32, u64);
-impl_mod_arithm_uu!(u64, u128);
-impl_mod_arithm_uu!(usize, u128);
+#[cfg(target_pointer_width = "32")]
+impl_core_ops_uu!{ usize => u64; }
+#[cfg(target_pointer_width = "64")]
+impl_core_ops_uu!{ usize => u128; }
 
 impl ModularCoreOps<u128, &u128> for u128 {
     type Output = u128;
@@ -235,25 +88,173 @@ impl ModularCoreOps<u128, &u128> for u128 {
         }
         result
     }
+}
 
-    #[inline]
-    fn negm(self, m: &u128) -> u128 {
-        let x = self % m;
-        if x == 0 {
-            0
-        } else {
-            m - x
+macro_rules! impl_powm_uprim {
+    ($($T:ty)*) => ($(
+        impl ModularPow<$T, &$T> for $T {
+            type Output = $T;
+            fn powm(self, exp: $T, m: &$T) -> $T {
+                match exp {
+                    1 => self % m,
+                    2 => self.mulm(self, m),
+                    _ => {
+                        let mut multi = self % m;
+                        let mut exp = exp;
+                        let mut result = 1;
+                        while exp > 0 {
+                            if exp & 1 != 0 {
+                                result = result.mulm(multi, m);
+                            }
+                            multi = multi.mulm(multi, m);
+                            exp >>= 1;
+                        }
+                        result
+                    }
+                }
+            }
         }
-    }
+    )*);
 }
-impl ModularOps<u128, &u128> for u128 {
-    impl_powm_uprim!(u128);
-    impl_jacobi_uprim!(u128);
-    impl_invm_uprim!(u128);
-}
+impl_powm_uprim!(u8 u16 u32 u64 u128 usize);
 
-macro_rules! impl_mod_arithm_by_deref {
+macro_rules! impl_symbols_uprim {
+    ($($T:ty)*) => ($(
+        impl ModularSymbols<&$T> for $T {
+            #[inline]
+            fn checked_legendre(self, n: &$T) -> Option<i8> {
+                match self.powm((n - 1) >> 1, &n) {
+                    0 => Some(0),
+                    1 => Some(1),
+                    x if x == n - 1 => Some(-1),
+                    _ => None,
+                }
+            }
+            #[inline]
+            fn legendre(self, n: &$T) -> i8 {
+                self.checked_legendre(n).expect("n is not prime!")
+            }
+    
+            #[inline]
+            fn checked_jacobi(self, n: &$T) -> Option<i8> {
+                if n % 2 == 0 || n < &0 {
+                    return None;
+                }
+                if self == 0 {
+                    return Some(0);
+                }
+                if self == 1 {
+                    return Some(1);
+                }
+    
+                let mut a = self % n;
+                let mut n = n.clone();
+                let mut t = 1;
+                while a > 0 {
+                    while (a & 1) == 0 {
+                        a = a / 2;
+                        if n & 7 == 3 || n & 7 == 5 {
+                            t *= -1;
+                        }
+                    }
+                    core::mem::swap(&mut a, &mut n);
+                    if (a & 3) == 3 && (n & 3) == 3 {
+                        t *= -1;
+                    }
+                    a = a % n;
+                }
+                Some(if n == 1 {
+                    t
+                } else {
+                    0
+                })
+            }
+            #[inline]
+            fn jacobi(self, n: &$T) -> i8 {
+                self.checked_jacobi(n).expect("the Jacobi symbol is only defined for non-negative odd integers")
+            }
+    
+            #[inline]
+            fn kronecker(self, n: &$T) -> i8 {
+                match n {
+                    0 => {
+                        if self == 1 {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    1 => 1,
+                    2 => {
+                        if self & 1 == 0 {
+                            0
+                        } else if self & 7 == 1 || self & 7 == 7 {
+                            1
+                        } else {
+                            -1
+                        }
+                    }
+                    _ => {
+                        let f = n.trailing_zeros();
+                        let n = n >> f;
+                        self.kronecker(&2).pow(f)
+                            * self.jacobi(&n)
+                    }
+                }
+            }
+        }
+    )*);
+}
+impl_symbols_uprim!(u8 u16 u32 u64 u128 usize);
+
+macro_rules! impl_unary_uprim {
+    ($($T:ty)*) => ($(
+        impl ModularUnaryOps<&$T> for $T {
+            type Output = $T;
+            #[inline]
+            fn negm(self, m: &$T) -> $T {
+                let x = self % m;
+                if x == 0 {
+                    0
+                } else {
+                    m - x
+                }
+            }
+
+            // inverse mod using extended euclidean algorithm
+            fn invm(self, m: &$T) -> Option<$T> {
+                // TODO: optimize using https://eprint.iacr.org/2020/972.pdf
+                let x = if &self >= m { self % m } else { self.clone() };
+    
+                let (mut last_r, mut r) = (m.clone(), x);
+                let (mut last_t, mut t) = (0, 1);
+    
+                while r > 0 {
+                    let (quo, rem) = last_r.div_rem(&r);
+                    last_r = r;
+                    r = rem;
+    
+                    let new_t = last_t.subm(quo.mulm(t, m), m);
+                    last_t = t;
+                    t = new_t;
+                }
+    
+                // if r = gcd(self, m) > 1, then inverse doesn't exist
+                if last_r > 1 {
+                    None
+                } else {
+                    Some(last_t)
+                }
+            }
+        }
+    )*);
+}
+impl_unary_uprim!(u8 u16 u32 u64 u128 usize);
+
+// forward modular arith ops on reference to value
+macro_rules! impl_mod_ops_by_deref {
     ($($T:ty)*) => {$(
+        // core ops
         impl ModularCoreOps<$T, &$T> for &$T {
             type Output = $T;
             #[inline]
@@ -268,34 +269,7 @@ macro_rules! impl_mod_arithm_by_deref {
             fn mulm(self, rhs: $T, m: &$T) -> $T {
                 (*self).mulm(rhs, &m)
             }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularCoreOps::<$T, &$T>::negm(*self, m)
-            }
         }
-        impl ModularOps<$T, &$T> for &$T {
-            #[inline]
-            fn powm(self, exp: $T, m: &$T) -> $T {
-                (*self).powm(exp, &m)
-            }
-            #[inline]
-            fn invm(self, m: &$T) -> Option<$T> {
-                ModularOps::<$T, &$T>::invm(*self, m)
-            }
-            #[inline]
-            fn legendre(self, n: &$T) -> i8 {
-                ModularOps::<$T, &$T>::legendre(*self, n)
-            }
-            #[inline]
-            fn jacobi(self, n: &$T) -> i8 {
-                ModularOps::<$T, &$T>::jacobi(*self, n)
-            }
-            #[inline]
-            fn kronecker(self, n: &$T) -> i8 {
-                ModularOps::<$T, &$T>::kronecker(*self, n)
-            }
-        }
-
         impl ModularCoreOps<&$T, &$T> for $T {
             type Output = $T;
             #[inline]
@@ -310,34 +284,7 @@ macro_rules! impl_mod_arithm_by_deref {
             fn mulm(self, rhs: &$T, m: &$T) -> $T {
                 self.mulm(*rhs, &m)
             }
-            #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularCoreOps::<$T, &$T>::negm(self, m)
-            }
         }
-        impl ModularOps<&$T, &$T> for $T {
-            #[inline]
-            fn powm(self, exp: &$T, m: &$T) -> $T {
-                self.powm(*exp, &m)
-            }
-            #[inline]
-            fn invm(self, m: &$T) -> Option<$T> {
-                ModularOps::<$T, &$T>::invm(self, m)
-            }
-            #[inline]
-            fn legendre(self, n: &$T) -> i8 {
-                ModularOps::<$T, &$T>::legendre(self, n)
-            }
-            #[inline]
-            fn jacobi(self, n: &$T) -> i8 {
-                ModularOps::<$T, &$T>::jacobi(self, n)
-            }
-            #[inline]
-            fn kronecker(self, n: &$T) -> i8 {
-                ModularOps::<$T, &$T>::kronecker(self, n)
-            }
-        }
-
         impl ModularCoreOps<&$T, &$T> for &$T {
             type Output = $T;
             #[inline]
@@ -352,37 +299,70 @@ macro_rules! impl_mod_arithm_by_deref {
             fn mulm(self, rhs: &$T, m: &$T) -> $T {
                 (*self).mulm(*rhs, &m)
             }
+        }
+
+        // pow
+        impl ModularPow<$T, &$T> for &$T {
+            type Output = $T;
             #[inline]
-            fn negm(self, m: &$T) -> $T {
-                ModularCoreOps::<$T, &$T>::negm(*self, m)
+            fn powm(self, exp: $T, m: &$T) -> $T {
+                (*self).powm(exp, &m)
             }
         }
-        impl ModularOps<&$T, &$T> for &$T {
+        impl ModularPow<&$T, &$T> for $T {
+            type Output = $T;
+            #[inline]
+            fn powm(self, exp: &$T, m: &$T) -> $T {
+                self.powm(*exp, &m)
+            }
+        }
+        impl ModularPow<&$T, &$T> for &$T {
+            type Output = $T;
             #[inline]
             fn powm(self, exp: &$T, m: &$T) -> $T {
                 (*self).powm(*exp, &m)
             }
+        }
+
+        // unary ops and symbols
+        impl ModularUnaryOps<&$T> for &$T {
+            type Output = $T;
+
             #[inline]
-            fn invm(self, m: &$T) -> Option<$T> {
-                ModularOps::<$T, &$T>::invm(*self, m)
+            fn negm(self, m: &$T) -> $T {
+                ModularUnaryOps::<&$T>::negm(*self, m)
             }
             #[inline]
+            fn invm(self, m: &$T) -> Option<$T> {
+                ModularUnaryOps::<&$T>::invm(*self, m)
+            }
+        }
+        impl ModularSymbols<&$T> for &$T {
+            #[inline]
             fn legendre(self, n: &$T) -> i8 {
-                ModularOps::<$T, &$T>::legendre(*self, n)
+                ModularSymbols::<&$T>::legendre(*self, n)
+            }
+            #[inline]
+            fn checked_legendre(self, n: &$T) -> Option<i8> {
+                ModularSymbols::<&$T>::checked_legendre(*self, n)
             }
             #[inline]
             fn jacobi(self, n: &$T) -> i8 {
-                ModularOps::<$T, &$T>::jacobi(*self, n)
+                ModularSymbols::<&$T>::jacobi(*self, n)
+            }
+            #[inline]
+            fn checked_jacobi(self, n: &$T) -> Option<i8> {
+                ModularSymbols::<&$T>::checked_jacobi(*self, n)
             }
             #[inline]
             fn kronecker(self, n: &$T) -> i8 {
-                ModularOps::<$T, &$T>::kronecker(*self, n)
+                ModularSymbols::<&$T>::kronecker(*self, n)
             }
         }
     )*};
 }
 
-impl_mod_arithm_by_deref!(u8 u16 u32 u64 u128 usize);
+impl_mod_ops_by_deref!(u8 u16 u32 u64 u128 usize);
 
 macro_rules! impl_absm_for_prim {
     ($($signed:ty => $unsigned:ty;)*) => {$(
@@ -391,7 +371,7 @@ macro_rules! impl_absm_for_prim {
                 if self >= 0 {
                     (self as $unsigned) % m
                 } else {
-                    ModularCoreOps::<$unsigned>::negm(&(-self as $unsigned), m)
+                    (-self as $unsigned).negm(m)
                 }
             }
         }
@@ -503,15 +483,15 @@ mod tests {
     fn negm_and_absm_test() {
         // fixed cases
         for &(m, x, r) in NEGM_CASES.iter() {
-            assert_eq!(ModularCoreOps::<&u8>::negm(&x, &m), r);
+            assert_eq!(x.negm(&m), r);
             assert_eq!((x as i8).neg().absm(&m), r);
-            assert_eq!(ModularCoreOps::<&u16>::negm(&(x as _), &(m as _)), r as _);
+            assert_eq!((x as u16).negm(&(m as _)), r as _);
             assert_eq!((x as i16).neg().absm(&(m as u16)), r as _);
-            assert_eq!(ModularCoreOps::<&u32>::negm(&(x as _), &(m as _)), r as _);
+            assert_eq!((x as u32).negm(&(m as _)), r as _);
             assert_eq!((x as i32).neg().absm(&(m as u32)), r as _);
-            assert_eq!(ModularCoreOps::<&u64>::negm(&(x as _), &(m as _)), r as _);
+            assert_eq!((x as u64).negm(&(m as _)), r as _);
             assert_eq!((x as i64).neg().absm(&(m as u64)), r as _);
-            assert_eq!(ModularCoreOps::<&u128>::negm(&(x as _), &(m as _)), r as _);
+            assert_eq!((x as u128).negm(&(m as _)), r as _);
             assert_eq!((x as i128).neg().absm(&(m as u128)), r as _);
         }
 
@@ -519,13 +499,13 @@ mod tests {
         for _ in 0..10 {
             let a = random::<u32>() as u64;
             let m = random::<u32>() as u64;
-            assert_eq!(ModularCoreOps::<&u64>::negm(&a, &m), (a as i64).neg().rem_euclid(m as i64) as u64);
-            assert_eq!(ModularCoreOps::<&u64>::negm(&a, &(1u64 << 32)) as u32, (a as u32).wrapping_neg());
+            assert_eq!(a.negm(&m), (a as i64).neg().rem_euclid(m as i64) as u64);
+            assert_eq!(a.negm(&(1u64 << 32)) as u32, (a as u32).wrapping_neg());
             
             let a = random::<u64>() as u128;
             let m = random::<u64>() as u128;
-            assert_eq!(ModularCoreOps::<&u128>::negm(&a, &m), (a as i128).neg().rem_euclid(m as i128) as u128);
-            assert_eq!(ModularCoreOps::<&u128>::negm(&a, &(1u128 << 64)) as u64, (a as u64).wrapping_neg());
+            assert_eq!(a.negm(&m), (a as i128).neg().rem_euclid(m as i128) as u128);
+            assert_eq!(a.negm(&(1u128 << 64)) as u64, (a as u64).wrapping_neg());
         }
     }
 
@@ -616,7 +596,114 @@ mod tests {
     fn invm_test() {
         // fixed cases
         for &(a, m, x) in INVM_CASES.iter() {
-            assert_eq!(ModularOps::<&u64>::invm(&a, &m).unwrap(), x);
+            assert_eq!(a.invm(&m).unwrap(), x);
+        }
+    }
+
+    
+    #[test]
+    fn legendre_test() {
+        const CASES: [(u8, u8, i8); 18] = [
+            (0, 11, 0),
+            (1, 11, 1),
+            (2, 11, -1),
+            (4, 11, 1),
+            (7, 11, -1),
+            (10, 11, -1),
+            (0, 17, 0),
+            (1, 17, 1),
+            (2, 17, 1),
+            (4, 17, 1),
+            (9, 17, 1),
+            (10, 17, -1),
+            (0, 101, 0),
+            (1, 101, 1),
+            (2, 101, -1),
+            (4, 101, 1),
+            (9, 101, 1),
+            (10, 101, -1),
+        ];
+
+        for &(a, n, res) in CASES.iter() {
+            assert_eq!(a.legendre(&n), res);
+            assert_eq!(
+                (a as u16).legendre(&(n as u16)),
+                res
+            );
+            assert_eq!(
+                (a as u32).legendre(&(n as u32)),
+                res
+            );
+            assert_eq!(
+                (a as u64).legendre(&(n as u64)),
+                res
+            );
+            assert_eq!(
+                (a as u128).legendre(&(n as u128)),
+                res
+            );
+        }
+    }
+    
+    #[test]
+    fn jacobi_test() {
+        const CASES: [(u8, u8, i8); 15] = [
+            (1, 1, 1),
+            (15, 1, 1),
+            (2, 3, -1),
+            (29, 9, 1),
+            (4, 11, 1),
+            (17, 11, -1),
+            (19, 29, -1),
+            (10, 33, -1),
+            (11, 33, 0),
+            (12, 33, 0),
+            (14, 33, -1),
+            (15, 33, 0),
+            (15, 37, -1),
+            (29, 59, 1),
+            (30, 59, -1),
+        ];
+
+        for &(a, n, res) in CASES.iter() {
+            assert_eq!(a.jacobi(&n), res);
+            assert_eq!((a as u16).jacobi(&(n as u16)), res);
+            assert_eq!((a as u32).jacobi(&(n as u32)), res);
+            assert_eq!((a as u64).jacobi(&(n as u64)), res);
+            assert_eq!((a as u128).jacobi(&(n as u128)), res);
+        }
+    }
+
+    
+    #[test]
+    fn kronecker_test() {
+        const CASES: [(u8, u8, i8); 18] = [
+            (0, 15, 0),
+            (1, 15, 1),
+            (2, 15, 1),
+            (4, 15, 1),
+            (7, 15, -1),
+            (10, 15, 0),
+            (0, 14, 0),
+            (1, 14, 1),
+            (2, 14, 0),
+            (4, 14, 0),
+            (9, 14, 1),
+            (10, 14, 0),
+            (0, 11, 0),
+            (1, 11, 1),
+            (2, 11, -1),
+            (4, 11, 1),
+            (9, 11, 1),
+            (10, 11, -1),
+        ];
+
+        for &(a, n, res) in CASES.iter() {
+            assert_eq!(a.kronecker(&n), res);
+            assert_eq!((a as u16).kronecker(&(n as u16)), res);
+            assert_eq!((a as u32).kronecker(&(n as u32)), res);
+            assert_eq!((a as u64).kronecker(&(n as u64)), res);
+            assert_eq!((a as u128).kronecker(&(n as u128)), res);
         }
     }
 }

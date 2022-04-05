@@ -1,4 +1,4 @@
-use crate::{ModularInteger, udouble, umax, ModularOps};
+use crate::{ModularInteger, udouble, umax, ModularUnaryOps};
 use core::ops::*;
 use num_traits::{Pow, Inv};
 
@@ -168,9 +168,9 @@ impl<const P: u8, const K: umax> Inv for MersenneInt<P, K> {
         // It seems that extended gcd is faster than using fermat's theorem a^-1 = a^(p-2) mod p
         // For faster inverse using fermat theorem, refer to https://eprint.iacr.org/2018/1038.pdf (haven't benchmarked with this)
         if (P as u32) < usize::BITS {
-            Self(ModularOps::<usize>::invm(&(self.0 as usize), &(Self::MODULUS as usize)).expect("the modulus shoud be a prime") as umax)
+            Self((self.0 as usize).invm(&(Self::MODULUS as usize)).expect("the modulus shoud be a prime") as umax)
         } else {
-            Self(ModularOps::<umax>::invm(&self.0, &Self::MODULUS).expect("the modulus shoud be a prime"))
+            Self(self.0.invm(&Self::MODULUS).expect("the modulus shoud be a prime"))
         }
     }
 }

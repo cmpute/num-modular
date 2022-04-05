@@ -291,3 +291,17 @@ mod impl_num_bigint {
 
     impl_mod_arithm_by_ref!(BigUint);
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn biguint_basic_mod_test() {
+        let a = rand::random::<u128>();
+        let ra = &BigUint::from(a);
+        let m = rand::random::<u128>();
+        let rm = &BigUint::from(m);
+        assert_eq!(ra.addm(ra, rm), (ra + ra) % rm);
+        assert_eq!(ra.mulm(ra, rm), (ra * ra) % rm);
+        assert_eq!(ra.powm(BigUint::from(3u8), rm), ra.pow(3) % rm);
+    }
+}
