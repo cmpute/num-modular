@@ -10,6 +10,8 @@ use num_traits::{Inv, Pow};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct MersenneInt<const P: u8, const K: umax>(umax); // the underlying integer is in the inclusive range [0, 2^P-K]
 
+// XXX: support other primes as modulo, such as solinas prime, proth prime
+
 impl<const P: u8, const K: umax> MersenneInt<P, K> {
     const BITMASK: umax = (1 << P) - 1;
     const MODULUS: umax = (1 << P) - K;

@@ -3,7 +3,7 @@
 use crate::{ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps};
 use num_integer::Integer;
 
-// TODO: implement the modular functions as const: https://github.com/rust-lang/rust/pull/68847
+// FIXME: implement the modular functions as const after https://github.com/rust-lang/rust/pull/68847
 
 macro_rules! impl_core_ops_uu {
     ($($T:ty => $Tdouble:ty;)*) => ($(
@@ -36,6 +36,7 @@ impl_core_ops_uu! { usize => u64; }
 #[cfg(target_pointer_width = "64")]
 impl_core_ops_uu! { usize => u128; }
 
+// TODO: benchmark against implementation using udouble
 impl ModularCoreOps<u128, &u128> for u128 {
     type Output = u128;
 
@@ -65,7 +66,6 @@ impl ModularCoreOps<u128, &u128> for u128 {
     }
 
     // XXX: benchmark against http://www.janfeitsma.nl/math/psp2/expmod
-    // XXX: benchmark against udouble implementation
     fn mulm(self, rhs: u128, m: &u128) -> u128 {
         if let Some(ab) = self.checked_mul(rhs) {
             return ab % m;

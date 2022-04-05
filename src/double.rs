@@ -1,7 +1,6 @@
 //! This module implements a double width integer type based on the largest built-in integer (u128)
 
 use core::ops::*;
-use num_traits::{One, Zero};
 
 /// Alias of the builtin integer type with max width (currently [u128])
 #[allow(non_camel_case_types)]
@@ -23,10 +22,9 @@ pub struct udouble {
 
 // TODO: port optimizations from and benchmark against
 //       https://github.com/nlordell/ethnum-rs
-// TODO(v0.3): remove excessive APIs that are not (likely) used (to reduce optimization burden)
-// if we found that we have complex requirements for mul and div, migrate to use ethnum
 
 impl udouble {
+    //> (not used yet)
     pub fn widening_add(lhs: umax, rhs: umax) -> Self {
         let (sum, carry) = lhs.overflowing_add(rhs);
         udouble {
@@ -37,6 +35,8 @@ impl udouble {
 
     /// Calculate multiplication of two [umax] integers with result represented in double width integer
     // equivalent to umul_ppmm, can be implemented efficiently with carrying_mul and widening_mul implemented (rust#85532)
+    //> (used in MersenneInt, Montgomery::<u128>::{reduce, mul}, num-order::NumHash)
+    // TODO(v0.3): implement as const fn
     pub fn widening_mul(lhs: umax, rhs: umax) -> Self {
         const HALF_BITS: u32 = umax::BITS >> 1;
         let halves = |x| (x >> HALF_BITS, x & !(0 as umax) >> HALF_BITS);
@@ -51,31 +51,32 @@ impl udouble {
         }
     }
 
-    pub fn overflowing_add(&self, rhs: Self) -> (Self, bool) {
+    //> (used in Montgomery::<u128>::reduce)
+    pub const fn overflowing_add(&self, rhs: Self) -> (Self, bool) {
         let (lo, carry) = self.lo.overflowing_add(rhs.lo);
         let (hi, of1) = self.hi.overflowing_add(rhs.hi);
         let (hi, of2) = hi.overflowing_add(carry as umax);
         (Self { lo, hi }, of1 || of2)
     }
 
-    pub fn overflowing_mul(&self, rhs: Self) -> (Self, bool) {
-        let c2 = self.hi != 0 && rhs.hi != 0;
-        let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs.lo);
-        let (z1x, c1x) = u128::overflowing_mul(self.lo, rhs.hi);
-        let (z1y, c1y) = u128::overflowing_mul(self.hi, rhs.lo);
-        let (z1z, c1z) = u128::overflowing_add(z1x, z1y);
-        let (z1, c1) = z1z.overflowing_add(c0);
-        (Self { hi: z1, lo: z0 }, c1x | c1y | c1z | c1 | c2)
+    /// Multiplication of double width and single width
+    //> (used in num-order:NumHash)
+    pub fn overflowing_mul1(&self, rhs: umax) -> (Self, bool) {
+        let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs);
+        let (z1, c1) = self.hi.overflowing_mul(rhs);
+        let (z1, cs1) = z1.overflowing_add(c0);
+        (Self { hi: z1, lo: z0 }, c1 | cs1)
     }
 
     /// Multiplication of double width and single width
-    pub fn overflowing_muls(&self, rhs: umax) -> (Self, bool) {
+    //> (used in Self::mul::<umax>)
+    pub fn checked_mul1(&self, rhs: umax) -> Option<Self> {
         let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs);
-        let (z1, c1) = u128::overflowing_mul(self.hi, rhs);
-        let (z1, cs1) = z1.overflowing_add(c0);
-        (Self { hi: z1, lo: z0 }, c1 | c1 | cs1)
+        let z1 = self.hi.checked_mul(rhs)?.checked_add(c0)?;
+        Some(Self { hi: z1, lo: z0 })
     }
 
+    //> (used in num-order::NumHash)
     pub fn checked_shl(self, rhs: u32) -> Option<Self> {
         if rhs < umax::BITS * 2 {
             Some(self << rhs)
@@ -84,6 +85,7 @@ impl udouble {
         }
     }
 
+    //> (not used yet)
     pub fn checked_shr(self, rhs: u32) -> Option<Self> {
         if rhs < umax::BITS * 2 {
             Some(self >> rhs)
@@ -137,6 +139,7 @@ impl AddAssign<umax> for udouble {
     }
 }
 
+//> (used in test of Add)
 impl Sub for udouble {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
@@ -147,6 +150,7 @@ impl Sub for udouble {
     }
 }
 
+//> (used in test of AddAssign)
 impl SubAssign for udouble {
     fn sub_assign(&mut self, rhs: Self) {
         let carry = self.lo < rhs.lo;
@@ -155,24 +159,9 @@ impl SubAssign for udouble {
     }
 }
 
-impl Zero for udouble {
-    fn zero() -> Self {
-        Self { lo: 0, hi: 0 }
-    }
-
-    fn is_zero(&self) -> bool {
-        self.lo == 0 && self.hi == 0
-    }
-}
-
-impl One for udouble {
-    fn one() -> Self {
-        Self { lo: 1, hi: 0 }
-    }
-}
-
-macro_rules! impl_shops {
+macro_rules! impl_sh_ops {
     ($t:ty) => {
+        //> (used in Self::checked_shl)
         impl Shl<$t> for udouble {
             type Output = Self;
             fn shl(self, rhs: $t) -> Self::Output {
@@ -189,6 +178,7 @@ macro_rules! impl_shops {
                 }
             }
         }
+        //> (not used yet)
         impl ShlAssign<$t> for udouble {
             fn shl_assign(&mut self, rhs: $t) {
                 match rhs {
@@ -205,6 +195,7 @@ macro_rules! impl_shops {
                 }
             }
         }
+        //> (used in Self::checked_shr)
         impl Shr<$t> for udouble {
             type Output = Self;
             fn shr(self, rhs: $t) -> Self::Output {
@@ -221,6 +212,7 @@ macro_rules! impl_shops {
                 }
             }
         }
+        //> (not used yet)
         impl ShrAssign<$t> for udouble {
             fn shr_assign(&mut self, rhs: $t) {
                 match rhs {
@@ -241,52 +233,53 @@ macro_rules! impl_shops {
 }
 
 // only implement most useful ones, so that we don't need to optimize so many variants
-impl_shops!(u8);
-impl_shops!(u16);
-impl_shops!(u32);
+impl_sh_ops!(u8);
+impl_sh_ops!(u16);
+impl_sh_ops!(u32);
 
+//> (not used yet)
 impl BitAnd for udouble {
     type Output = Self;
     fn bitand(self, rhs: Self) -> Self::Output {
         Self { lo: self.lo & rhs.lo, hi: self.hi & rhs.hi }
     }
 }
-
+//> (not used yet)
 impl BitAndAssign for udouble {
     fn bitand_assign(&mut self, rhs: Self) {
         self.lo &= rhs.lo;
         self.hi &= rhs.hi;
     }
 }
-
+//> (not used yet)
 impl BitOr for udouble {
     type Output = Self;
     fn bitor(self, rhs: Self) -> Self::Output {
         Self { lo: self.lo | rhs.lo, hi: self.hi | rhs.hi }
     }
 }
-
+//> (not used yet)
 impl BitOrAssign for udouble {
     fn bitor_assign(&mut self, rhs: Self) {
         self.lo |= rhs.lo;
         self.hi |= rhs.hi;
     }
 }
-
+//> (not used yet)
 impl BitXor for udouble {
     type Output = Self;
     fn bitxor(self, rhs: Self) -> Self::Output {
         Self { lo: self.lo ^ rhs.lo, hi: self.hi ^ rhs.hi }
     }
 }
-
+//> (not used yet)
 impl BitXorAssign for udouble {
     fn bitxor_assign(&mut self, rhs: Self) {
         self.lo ^= rhs.lo;
         self.hi ^= rhs.hi;
     }
 }
-
+//> (not used yet)
 impl Not for udouble {
     type Output = Self;
     fn not(self) -> Self::Output {
@@ -295,6 +288,7 @@ impl Not for udouble {
 }
 
 impl udouble {
+    //> (used in Self::div_mod)
     pub const fn leading_zeros(self) -> u32 {
         if self.hi == 0 {
             self.lo.leading_zeros() + umax::BITS
@@ -304,10 +298,11 @@ impl udouble {
     }
 
     // similar to udiv_qrnnd
+    // TODO(v0.3): optimize to only support div single word
     pub fn div_rem(self, other: Self) -> (Self, Self) {
         let mut n = self; // numerator
         let mut d = other; // denominator
-        let mut q = Self::zero(); // quotient
+        let mut q = Self{ lo: 0, hi: 0 }; // quotient
 
         let nbits = (2 * umax::BITS - n.leading_zeros()) as u16; // assuming umax = u128
         let dbits = (2 * umax::BITS - d.leading_zeros()) as u16;
@@ -338,36 +333,25 @@ impl udouble {
     }
 }
 
-impl Mul for udouble {
-    type Output = Self;
-    fn mul(self, rhs: Self) -> Self::Output {
-        // TODO: use checked_mul instead of overflowing_mul
-        let (m, overflow) = self.overflowing_mul(rhs);
-        assert!(!overflow, "multiplication overflow!");
-        m
-    }
-}
-
-impl Div for udouble {
-    type Output = Self;
-    fn div(self, rhs: Self) -> Self::Output {
-        self.div_rem(rhs).0
-    }
-}
-
-impl Rem for udouble {
-    type Output = Self;
-    fn rem(self, rhs: Self) -> Self::Output {
-        self.div_rem(rhs).1
-    }
-}
-
 impl Mul<umax> for udouble {
     type Output = Self;
     fn mul(self, rhs: umax) -> Self::Output {
-        let (m, overflow) = self.overflowing_muls(rhs);
-        assert!(!overflow, "multiplication overflow!");
-        m
+        self.checked_mul1(rhs).expect("multiplication overflow!")
+    }
+}
+
+impl Div<umax> for udouble {
+    type Output = Self;
+    fn div(self, rhs: umax) -> Self::Output {
+        self.div_rem(rhs.into()).0
+    }
+}
+
+//> (used in Montgomery::<u128>::transform)
+impl Rem<umax> for udouble {
+    type Output = Self;
+    fn rem(self, rhs: umax) -> Self::Output {
+        self.div_rem(rhs.into()).1
     }
 }
 
@@ -378,10 +362,6 @@ mod tests {
 
     #[test]
     fn test_construction() {
-        // construct zero
-        assert!(udouble { lo: 0, hi: 0 }.is_zero());
-        assert!(udouble { lo: 1, hi: 0 }.is_one());
-
         // from widening operators
         assert_eq!(udouble { hi: 0, lo: 2 }, udouble::widening_add(1, 1));
         assert_eq!(udouble { hi: 1, lo: umax::MAX - 1 }, udouble::widening_add(umax::MAX, umax::MAX));
@@ -414,27 +394,22 @@ mod tests {
         assert_eq!(ONEZERO >> umax::BITS, ONE);
         assert_eq!(ONEMAX >> 1u8, MAX);
 
-        assert_eq!(ONE * MAX, MAX);
-        assert_eq!(ONE * ONEMAX, ONEMAX);
-        assert_eq!(TWO * ONEMAX, ONEMAX + ONEMAX);
-        assert_eq!(MAX / ONE, MAX);
-        assert_eq!(MAX / MAX, ONE);
-        assert_eq!(ONE / MAX, udouble::zero());
-        assert_eq!(ONEMAX / ONE, ONEMAX);
-        assert_eq!(ONEMAX / ONEMAX, ONE);
-        assert_eq!(ONEMAX / MAX, TWO);
-        assert_eq!(ONEMAX / TWO, MAX);
-        assert_eq!(ONE % MAX, ONE);
-        assert_eq!(TWO % MAX, TWO);
-        assert_eq!(ONEMAX % MAX, ONE);
-        assert_eq!(ONEMAX % TWO, ONE);
+        assert_eq!(ONE * MAX.lo, MAX);
+        assert_eq!(ONEMAX * ONE.lo, ONEMAX);
+        assert_eq!(ONEMAX * TWO.lo, ONEMAX + ONEMAX);
+        assert_eq!(MAX / ONE.lo, MAX);
+        assert_eq!(MAX / MAX.lo, ONE);
+        assert_eq!(ONE / MAX.lo, udouble { lo: 0, hi: 0 });
+        assert_eq!(ONEMAX / ONE.lo, ONEMAX);
+        assert_eq!(ONEMAX / MAX.lo, TWO);
+        assert_eq!(ONEMAX / TWO.lo, MAX);
+        assert_eq!(ONE % MAX.lo, ONE);
+        assert_eq!(TWO % MAX.lo, TWO);
+        assert_eq!(ONEMAX % MAX.lo, ONE);
+        assert_eq!(ONEMAX % TWO.lo, ONE);
 
-        let (m, overflow) = ONEMAX.overflowing_mul(MAX);
-        assert_eq!(m, udouble { lo: 1, hi: umax::MAX - 2});
-        assert!(overflow);
-        let (m, overflow) = TWOZERO.overflowing_mul(MAX);
-        assert_eq!(m, udouble { lo: 0, hi: umax::MAX - 1});
-        assert!(overflow);
+        assert_eq!(ONEMAX.checked_mul1(MAX.lo), None);
+        assert_eq!(TWOZERO.checked_mul1(MAX.lo), None);
     }
 
     #[test]

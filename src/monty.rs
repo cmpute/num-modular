@@ -23,8 +23,8 @@ pub trait Montgomery: Sized {
     /// so it's okay that it's not actually doubled with
     type Double;
 
-    /// Calculate -(m^-1) mod R
-    fn neginv(m: &Self) -> Self::Inv; // TODO(v0.3): return Option<Self::Inv>, return None if m is even
+    /// Calculate -(m^-1) mod R, return [None] if the inverse doesn't exist.
+    fn neginv(m: &Self) -> Option<Self::Inv>;
 
     /// Transform a normal integer into Montgomery form (compute `target*R mod m`)
     fn transform(target: Self, m: &Self) -> Self;
@@ -153,8 +153,12 @@ impl Montgomery for u8 {
     impl_uprim_montgomery_core!();
     impl_uprim_montgomery!();
 
-    fn neginv(m: &Self) -> Self {
-        BINVERT_TABLE[((m >> 1) & 0x7F) as usize].wrapping_neg()
+    fn neginv(m: &Self) -> Option<Self> {
+        if m & 1 == 0 {
+            return None;
+        }
+        let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize].wrapping_neg();
+        Some(i)
     }
 }
 
@@ -165,10 +169,14 @@ impl Montgomery for u16 {
     impl_uprim_montgomery_core!();
     impl_uprim_montgomery!();
 
-    fn neginv(m: &Self) -> Self {
+    fn neginv(m: &Self) -> Option<Self> {
+        if m & 1 == 0 {
+            return None;
+        }
         let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u16;
         // Newton-Rhapson iteration (hensel lifting), see https://arxiv.org/abs/1303.0328
-        i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
+        let i = i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i);
+        Some(i)
     }
 }
 
@@ -179,10 +187,14 @@ impl Montgomery for u32 {
     impl_uprim_montgomery_core!();
     impl_uprim_montgomery!();
 
-    fn neginv(m: &Self) -> Self {
+    fn neginv(m: &Self) -> Option<Self> {
+        if m & 1 == 0 {
+            return None;
+        }
         let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u32;
         let i = 2u32.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
-        i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
+        let i = i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i);
+        Some(i)
     }
 }
 
@@ -193,11 +205,15 @@ impl Montgomery for u64 {
     impl_uprim_montgomery_core!();
     impl_uprim_montgomery!();
 
-    fn neginv(m: &Self) -> Self {
+    fn neginv(m: &Self) -> Option<Self> {
+        if m & 1 == 0 {
+            return None;
+        }
         let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u64;
         let i = 2u64.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
         let i = 2u64.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
-        i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
+        let i = i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i);
+        Some(i)
     }
 }
 
@@ -205,12 +221,16 @@ impl Montgomery for u128 {
     type Inv = u128;
     type Double = udouble;
 
-    fn neginv(m: &Self) -> Self {
+    fn neginv(m: &Self) -> Option<Self> {
+        if m & 1 == 0 {
+            return None;
+        }
         let i = BINVERT_TABLE[((m >> 1) & 0x7F) as usize] as u128;
         let i = 2u128.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
         let i = 2u128.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
         let i = 2u128.wrapping_sub(i.wrapping_mul(*m)).wrapping_mul(i);
-        i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i)
+        let i = i.wrapping_mul(*m).wrapping_sub(2).wrapping_mul(i);
+        Some(i)
     }
 
     #[inline]
@@ -218,7 +238,7 @@ impl Montgomery for u128 {
         if target == 0 {
             return 0;
         }
-        let r = udouble { hi: target, lo: 0 } % udouble::from(*m);
+        let r = udouble { hi: target, lo: 0 } % *m;
         r.lo
     }
 
@@ -280,7 +300,8 @@ where
     /// Convert n into the modulo ring ℤ/mℤ (i.e. `n % m`)
     #[inline]
     pub fn new(n: T, m: T) -> Self {
-        let minv = Montgomery::neginv(&m);
+        // TODO: accept even numbers by removing 2 factors from m and store the exponent
+        let minv = Montgomery::neginv(&m).expect("the modulus has to be odd for 2^n based Montgomery");
         let a = Montgomery::transform(n, &m);
         MontgomeryInt { a, m, mi: minv }
     }
