@@ -19,12 +19,12 @@ impl<const P: u8, const K: umax> MersenneInt<P, K> {
     pub const fn new(n: umax) -> Self {
         // FIXME: use compile time checks, maybe after https://github.com/rust-lang/rust/issues/76560
         assert!(P <= 127);
-        assert!(K > 0 && K < 2u128.pow(P as u32 - 1));
-        assert!(
-            Self::MODULUS % 2 != 0
-                && Self::MODULUS % 3 != 0
+        assert!(K > 0 && K < 2u128.pow(P as u32 - 1) && K % 2 == 1);
+        assert!(Self::MODULUS % 3 != 0
                 && Self::MODULUS % 5 != 0
                 && Self::MODULUS % 7 != 0
+                && Self::MODULUS % 11 != 0
+                && Self::MODULUS % 13 != 0
         ); // error on easy composites
 
         let mut lo = n & Self::BITMASK;
@@ -222,7 +222,7 @@ impl<const P: u8, const K: umax> ModularInteger for MersenneInt<P, K> {
     }
 
     #[inline]
-    fn new(&self, n: Self::Base) -> Self {
+    fn convert(&self, n: Self::Base) -> Self {
         Self::new(n)
     }
 }
@@ -230,32 +230,98 @@ impl<const P: u8, const K: umax> ModularInteger for MersenneInt<P, K> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ModularCoreOps;
+    use crate::{ModularCoreOps, ModularPow};
     use rand::random;
 
     const P1: u128 = (1 << 31) - 1;
+    const P2: u128 = (1 << 61) - 1;
+    const P3: u128 = (1 << 127) - 1;
+    const P4: u128 = (1 << 32) - 5;
+    const P5: u128 = (1 << 56) - 5;
+    const P6: u128 = (1 << 122) - 3;
+
+    const NRANDOM: u32 = 10;
 
     #[test]
     fn creation_test() {
         // random creation test
-        for _ in 0..10 {
-            // mod 2^31-1
+        for _ in 0..NRANDOM {
             let a = random::<u128>();
+
             assert_eq!(MersenneInt::<31, 1>::new(a).residue(), a % P1);
+            assert_eq!(MersenneInt::<61, 1>::new(a).residue(), a % P2);
+            assert_eq!(MersenneInt::<127, 1>::new(a).residue(), a % P3);
+            assert_eq!(MersenneInt::<32, 5>::new(a).residue(), a % P4);
+            assert_eq!(MersenneInt::<56, 5>::new(a).residue(), a % P5);
+            assert_eq!(MersenneInt::<122, 3>::new(a).residue(), a % P6);
         }
     }
 
     #[test]
-    fn binary_op_tests() {
-        // TODO(v0.3): test more operations and more primes
-        for _ in 0..10 {
-            // mod 2^31-1
+    fn test_against_prim() {
+        for _ in 0..NRANDOM {
             let (a, b) = (random::<u128>(), random::<u128>());
+            let e = random::<u8>();
+
+            // mod 2^31-1
             let am = MersenneInt::<31, 1>::new(a);
             let bm = MersenneInt::<31, 1>::new(b);
             assert_eq!((am + bm).residue(), a.addm(b, &P1));
             assert_eq!((am - bm).residue(), a.subm(b, &P1));
             assert_eq!((am * bm).residue(), a.mulm(b, &P1));
+            assert_eq!((am / bm).residue(), a.mulm(b.invm(&P1).unwrap(), &P1));
+            assert_eq!(am.neg().residue(), a.negm(&P1));
+            assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P1));
+
+            // mod 2^61-1
+            let am = MersenneInt::<61, 1>::new(a);
+            let bm = MersenneInt::<61, 1>::new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &P2));
+            assert_eq!((am - bm).residue(), a.subm(b, &P2));
+            assert_eq!((am * bm).residue(), a.mulm(b, &P2));
+            assert_eq!((am / bm).residue(), a.mulm(b.invm(&P2).unwrap(), &P2));
+            assert_eq!(am.neg().residue(), a.negm(&P2));
+            assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P2));
+
+            // mod 2^127-1
+            let am = MersenneInt::<127, 1>::new(a);
+            let bm = MersenneInt::<127, 1>::new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &P3));
+            assert_eq!((am - bm).residue(), a.subm(b, &P3));
+            assert_eq!((am * bm).residue(), a.mulm(b, &P3));
+            assert_eq!((am / bm).residue(), a.mulm(b.invm(&P3).unwrap(), &P3));
+            assert_eq!(am.neg().residue(), a.negm(&P3));
+            assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P3));
+
+            // mod 2^32-5
+            let am = MersenneInt::<32, 5>::new(a);
+            let bm = MersenneInt::<32, 5>::new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &P4));
+            assert_eq!((am - bm).residue(), a.subm(b, &P4));
+            assert_eq!((am * bm).residue(), a.mulm(b, &P4));
+            assert_eq!((am / bm).residue(), a.mulm(b.invm(&P4).unwrap(), &P4));
+            assert_eq!(am.neg().residue(), a.negm(&P4));
+            assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P4));
+
+            // mod 2^56-5
+            let am = MersenneInt::<56, 5>::new(a);
+            let bm = MersenneInt::<56, 5>::new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &P5));
+            assert_eq!((am - bm).residue(), a.subm(b, &P5));
+            assert_eq!((am * bm).residue(), a.mulm(b, &P5));
+            assert_eq!((am / bm).residue(), a.mulm(b.invm(&P5).unwrap(), &P5));
+            assert_eq!(am.neg().residue(), a.negm(&P5));
+            assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P5));
+
+            // mod 2^122-3
+            let am = MersenneInt::<122, 3>::new(a);
+            let bm = MersenneInt::<122, 3>::new(b);
+            assert_eq!((am + bm).residue(), a.addm(b, &P6));
+            assert_eq!((am - bm).residue(), a.subm(b, &P6));
+            assert_eq!((am * bm).residue(), a.mulm(b, &P6));
+            assert_eq!((am / bm).residue(), a.mulm(b.invm(&P6).unwrap(), &P6));
+            assert_eq!(am.neg().residue(), a.negm(&P6));
+            assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P6));
         }
     }
 }

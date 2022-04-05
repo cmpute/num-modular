@@ -15,7 +15,7 @@
 //!
 //! // convert integers into ModularInteger
 //! let mx = MontgomeryInt::new(x, m);
-//! let my = mx.new(y); // faster than static new()
+//! let my = mx.convert(y); // faster than static MontgomeryInt::new(y, m)
 //! assert_eq!((mx * my).residue(), x * y % m);
 //! ```
 //!
@@ -152,7 +152,7 @@ pub trait ModularInteger:
     ///
     /// This method should be perferred over the static
     /// constructor to prevent unnecessary overhead of pre-computation.
-    fn new(&self, n: Self::Base) -> Self;
+    fn convert(&self, n: Self::Base) -> Self;
 }
 
 mod barret;

@@ -385,8 +385,7 @@ where
     }
 
     #[inline]
-    fn new(&self, n: T) -> Self {
-        // TODO(v0.3): rename to convert
+    fn convert(&self, n: T) -> Self {
         let a = Montgomery::transform(n, &self.m);
         MontgomeryInt {
             a,
@@ -399,8 +398,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ModularCoreOps;
+    use crate::{ModularCoreOps, ModularUnaryOps, ModularPow};
     use rand::random;
+
+    const NRANDOM: u32 = 10;
 
     #[test]
     fn creation_test() {
@@ -411,7 +412,7 @@ mod tests {
         assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
 
         // random creation test
-        for _ in 0..10 {
+        for _ in 0..NRANDOM {
             let a = random::<u8>();
             let m = random::<u8>() | 1;
             assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
@@ -435,48 +436,62 @@ mod tests {
     }
 
     #[test]
-    fn binary_op_tests() {
-        // TODO(v0.3): test more operations
-        for _ in 0..10 {
+    fn test_against_prim() {
+        for _ in 0..NRANDOM {
             let m = random::<u8>() | 1;
+            let e = random::<u8>();
             let (a, b) = (random::<u8>(), random::<u8>());
             let am = MontgomeryInt::new(a, m);
-            let bm = am.new(b);
+            let bm = am.convert(b);
             assert_eq!((am + bm).residue(), a.addm(b, &m));
             assert_eq!((am - bm).residue(), a.subm(b, &m));
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
+            assert_eq!((-am).residue(), a.negm(&m));
+            assert_eq!(am.pow(e).residue(), a.powm(e, &m));
 
             let m = random::<u16>() | 1;
+            let e = e as u16;
             let (a, b) = (random::<u16>(), random::<u16>());
             let am = MontgomeryInt::new(a, m);
-            let bm = am.new(b);
+            let bm = am.convert(b);
             assert_eq!((am + bm).residue(), a.addm(b, &m));
             assert_eq!((am - bm).residue(), a.subm(b, &m));
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
+            assert_eq!((-am).residue(), a.negm(&m));
+            assert_eq!(am.pow(e).residue(), a.powm(e, &m));
 
             let m = random::<u32>() | 1;
+            let e = e as u32;
             let (a, b) = (random::<u32>(), random::<u32>());
             let am = MontgomeryInt::new(a, m);
-            let bm = am.new(b);
+            let bm = am.convert(b);
             assert_eq!((am + bm).residue(), a.addm(b, &m));
             assert_eq!((am - bm).residue(), a.subm(b, &m));
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
+            assert_eq!((-am).residue(), a.negm(&m));
+            assert_eq!(am.pow(e).residue(), a.powm(e, &m));
 
             let m = random::<u64>() | 1;
+            let e = e as u64;
             let (a, b) = (random::<u64>(), random::<u64>());
             let am = MontgomeryInt::new(a, m);
-            let bm = am.new(b);
+            let bm = am.convert(b);
             assert_eq!((am + bm).residue(), a.addm(b, &m));
             assert_eq!((am - bm).residue(), a.subm(b, &m));
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
+            assert_eq!((-am).residue(), a.negm(&m));
+            assert_eq!(am.pow(e).residue(), a.powm(e, &m));
 
             let m = random::<u128>() | 1;
+            let e = e as u128;
             let (a, b) = (random::<u128>(), random::<u128>());
             let am = MontgomeryInt::new(a, m);
-            let bm = am.new(b);
+            let bm = am.convert(b);
             assert_eq!((am + bm).residue(), a.addm(b, &m));
             assert_eq!((am - bm).residue(), a.subm(b, &m));
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
+            assert_eq!((-am).residue(), a.negm(&m));
+            assert_eq!(am.pow(e).residue(), a.powm(e, &m));
         }
     }
 }
