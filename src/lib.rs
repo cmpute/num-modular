@@ -19,6 +19,7 @@
 //! assert_eq!((mx * my).residue(), x * y % m);
 //! ```
 //!
+// TODO(v0.3): Fix docs
 
 // XXX: consider implementing lookup table based modulo?
 // REF: https://eprint.iacr.org/2014/040.pdf

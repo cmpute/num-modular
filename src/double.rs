@@ -3,9 +3,19 @@
 
 use core::ops::*;
 
+use num_integer::Integer;
+
 /// Alias of the builtin integer type with max width (currently [u128])
 #[allow(non_camel_case_types)]
 pub type umax = u128;
+
+const HALF_BITS: u32 = umax::BITS / 2;
+
+// Split umax into hi and lo parts. Tt's critical to use inline here
+#[inline(always)]
+const fn split(v: umax) -> (umax, umax) {
+    (v >> HALF_BITS, v & (umax::MAX >> HALF_BITS))
+}
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -37,13 +47,6 @@ impl udouble {
     //> (used in MersenneInt, Montgomery::<u128>::{reduce, mul}, num-order::NumHash)
     #[inline]
     pub const fn widening_mul(lhs: umax, rhs: umax) -> Self {
-        const HALF_BITS: u32 = umax::BITS / 2;
-
-        // it's critical to use inline here
-        #[inline(always)]
-        const fn split(v: u128) -> (u128, u128) {
-            (v >> HALF_BITS, v & (umax::MAX >> HALF_BITS))
-        }
         let ((x1, x0), (y1, y0)) = (split(lhs), split(rhs));
 
         let z2 = x1 * y1;
@@ -66,14 +69,14 @@ impl udouble {
         (Self { lo, hi }, of1 || of2)
     }
 
-    // double by single multiplication, listed here in case of future use
+    // double by double multiplication, listed here in case of future use
     #[allow(dead_code)]
     fn overflowing_mul(&self, rhs: Self) -> (Self, bool) {
         let c2 = self.hi != 0 && rhs.hi != 0;
         let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs.lo);
-        let (z1x, c1x) = u128::overflowing_mul(self.lo, rhs.hi);
-        let (z1y, c1y) = u128::overflowing_mul(self.hi, rhs.lo);
-        let (z1z, c1z) = u128::overflowing_add(z1x, z1y);
+        let (z1x, c1x) = umax::overflowing_mul(self.lo, rhs.hi);
+        let (z1y, c1y) = umax::overflowing_mul(self.hi, rhs.lo);
+        let (z1z, c1z) = umax::overflowing_add(z1x, z1y);
         let (z1, c1) = z1z.overflowing_add(c0);
         (Self { hi: z1, lo: z0 }, c1x | c1y | c1z | c1 | c2)
     }
@@ -197,7 +200,7 @@ macro_rules! impl_sh_ops {
             #[inline]
             fn shl(self, rhs: $t) -> Self::Output {
                 match rhs {
-                    0 => self,
+                    0 => self, // avoid shifting by full bits, which is UB
                     s if s >= umax::BITS as $t => Self {
                         hi: self.lo << (s - umax::BITS as $t),
                         lo: 0,
@@ -329,7 +332,7 @@ impl Not for udouble {
 }
 
 impl udouble {
-    //> (used in Self::div_mod)
+    //> (used in Self::div_rem)
     #[inline]
     pub const fn leading_zeros(self) -> u32 {
         if self.hi == 0 {
@@ -339,9 +342,9 @@ impl udouble {
         }
     }
 
-    // similar to udiv_qrnnd
-    // TODO(v0.3): optimize to only support div single word
-    pub fn div_rem(self, other: Self) -> (Self, Self) {
+    // double by double division (long division), listed here in case of future use
+    #[allow(dead_code)]
+    fn div_rem(self, other: Self) -> (Self, Self) {
         let mut n = self; // numerator
         let mut d = other; // denominator
         let mut q = Self{ lo: 0, hi: 0 }; // quotient
@@ -373,6 +376,57 @@ impl udouble {
         }
         (q, n)
     }
+
+    // double by single to single division.
+    // equivalent to `udiv_qrnnd` in C or `divq` in assembly.
+    //> (used in Self::{div, rem}::<umax>)
+    fn div_rem1(self, other: umax) -> (umax, umax) {
+        // the following algorithm comes from `ethnum` crate
+        const B: umax = 1 << HALF_BITS; // number base (64 bits)
+
+        // Normalize the divisor.
+        let s = other.leading_zeros();
+        let (n, d) = (self << s, other << s); // numerator, denominator
+        let (d1, d0) = split(d);
+        let (n1, n0) = split(n.lo); // split lower part of dividend
+
+        // Compute the first quotient digit q1.
+        let (mut q1, mut rhat) = n.hi.div_rem(&d1);
+
+        // q1 has at most error 2. No more than 2 iterations.
+        while q1 >= B || q1 * d0 > B * rhat + n1 {
+            q1 -= 1;
+            rhat += d1;
+            if rhat >= B {
+                break;
+            }
+        }
+
+        let r21 = n.hi
+            .wrapping_mul(B)
+            .wrapping_add(n1)
+            .wrapping_sub(q1.wrapping_mul(d));
+
+        // Compute the second quotient digit q0.
+        let (mut q0, mut rhat) = r21.div_rem(&d1);
+    
+        // q0 has at most error 2. No more than 2 iterations.
+        while q0 >= B || q0 * d0 > B * rhat + n0 {
+            q0 -= 1;
+            rhat += d1;
+            if rhat >= B {
+                break;
+            }
+        }
+    
+        let r = (r21
+            .wrapping_mul(B)
+            .wrapping_add(n0)
+            .wrapping_sub(q0.wrapping_mul(d)))
+            >> s;
+        let q = q1 * B + q0;
+        (q, r)
+    }
 }
 
 impl Mul<umax> for udouble {
@@ -387,16 +441,31 @@ impl Div<umax> for udouble {
     type Output = Self;
     #[inline]
     fn div(self, rhs: umax) -> Self::Output {
-        self.div_rem(rhs.into()).0
+        // self.div_rem(rhs.into()).0
+        if self.hi < rhs {
+            // The result fits in 128 bits.
+            Self { lo: self.div_rem1(rhs).0, hi: 0 }
+        } else {
+            let (q, r) = self.hi.div_rem(&rhs);
+            Self {
+                lo: Self { lo: self.lo, hi: r }.div_rem1(rhs).0,
+                hi: q
+            }
+        }
     }
 }
 
 //> (used in Montgomery::<u128>::transform)
 impl Rem<umax> for udouble {
-    type Output = Self;
+    type Output = umax;
     #[inline]
     fn rem(self, rhs: umax) -> Self::Output {
-        self.div_rem(rhs.into()).1
+        if self.hi < rhs {
+            // The result fits in 128 bits.
+            self.div_rem1(rhs).1
+        } else {
+            Self { lo: self.lo, hi: self.hi % rhs}.div_rem1(rhs).1
+        }
     }
 }
 
@@ -448,10 +517,10 @@ mod tests {
         assert_eq!(ONEMAX / ONE.lo, ONEMAX);
         assert_eq!(ONEMAX / MAX.lo, TWO);
         assert_eq!(ONEMAX / TWO.lo, MAX);
-        assert_eq!(ONE % MAX.lo, ONE);
-        assert_eq!(TWO % MAX.lo, TWO);
-        assert_eq!(ONEMAX % MAX.lo, ONE);
-        assert_eq!(ONEMAX % TWO.lo, ONE);
+        assert_eq!(ONE % MAX.lo, 1);
+        assert_eq!(TWO % MAX.lo, 2);
+        assert_eq!(ONEMAX % MAX.lo, 1);
+        assert_eq!(ONEMAX % TWO.lo, 1);
 
         assert_eq!(ONEMAX.checked_mul1(MAX.lo), None);
         assert_eq!(TWOZERO.checked_mul1(MAX.lo), None);

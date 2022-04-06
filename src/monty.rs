@@ -238,8 +238,7 @@ impl Montgomery for u128 {
         if target == 0 {
             return 0;
         }
-        let r = udouble { hi: target, lo: 0 } % *m;
-        r.lo
+        udouble { hi: target, lo: 0 } % *m
     }
 
     // REDC algorithm
