@@ -22,7 +22,8 @@ impl<const P: u8, const K: umax> MersenneInt<P, K> {
         // FIXME: use compile time checks, maybe after https://github.com/rust-lang/rust/issues/76560
         assert!(P <= 127);
         assert!(K > 0 && K < 2u128.pow(P as u32 - 1) && K % 2 == 1);
-        assert!(Self::MODULUS % 3 != 0
+        assert!(
+            Self::MODULUS % 3 != 0
                 && Self::MODULUS % 5 != 0
                 && Self::MODULUS % 7 != 0
                 && Self::MODULUS % 11 != 0

@@ -301,7 +301,8 @@ where
     #[inline]
     pub fn new(n: T, m: T) -> Self {
         // TODO: accept even numbers by removing 2 factors from m and store the exponent
-        let minv = Montgomery::neginv(&m).expect("the modulus has to be odd for 2^n based Montgomery");
+        let minv =
+            Montgomery::neginv(&m).expect("the modulus has to be odd for 2^n based Montgomery");
         let a = Montgomery::transform(n, &m);
         MontgomeryInt { a, m, mi: minv }
     }
@@ -419,7 +420,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ModularCoreOps, ModularUnaryOps, ModularPow};
+    use crate::{ModularCoreOps, ModularPow, ModularUnaryOps};
     use rand::random;
 
     const NRANDOM: u32 = 10;

@@ -1,4 +1,5 @@
 //! This module implements a double width integer type based on the largest built-in integer (u128)
+//! Part of the optimization comes from `ethnum` and `zkp-u256` crates.
 
 use core::ops::*;
 
@@ -20,12 +21,10 @@ pub struct udouble {
     pub lo: umax,
 }
 
-// TODO: port optimizations from and benchmark against
-//       https://github.com/nlordell/ethnum-rs
-
 impl udouble {
     //> (not used yet)
-    pub fn widening_add(lhs: umax, rhs: umax) -> Self {
+    #[inline]
+    pub const fn widening_add(lhs: umax, rhs: umax) -> Self {
         let (sum, carry) = lhs.overflowing_add(rhs);
         udouble {
             hi: carry as umax,
@@ -36,22 +35,30 @@ impl udouble {
     /// Calculate multiplication of two [umax] integers with result represented in double width integer
     // equivalent to umul_ppmm, can be implemented efficiently with carrying_mul and widening_mul implemented (rust#85532)
     //> (used in MersenneInt, Montgomery::<u128>::{reduce, mul}, num-order::NumHash)
-    // TODO(v0.3): implement as const fn
-    pub fn widening_mul(lhs: umax, rhs: umax) -> Self {
-        const HALF_BITS: u32 = umax::BITS >> 1;
-        let halves = |x| (x >> HALF_BITS, x & !(0 as umax) >> HALF_BITS);
-        let ((x1, x0), (y1, y0)) = (halves(lhs), halves(rhs));
-        let (z2, z0) = (x1 * y1, x0 * y0);
-        // it's possible to use Karatsuba multiplication, but overflow checking is much easier here
-        let (z1, c1) = (x1 * y0).overflowing_add(x0 * y1);
-        let (lo, c0) = umax::overflowing_add(z0, z1 << HALF_BITS);
+    #[inline]
+    pub const fn widening_mul(lhs: umax, rhs: umax) -> Self {
+        const HALF_BITS: u32 = umax::BITS / 2;
+
+        // it's critical to use inline here
+        #[inline(always)]
+        const fn split(v: u128) -> (u128, u128) {
+            (v >> HALF_BITS, v & (umax::MAX >> HALF_BITS))
+        }
+        let ((x1, x0), (y1, y0)) = (split(lhs), split(rhs));
+
+        let z2 = x1 * y1;
+        let (c0, z0) = split(x0 * y0); // l1 <= umax::MAX - 2
+        let (c1, z1) = split(x1 * y0 + c0);
+        let z2 = z2 + c1;
+        let (c1, z1) = split(x0 * y1 + z1);
         Self {
-            hi: z2 + (z1 >> HALF_BITS) + c0 as umax + ((c1 as umax) << HALF_BITS),
-            lo,
+            hi: z2 + c1,
+            lo: z0 | z1 << HALF_BITS
         }
     }
 
     //> (used in Montgomery::<u128>::reduce)
+    #[inline]
     pub const fn overflowing_add(&self, rhs: Self) -> (Self, bool) {
         let (lo, carry) = self.lo.overflowing_add(rhs.lo);
         let (hi, of1) = self.hi.overflowing_add(rhs.hi);
@@ -59,9 +66,22 @@ impl udouble {
         (Self { lo, hi }, of1 || of2)
     }
 
+    // double by single multiplication, listed here in case of future use
+    #[allow(dead_code)]
+    fn overflowing_mul(&self, rhs: Self) -> (Self, bool) {
+        let c2 = self.hi != 0 && rhs.hi != 0;
+        let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs.lo);
+        let (z1x, c1x) = u128::overflowing_mul(self.lo, rhs.hi);
+        let (z1y, c1y) = u128::overflowing_mul(self.hi, rhs.lo);
+        let (z1z, c1z) = u128::overflowing_add(z1x, z1y);
+        let (z1, c1) = z1z.overflowing_add(c0);
+        (Self { hi: z1, lo: z0 }, c1x | c1y | c1z | c1 | c2)
+    }
+
     /// Multiplication of double width and single width
     //> (used in num-order:NumHash)
-    pub fn overflowing_mul1(&self, rhs: umax) -> (Self, bool) {
+    #[inline]
+    pub const fn overflowing_mul1(&self, rhs: umax) -> (Self, bool) {
         let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs);
         let (z1, c1) = self.hi.overflowing_mul(rhs);
         let (z1, cs1) = z1.overflowing_add(c0);
@@ -70,6 +90,7 @@ impl udouble {
 
     /// Multiplication of double width and single width
     //> (used in Self::mul::<umax>)
+    #[inline]
     pub fn checked_mul1(&self, rhs: umax) -> Option<Self> {
         let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs);
         let z1 = self.hi.checked_mul(rhs)?.checked_add(c0)?;
@@ -77,6 +98,7 @@ impl udouble {
     }
 
     //> (used in num-order::NumHash)
+    #[inline]
     pub fn checked_shl(self, rhs: u32) -> Option<Self> {
         if rhs < umax::BITS * 2 {
             Some(self << rhs)
@@ -86,6 +108,7 @@ impl udouble {
     }
 
     //> (not used yet)
+    #[inline]
     pub fn checked_shr(self, rhs: u32) -> Option<Self> {
         if rhs < umax::BITS * 2 {
             Some(self >> rhs)
@@ -96,6 +119,7 @@ impl udouble {
 }
 
 impl From<umax> for udouble {
+    #[inline]
     fn from(v: umax) -> Self {
         Self { lo: v, hi: 0 }
     }
@@ -105,6 +129,7 @@ impl Add for udouble {
     type Output = udouble;
 
     // equivalent to add_ssaaaa
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         let (lo, carry) = self.lo.overflowing_add(rhs.lo);
         let hi = self.hi + rhs.hi + carry as umax;
@@ -114,6 +139,7 @@ impl Add for udouble {
 
 impl Add<umax> for udouble {
     type Output = udouble;
+    #[inline]
     fn add(self, rhs: umax) -> Self::Output {
         let (lo, carry) = self.lo.overflowing_add(rhs);
         let hi = if carry { self.hi + 1 } else { self.hi };
@@ -122,6 +148,7 @@ impl Add<umax> for udouble {
 }
 
 impl AddAssign for udouble {
+    #[inline]
     fn add_assign(&mut self, rhs: Self) {
         let (lo, carry) = self.lo.overflowing_add(rhs.lo);
         self.lo = lo;
@@ -130,6 +157,7 @@ impl AddAssign for udouble {
 }
 
 impl AddAssign<umax> for udouble {
+    #[inline]
     fn add_assign(&mut self, rhs: umax) {
         let (lo, carry) = self.lo.overflowing_add(rhs);
         self.lo = lo;
@@ -142,6 +170,7 @@ impl AddAssign<umax> for udouble {
 //> (used in test of Add)
 impl Sub for udouble {
     type Output = Self;
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         let carry = self.lo < rhs.lo;
         let lo = self.lo.wrapping_sub(rhs.lo);
@@ -152,6 +181,7 @@ impl Sub for udouble {
 
 //> (used in test of AddAssign)
 impl SubAssign for udouble {
+    #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         let carry = self.lo < rhs.lo;
         self.lo = self.lo.wrapping_sub(rhs.lo);
@@ -164,6 +194,7 @@ macro_rules! impl_sh_ops {
         //> (used in Self::checked_shl)
         impl Shl<$t> for udouble {
             type Output = Self;
+            #[inline]
             fn shl(self, rhs: $t) -> Self::Output {
                 match rhs {
                     0 => self,
@@ -180,6 +211,7 @@ macro_rules! impl_sh_ops {
         }
         //> (not used yet)
         impl ShlAssign<$t> for udouble {
+            #[inline]
             fn shl_assign(&mut self, rhs: $t) {
                 match rhs {
                     0 => {}
@@ -198,6 +230,7 @@ macro_rules! impl_sh_ops {
         //> (used in Self::checked_shr)
         impl Shr<$t> for udouble {
             type Output = Self;
+            #[inline]
             fn shr(self, rhs: $t) -> Self::Output {
                 match rhs {
                     0 => self,
@@ -214,6 +247,7 @@ macro_rules! impl_sh_ops {
         }
         //> (not used yet)
         impl ShrAssign<$t> for udouble {
+            #[inline]
             fn shr_assign(&mut self, rhs: $t) {
                 match rhs {
                     0 => {}
@@ -240,12 +274,14 @@ impl_sh_ops!(u32);
 //> (not used yet)
 impl BitAnd for udouble {
     type Output = Self;
+    #[inline]
     fn bitand(self, rhs: Self) -> Self::Output {
         Self { lo: self.lo & rhs.lo, hi: self.hi & rhs.hi }
     }
 }
 //> (not used yet)
 impl BitAndAssign for udouble {
+    #[inline]
     fn bitand_assign(&mut self, rhs: Self) {
         self.lo &= rhs.lo;
         self.hi &= rhs.hi;
@@ -254,12 +290,14 @@ impl BitAndAssign for udouble {
 //> (not used yet)
 impl BitOr for udouble {
     type Output = Self;
+    #[inline]
     fn bitor(self, rhs: Self) -> Self::Output {
         Self { lo: self.lo | rhs.lo, hi: self.hi | rhs.hi }
     }
 }
 //> (not used yet)
 impl BitOrAssign for udouble {
+    #[inline]
     fn bitor_assign(&mut self, rhs: Self) {
         self.lo |= rhs.lo;
         self.hi |= rhs.hi;
@@ -268,12 +306,14 @@ impl BitOrAssign for udouble {
 //> (not used yet)
 impl BitXor for udouble {
     type Output = Self;
+    #[inline]
     fn bitxor(self, rhs: Self) -> Self::Output {
         Self { lo: self.lo ^ rhs.lo, hi: self.hi ^ rhs.hi }
     }
 }
 //> (not used yet)
 impl BitXorAssign for udouble {
+    #[inline]
     fn bitxor_assign(&mut self, rhs: Self) {
         self.lo ^= rhs.lo;
         self.hi ^= rhs.hi;
@@ -282,6 +322,7 @@ impl BitXorAssign for udouble {
 //> (not used yet)
 impl Not for udouble {
     type Output = Self;
+    #[inline]
     fn not(self) -> Self::Output {
         Self { lo: !self.lo, hi: !self.hi }
     }
@@ -289,6 +330,7 @@ impl Not for udouble {
 
 impl udouble {
     //> (used in Self::div_mod)
+    #[inline]
     pub const fn leading_zeros(self) -> u32 {
         if self.hi == 0 {
             self.lo.leading_zeros() + umax::BITS
@@ -335,6 +377,7 @@ impl udouble {
 
 impl Mul<umax> for udouble {
     type Output = Self;
+    #[inline]
     fn mul(self, rhs: umax) -> Self::Output {
         self.checked_mul1(rhs).expect("multiplication overflow!")
     }
@@ -342,6 +385,7 @@ impl Mul<umax> for udouble {
 
 impl Div<umax> for udouble {
     type Output = Self;
+    #[inline]
     fn div(self, rhs: umax) -> Self::Output {
         self.div_rem(rhs.into()).0
     }
@@ -350,6 +394,7 @@ impl Div<umax> for udouble {
 //> (used in Montgomery::<u128>::transform)
 impl Rem<umax> for udouble {
     type Output = Self;
+    #[inline]
     fn rem(self, rhs: umax) -> Self::Output {
         self.div_rem(rhs.into()).1
     }
