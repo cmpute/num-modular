@@ -139,7 +139,7 @@ impl Add for udouble {
         Self { lo, hi }
     }
 }
-
+//> (used in Self::div_rem)
 impl Add<umax> for udouble {
     type Output = udouble;
     #[inline]
@@ -149,7 +149,6 @@ impl Add<umax> for udouble {
         Self { lo, hi }
     }
 }
-
 impl AddAssign for udouble {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
@@ -158,7 +157,6 @@ impl AddAssign for udouble {
         self.hi += rhs.hi + carry as umax;
     }
 }
-
 impl AddAssign<umax> for udouble {
     #[inline]
     fn add_assign(&mut self, rhs: umax) {
@@ -181,7 +179,16 @@ impl Sub for udouble {
         Self { lo, hi }
     }
 }
-
+impl Sub<umax> for udouble {
+    type Output = Self;
+    #[inline]
+    fn sub(self, rhs: umax) -> Self::Output {
+        let carry = self.lo < rhs;
+        let lo = self.lo.wrapping_sub(rhs);
+        let hi = if carry { self.hi - 1 } else { self.hi };
+        Self { lo, hi }
+    }
+}
 //> (used in test of AddAssign)
 impl SubAssign for udouble {
     #[inline]
@@ -189,6 +196,14 @@ impl SubAssign for udouble {
         let carry = self.lo < rhs.lo;
         self.lo = self.lo.wrapping_sub(rhs.lo);
         self.hi -= rhs.hi + carry as umax;
+    }
+}
+impl SubAssign<umax> for udouble {
+    #[inline]
+    fn sub_assign(&mut self, rhs: umax) {
+        let carry = self.lo < rhs;
+        self.lo = self.lo.wrapping_sub(rhs);
+        if carry { self.hi -= 1; }
     }
 }
 

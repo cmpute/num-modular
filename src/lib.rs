@@ -2,8 +2,8 @@
 //! including primitive integers and `num-bigint`. The latter option is enabled optionally.
 //!
 //! To achieve fast modular arithmetics, convert integers to any [ModularInteger] implementation
-//! use static `new()` or associated [ModularInteger::new()]. [MontgomeryInt] is a builtin implementation
-//! of [ModularInteger] based on the Montgomery form.
+//! use static `new()` or associated [ModularInteger::convert()] functions. Some builtin implementations
+//! of [ModularInteger] includes [MontgomeryInt] and [MersenneInt].
 //!
 //! Example code:
 //! ```rust
@@ -19,7 +19,6 @@
 //! assert_eq!((mx * my).residue(), x * y % m);
 //! ```
 //!
-// TODO(v0.3): Fix docs
 
 // XXX: consider implementing lookup table based modulo?
 // REF: https://eprint.iacr.org/2014/040.pdf
@@ -30,7 +29,7 @@ extern crate std;
 
 use core::ops::{Add, Mul, Neg, Sub};
 
-/// This trait describes core modular arithmetic operations.
+/// Core modular arithmetic operations.
 ///
 /// Note that all functions will panic if the modulus is zero.
 pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
@@ -46,6 +45,9 @@ pub trait ModularCoreOps<Rhs = Self, Modulus = Self> {
     fn mulm(self, rhs: Rhs, m: Modulus) -> Self::Output;
 }
 
+/// Core unary modular arithmetics
+///
+/// Note that all functions will panic if the modulus is zero.
 pub trait ModularUnaryOps<Modulus = Self> {
     type Output;
 
@@ -63,6 +65,7 @@ pub trait ModularUnaryOps<Modulus = Self> {
     // REF: https://stackoverflow.com/questions/6752374/cube-root-modulo-p-how-do-i-do-this
 }
 
+/// Modular power functions
 pub trait ModularPow<Exp = Self, Modulus = Self> {
     type Output;
 
@@ -70,6 +73,7 @@ pub trait ModularPow<Exp = Self, Modulus = Self> {
     fn powm(self, exp: Exp, m: Modulus) -> Self::Output;
 }
 
+/// Math symbols related to modular arithmetics
 pub trait ModularSymbols<Modulus = Self> {
     /// Calculate Legendre Symbol (a|n), where a is self.
     ///
@@ -83,7 +87,7 @@ pub trait ModularSymbols<Modulus = Self> {
         self.checked_legendre(n).expect("n shoud be a prime")
     }
 
-    /// Checked version of [legendre], return [None] if n is not prime
+    /// Checked version of [legendre()][ModularSymbols::legendre], return [None] if n is not prime
     fn checked_legendre(&self, n: Modulus) -> Option<i8>;
 
     /// Calculate Jacobi Symbol (a|n), where a is self
@@ -96,7 +100,7 @@ pub trait ModularSymbols<Modulus = Self> {
             .expect("the Jacobi symbol is only defined for non-negative odd integers")
     }
 
-    /// Checked version of [jacobi], return [None] if n is negative or even
+    /// Checked version of [jacobi()][ModularSymbols::jacobi], return [None] if n is negative or even
     fn checked_jacobi(&self, n: Modulus) -> Option<i8>;
 
     /// Calculate Kronecker Symbol (a|n), where a is self
