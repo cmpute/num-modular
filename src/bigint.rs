@@ -87,6 +87,14 @@ macro_rules! impl_mod_ops_by_ref {
             fn invm(self, m: &$T) -> Option<$T> {
                 ModularUnaryOps::<&$T>::invm(&self, m)
             }
+            #[inline]
+            fn dblm(self, m: &$T) -> $T {
+                ModularUnaryOps::<&$T>::dblm(&self, m)
+            }
+            #[inline]
+            fn sqm(self, m: &$T) -> $T {
+                ModularUnaryOps::<&$T>::sqm(&self, m)
+            }
         }
     };
 }
@@ -160,6 +168,22 @@ mod _num_bigint {
             } else {
                 Some(last_t)
             }
+        }
+
+        #[inline]
+        fn dblm(self, m: &BigUint) -> BigUint {
+            let x = self % m;
+            let d = x << 1;
+            if &d > m {
+                d - m
+            } else {
+                d
+            }
+        }
+
+        #[inline]
+        fn sqm(self, m: &BigUint) -> BigUint {
+            self.mulm(self, m)
         }
     }
 

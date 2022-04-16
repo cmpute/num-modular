@@ -60,6 +60,12 @@ pub trait ModularUnaryOps<Modulus = Self> {
     /// the result will be [None].
     fn invm(self, m: Modulus) -> Option<Self::Output>;
 
+    /// Calculate modular double ( x+x mod m)
+    fn dblm(self, m: Modulus) -> Self::Output;
+
+    /// Calculate modular square ( x*x mod m )
+    fn sqm(self, m: Modulus) -> Self::Output;
+
     // TODO: Modular sqrt aka Quadratic residue, follow the behavior of FLINT `n_sqrtmod`
     // fn sqrtm(self, m: Modulus) -> Option<Self::Output>;
     // REF: https://stackoverflow.com/questions/6752374/cube-root-modulo-p-how-do-i-do-this
@@ -111,20 +117,23 @@ pub trait ModularSymbols<Modulus = Self> {
 // fn logm(self, base: Modulus, m: Modulus);
 
 /// Collection of common modular arithmetic operations
-pub trait ModularOps<Rhs = Self, Modulus = Self>:
-    ModularCoreOps<Rhs, Modulus>
-    + ModularUnaryOps<Modulus>
-    + ModularPow<Rhs, Modulus>
+pub trait ModularOps<Rhs = Self, Modulus = Self, Output = Self>:
+    ModularCoreOps<Rhs, Modulus, Output = Output>
+    + ModularUnaryOps<Modulus, Output = Output>
+    + ModularPow<Rhs, Modulus, Output = Output>
     + ModularSymbols<Modulus>
 {
 }
 impl<T, Rhs, Modulus> ModularOps<Rhs, Modulus> for T where
-    T: ModularCoreOps<Rhs, Modulus>
-        + ModularUnaryOps<Modulus>
-        + ModularPow<Rhs, Modulus>
+    T: ModularCoreOps<Rhs, Modulus, Output = T>
+        + ModularUnaryOps<Modulus, Output = T>
+        + ModularPow<Rhs, Modulus, Output = T>
         + ModularSymbols<Modulus>
 {
 }
+
+pub trait ModularRefOps: for<'r> ModularOps<&'r Self, &'r Self> + Sized {}
+impl<T> ModularRefOps for T where T: for<'r> ModularOps<&'r T, &'r T> {}
 
 /// Provides a utility function to convert signed integers into unsigned modular form
 pub trait ModularAbs<Modulus> {
@@ -168,8 +177,6 @@ mod prim;
 
 pub use double::{udouble, umax};
 pub use mersenne::MersenneInt;
-#[cfg(std)]
-pub use monty::MontgomeryBigint;
 pub use monty::{Montgomery, MontgomeryInt};
 
 #[cfg(feature = "num-bigint")]

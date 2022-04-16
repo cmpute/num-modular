@@ -2,7 +2,7 @@ use crate::{udouble, umax, ModularInteger, ModularUnaryOps};
 use core::ops::*;
 use num_traits::{Inv, Pow};
 
-// TODO: use unchecked operators to speed up calculation
+// FIXME: use unchecked operators to speed up calculation (after https://github.com/rust-lang/rust/issues/85122)
 /// An unsigned integer modulo (pseudo) Mersenne primes `2^P - K`, it supports P up to 127 and `K < 2^(P-1)`
 ///
 /// IMPORTANT NOTE: this class assumes that `2^P-K` is a prime. During compliation, we don't do full check

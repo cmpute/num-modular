@@ -238,6 +238,15 @@ macro_rules! impl_unary_uprim {
                     Some(last_t)
                 }
             }
+
+            #[inline]
+            fn dblm(self, m: &$T) -> $T {
+                self.addm(self, m)
+            }
+            #[inline]
+            fn sqm(self, m: &$T) -> $T {
+                self.mulm(self, m)
+            }
         }
     )*);
 }
@@ -327,6 +336,14 @@ macro_rules! impl_mod_ops_by_deref {
             #[inline]
             fn invm(self, m: &$T) -> Option<$T> {
                 ModularUnaryOps::<&$T>::invm(*self, m)
+            }
+            #[inline]
+            fn dblm(self, m: &$T) -> $T {
+                ModularUnaryOps::<&$T>::dblm(*self, m)
+            }
+            #[inline]
+            fn sqm(self, m: &$T) -> $T {
+                ModularUnaryOps::<&$T>::sqm(*self, m)
             }
         }
     )*};
@@ -610,6 +627,26 @@ mod tests {
             if let Some(ia) = a.invm(&m) {
                 assert_eq!(a.mulm(ia, &m), 1);
             }
+        }
+    }
+
+    #[test]
+    fn dblm_and_sqm_test() {
+        // random cases for u64 and u128
+        for _ in 0..NRANDOM {
+            let a = random::<u64>();
+            let m = random::<u64>();
+            assert_eq!(a.addm(a, &m), a.dblm(&m));
+            assert_eq!(a.mulm(2, &m), a.dblm(&m));
+            assert_eq!(a.mulm(a, &m), a.sqm(&m));
+            assert_eq!(a.powm(2, &m), a.sqm(&m));
+
+            let a = random::<u128>();
+            let m = random::<u128>();
+            assert_eq!(a.addm(a, &m), a.dblm(&m));
+            assert_eq!(a.mulm(2, &m), a.dblm(&m));
+            assert_eq!(a.mulm(a, &m), a.sqm(&m));
+            assert_eq!(a.powm(2, &m), a.sqm(&m));
         }
     }
 
