@@ -16,6 +16,58 @@ impl<const P: u8, const K: umax> MersenneInt<P, K> {
     const BITMASK: umax = (1 << P) - 1;
     const MODULUS: umax = (1 << P) - K;
 
+    // Calculate v % Self::MODULUS, where v is a umax integer
+    const fn reduce_single(v: umax) -> umax {
+        let mut lo = v & Self::BITMASK;
+        let mut hi = v >> P;
+        while hi > 0 {
+            let sum = if K == 1 { hi + lo } else { hi * K + lo };
+            lo = sum & Self::BITMASK;
+            hi = sum >> P;
+        }
+    
+        if K == 1 {
+            lo
+        } else {
+            if lo > Self::MODULUS {
+                lo - Self::MODULUS
+            } else {
+                lo
+            }
+        }
+    }
+
+    // Calculate v % Self::MODULUS, where v is a udouble integer
+    fn reduce_double(v: udouble) -> umax {
+        // reduce modulo
+        let mut lo = v.lo & Self::BITMASK;
+        let mut hi = v >> P;
+        while hi.hi > 0 {
+            // first reduce until high bits fit in umax
+            let sum = if K == 1 { hi + lo } else { hi * K + lo };
+            lo = sum.lo & Self::BITMASK;
+            hi = sum >> P;
+        }
+
+        let mut hi = hi.lo;
+        while hi > 0 {
+            // then reduce the smaller high bits
+            let sum = if K == 1 { hi + lo } else { hi * K + lo };
+            lo = sum & Self::BITMASK;
+            hi = sum >> P;
+        }
+
+        if K == 1 {
+            lo
+        } else {
+            if lo > Self::MODULUS {
+                lo - Self::MODULUS
+            } else {
+                lo
+            }
+        }
+    }
+
     /// Create a new MersenneInt instance from a normal integer (by modulo `2^P-K`)
     #[inline]
     pub const fn new(n: umax) -> Self {
@@ -29,25 +81,7 @@ impl<const P: u8, const K: umax> MersenneInt<P, K> {
                 && Self::MODULUS % 11 != 0
                 && Self::MODULUS % 13 != 0
         ); // error on easy composites
-
-        let mut lo = n & Self::BITMASK;
-        let mut hi = n >> P;
-        while hi > 0 {
-            let sum = if K == 1 { lo + hi } else { lo + hi * K };
-            lo = sum & Self::BITMASK;
-            hi = sum >> P;
-        }
-
-        let v = if K == 1 {
-            lo
-        } else {
-            if lo > Self::MODULUS {
-                lo - Self::MODULUS
-            } else {
-                lo
-            }
-        };
-        Self(v)
+        Self(Self::reduce_single(n))
     }
 }
 
@@ -90,65 +124,12 @@ impl<const P: u8, const K: umax> Sub for MersenneInt<P, K> {
 
 impl<const P: u8, const K: umax> Mul for MersenneInt<P, K> {
     type Output = Self;
+    #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
-        if (P as u32) < usize::BITS {
-            // optimized branch for small modulo
-
-            #[cfg(target_pointer_width = "32")]
-            type DOUBLESIZE = u64;
-            #[cfg(target_pointer_width = "64")]
-            type DOUBLESIZE = u128;
-            let prod = self.0 as DOUBLESIZE * rhs.0 as DOUBLESIZE;
-
-            // reduce modulo
-            let mut lo: DOUBLESIZE = prod & Self::BITMASK as DOUBLESIZE;
-            let mut hi: DOUBLESIZE = prod >> P;
-            while hi > 0 {
-                let sum = if K == 1 { hi + lo } else { hi * K + lo };
-                lo = sum & Self::BITMASK;
-                hi = sum >> P;
-            }
-
-            let v = if K == 1 {
-                lo
-            } else {
-                if lo > Self::MODULUS {
-                    lo - Self::MODULUS
-                } else {
-                    lo
-                }
-            };
-            Self(v as umax)
+        if (P as u32) < (umax::BITS / 2) {
+            Self(Self::reduce_single(self.0 * rhs.0))
         } else {
-            let prod = udouble::widening_mul(self.0, rhs.0);
-
-            // reduce modulo
-            let mut lo = prod.lo & Self::BITMASK;
-            let mut hi = prod >> P;
-            while hi.hi > 0 {
-                // first reduce until high bits fit in umax
-                let sum = if K == 1 { hi + lo } else { hi * K + lo };
-                lo = sum.lo & Self::BITMASK;
-                hi = sum >> P;
-            }
-
-            let mut hi = hi.lo;
-            while hi > 0 {
-                // then reduce the smaller high bits
-                let sum = if K == 1 { hi + lo } else { hi * K + lo };
-                lo = sum & Self::BITMASK;
-                hi = sum >> P;
-            }
-
-            Self(if K == 1 {
-                lo
-            } else {
-                if lo > Self::MODULUS {
-                    lo - Self::MODULUS
-                } else {
-                    lo
-                }
-            })
+            Self(Self::reduce_double(udouble::widening_mul(self.0, rhs.0)))
         }
     }
 }
@@ -168,7 +149,7 @@ impl<const P: u8, const K: umax> Pow<umax> for MersenneInt<P, K> {
                     if exp & 1 != 0 {
                         result = result * multi;
                     }
-                    multi = multi * multi;
+                    multi = multi.square();
                     exp >>= 1;
                 }
                 result
@@ -228,6 +209,25 @@ impl<const P: u8, const K: umax> ModularInteger for MersenneInt<P, K> {
     fn convert(&self, n: Self::Base) -> Self {
         Self::new(n)
     }
+
+    #[inline]
+    fn double(self) -> Self {
+        let sum = self.0 << 1;
+        Self(if sum > Self::MODULUS {
+            sum - Self::MODULUS
+        } else {
+            sum
+        })
+    }
+
+    #[inline]
+    fn square(self) -> Self {
+        if (P as u32) < (umax::BITS / 2) {
+            Self(Self::reduce_single(self.0 * self.0))
+        } else {
+            Self(Self::reduce_double(udouble::widening_square(self.0)))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -274,6 +274,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &P1));
             assert_eq!((am / bm).residue(), a.mulm(b.invm(&P1).unwrap(), &P1));
             assert_eq!(am.neg().residue(), a.negm(&P1));
+            assert_eq!(am.double().residue(), a.dblm(&P1));
+            assert_eq!(am.square().residue(), a.sqm(&P1));
             assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P1));
 
             // mod 2^61-1
@@ -284,6 +286,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &P2));
             assert_eq!((am / bm).residue(), a.mulm(b.invm(&P2).unwrap(), &P2));
             assert_eq!(am.neg().residue(), a.negm(&P2));
+            assert_eq!(am.double().residue(), a.dblm(&P2));
+            assert_eq!(am.square().residue(), a.sqm(&P2));
             assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P2));
 
             // mod 2^127-1
@@ -294,6 +298,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &P3));
             assert_eq!((am / bm).residue(), a.mulm(b.invm(&P3).unwrap(), &P3));
             assert_eq!(am.neg().residue(), a.negm(&P3));
+            assert_eq!(am.double().residue(), a.dblm(&P3));
+            assert_eq!(am.square().residue(), a.sqm(&P3));
             assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P3));
 
             // mod 2^32-5
@@ -304,6 +310,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &P4));
             assert_eq!((am / bm).residue(), a.mulm(b.invm(&P4).unwrap(), &P4));
             assert_eq!(am.neg().residue(), a.negm(&P4));
+            assert_eq!(am.double().residue(), a.dblm(&P4));
+            assert_eq!(am.square().residue(), a.sqm(&P4));
             assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P4));
 
             // mod 2^56-5
@@ -314,6 +322,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &P5));
             assert_eq!((am / bm).residue(), a.mulm(b.invm(&P5).unwrap(), &P5));
             assert_eq!(am.neg().residue(), a.negm(&P5));
+            assert_eq!(am.double().residue(), a.dblm(&P5));
+            assert_eq!(am.square().residue(), a.sqm(&P5));
             assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P5));
 
             // mod 2^122-3
@@ -324,6 +334,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &P6));
             assert_eq!((am / bm).residue(), a.mulm(b.invm(&P6).unwrap(), &P6));
             assert_eq!(am.neg().residue(), a.negm(&P6));
+            assert_eq!(am.double().residue(), a.dblm(&P6));
+            assert_eq!(am.square().residue(), a.sqm(&P6));
             assert_eq!(am.pow(e as u128).residue(), a.powm(e as u128, &P6));
         }
     }

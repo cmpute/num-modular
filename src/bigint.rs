@@ -3,6 +3,9 @@ use core::convert::TryInto;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
 
+// Efficient implementation for bigints can be found in "Handbook of Applied Cryptography"
+// Reference: https://cacr.uwaterloo.ca/hac/about/chap14.pdf
+
 // Forward modular operations to ref by ref
 macro_rules! impl_mod_ops_by_ref {
     ($T:ty) => {

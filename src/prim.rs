@@ -83,7 +83,7 @@ impl ModularCoreOps<u128, &u128> for u128 {
             if b & 1 > 0 {
                 result = result.addm(a, m);
             }
-            a = a.addm(a, m);
+            a = a.dblm(m);
             b >>= 1;
         }
         result
@@ -106,7 +106,7 @@ macro_rules! impl_powm_uprim {
                             if exp & 1 != 0 {
                                 result = result.mulm(multi, m);
                             }
-                            multi = multi.mulm(multi, m);
+                            multi = multi.sqm(m);
                             exp >>= 1;
                         }
                         result

@@ -50,10 +50,29 @@ impl udouble {
         let ((x1, x0), (y1, y0)) = (split(lhs), split(rhs));
 
         let z2 = x1 * y1;
-        let (c0, z0) = split(x0 * y0); // l1 <= umax::MAX - 2
+        let (c0, z0) = split(x0 * y0); // c0 <= umax::MAX - 1
         let (c1, z1) = split(x1 * y0 + c0);
         let z2 = z2 + c1;
         let (c1, z1) = split(x0 * y1 + z1);
+        Self {
+            hi: z2 + c1,
+            lo: z0 | z1 << HALF_BITS
+        }
+    }
+
+    /// Optimized squaring function for [umax] integers
+    //> (used in Montgomery::<u128>::{square})
+    #[inline]
+    pub const fn widening_square(x: umax) -> Self {
+        // the algorithm here is basically the same as widening_mul
+        let (x1, x0) = split(x);
+
+        let z2 = x1 * x1;
+        let m = x1 * x0;
+        let (c0, z0) = split(x0 * x0);
+        let (c1, z1) = split(m + c0);
+        let z2 = z2 + c1;
+        let (c1, z1) = split(m + z1);
         Self {
             hi: z2 + c1,
             lo: z0 | z1 << HALF_BITS
@@ -496,9 +515,13 @@ mod tests {
         assert_eq!(udouble { hi: 1, lo: umax::MAX - 1 }, udouble::widening_add(umax::MAX, umax::MAX));
 
         assert_eq!(udouble { hi: 0, lo: 1 }, udouble::widening_mul(1, 1));
+        assert_eq!(udouble { hi: 0, lo: 1 }, udouble::widening_square(1));
         assert_eq!(udouble { hi: 1 << 32, lo: 0 }, udouble::widening_mul(1 << 80, 1 << 80));
+        assert_eq!(udouble { hi: 1 << 32, lo: 0 }, udouble::widening_square(1 << 80));
         assert_eq!(udouble { hi: 1 << 32, lo: 2 << 120 | 1 << 80 }, udouble::widening_mul(1 << 80 | 1 << 40, 1 << 80 | 1 << 40));
+        assert_eq!(udouble { hi: 1 << 32, lo: 2 << 120 | 1 << 80 }, udouble::widening_square(1 << 80 | 1 << 40));
         assert_eq!(udouble { hi: umax::MAX - 1, lo: 1 }, udouble::widening_mul(umax::MAX, umax::MAX));
+        assert_eq!(udouble { hi: umax::MAX - 1, lo: 1 }, udouble::widening_square(umax::MAX));
     }
 
     #[test]

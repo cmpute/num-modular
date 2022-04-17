@@ -167,7 +167,15 @@ pub trait ModularInteger:
     /// This method should be perferred over the static
     /// constructor to prevent unnecessary overhead of pre-computation.
     fn convert(&self, n: Self::Base) -> Self;
+
+    // Calculate the value of self + self
+    fn double(self) -> Self;
+
+    // Calculate the value of self * self
+    fn square(self) -> Self;
 }
+
+// XXX: implement this trait for ff::PrimeField?
 
 mod barret;
 mod double;

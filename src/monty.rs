@@ -12,7 +12,7 @@ use std::rc::Rc;
 /// The generic type T represents the underlying integer representation, and
 /// R=2^B will be used as the auxiliary modulus, where B is automatically selected
 /// based on the size of T.
-pub trait Montgomery: Sized {
+pub trait Montgomery {
     /// The type for inversion of the modulus.
     ///
     /// This type is usually the same as Self, but it can be smaller when using
@@ -38,11 +38,21 @@ pub trait Montgomery: Sized {
     /// Calculate (lhs - rhs) mod m in Montgomery form
     fn sub(lhs: &Self, rhs: &Self, m: &Self) -> Self;
 
+    /// Calculate 2*monty mod m
+    fn double(monty: &Self, m: &Self) -> Self where Self: Sized {
+        Montgomery::add(monty, monty, m)
+    }
+
     /// Calculate -monty mod m in Montgomery form
     fn neg(monty: &Self, m: &Self) -> Self;
 
     /// Calculate (lhs * rhs) mod m in Montgomery form
     fn mul(lhs: &Self, rhs: &Self, m: &Self, minv: &Self::Inv) -> Self;
+
+    /// Calculate monty^2 mod m in Montgomery form
+    fn square(monty: &Self, m: &Self, minv: &Self::Inv) -> Self where Self: Sized {
+        Montgomery::mul(monty, monty, m, minv)
+    }
 
     /// Calculate base ^ exp mod m in Montgomery form
     fn pow(base: &Self, exp: &Self, m: &Self, minv: &Self::Inv) -> Self;
@@ -91,6 +101,12 @@ macro_rules! impl_uprim_montgomery_core {
         #[inline]
         fn mul(lhs: &Self, rhs: &Self, m: &Self, minv: &Self::Inv) -> Self {
             Montgomery::reduce((*lhs as Self::Double) * (*rhs as Self::Double), m, minv)
+        }
+
+        #[inline]
+        fn square(monty: &Self, m: &Self, minv: &Self::Inv) -> Self {
+            let d = *monty as Self::Double;
+            Montgomery::reduce(d * d, m, minv)
         }
     };
 }
@@ -267,10 +283,18 @@ impl Montgomery for u128 {
         Montgomery::reduce(udouble::widening_mul(*lhs, *rhs), m, minv)
     }
 
+    #[inline]
+    fn square(monty: &Self, m: &Self, minv: &Self::Inv) -> Self {
+        Montgomery::reduce(udouble::widening_square(*monty), m, minv)
+    }
+
     impl_uprim_montgomery!();
 }
 
 /// An integer represented in [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form).
+/// 
+/// It supports common operators just like a common integer, but it requires that the operands have the same modulus. Note that this condition
+/// is only checked in the debug build.
 #[derive(Debug, Clone, Copy)]
 pub struct MontgomeryInt<T: Integer + Montgomery> {
     /// The Montgomery representation of the integer.
@@ -284,13 +308,17 @@ pub struct MontgomeryInt<T: Integer + Montgomery> {
 }
 
 impl<T: Integer + Montgomery> MontgomeryInt<T> {
-    #[inline]
+    #[inline(always)]
     fn check_modulus_eq(&self, rhs: &Self) {
-        if self.m != rhs.m {
+        if cfg!(debug_assertions) && self.m != rhs.m {
             panic!("The modulus of two operators should be the same!");
         }
     }
 }
+
+// TODO(v0.4.x): accept even numbers by removing 2 factors from m and store the exponent
+// Requirement: 1. A separate class to perform modular arithmetics with 2^n as modulus
+//              2. Algorithm for construct residue from two components (see http://koclab.cs.ucsb.edu/teaching/cs154/docx/Notes7-Montgomery.pdf)
 
 impl<T: Integer + Montgomery> MontgomeryInt<T>
 where
@@ -299,7 +327,6 @@ where
     /// Convert n into the modulo ring ℤ/mℤ (i.e. `n % m`)
     #[inline]
     pub fn new(n: T, m: T) -> Self {
-        // TODO(v0.4): accept even numbers by removing 2 factors from m and store the exponent
         let minv =
             Montgomery::neginv(&m).expect("the modulus has to be odd for 2^n based Montgomery");
         let a = Montgomery::transform(n, &m);
@@ -321,12 +348,9 @@ impl<T: Integer + Montgomery> Add for MontgomeryInt<T> {
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
-        let a = Montgomery::add(&self.a, &rhs.a, &self.m);
-        MontgomeryInt {
-            a,
-            m: self.m,
-            mi: self.mi,
-        }
+        let Self { a, m, mi } = self;
+        let a = Montgomery::add(&a, &rhs.a, &m);
+        MontgomeryInt { a, m, mi }
     }
 }
 
@@ -336,12 +360,9 @@ impl<T: Integer + Montgomery> Sub for MontgomeryInt<T> {
     #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
-        let a = Montgomery::sub(&self.a, &rhs.a, &self.m);
-        MontgomeryInt {
-            a,
-            m: self.m,
-            mi: self.mi,
-        }
+        let Self { a, m, mi } = self;
+        let a = Montgomery::sub(&a, &rhs.a, &m);
+        MontgomeryInt { a, m, mi }
     }
 }
 
@@ -350,12 +371,9 @@ impl<T: Integer + Montgomery> Neg for MontgomeryInt<T> {
 
     #[inline]
     fn neg(self) -> Self::Output {
-        let a = Montgomery::neg(&self.a, &self.m);
-        MontgomeryInt {
-            a,
-            m: self.m,
-            mi: self.mi,
-        }
+        let Self { a, m, mi } = self;
+        let a = Montgomery::neg(&a, &m);
+        MontgomeryInt { a, m, mi }
     }
 }
 
@@ -365,12 +383,9 @@ impl<T: Integer + Montgomery> Mul for MontgomeryInt<T> {
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
-        let a = Montgomery::mul(&self.a, &rhs.a, &self.m, &self.mi);
-        MontgomeryInt {
-            a,
-            m: self.m,
-            mi: self.mi,
-        }
+        let Self { a, m, mi } = self;
+        let a = Montgomery::mul(&a, &rhs.a, &m, &mi);
+        MontgomeryInt { a, m, mi }
     }
 }
 
@@ -379,12 +394,9 @@ impl<T: Integer + Montgomery> Pow<T> for MontgomeryInt<T> {
 
     #[inline]
     fn pow(self, rhs: T) -> Self::Output {
-        let a = Montgomery::pow(&self.a, &rhs, &self.m, &self.mi);
-        MontgomeryInt {
-            a,
-            m: self.m,
-            mi: self.mi,
-        }
+        let Self { a, m, mi } = self;
+        let a = Montgomery::pow(&a, &rhs, &m, &mi);
+        MontgomeryInt { a, m, mi }
     }
 }
 
@@ -413,6 +425,20 @@ where
             m: self.m.clone(),
             mi: self.mi.clone(),
         }
+    }
+
+    #[inline]
+    fn double(self) -> Self {
+        let Self { a, m, mi } = self;
+        let a = Montgomery::double(&a, &m);
+        MontgomeryInt { a, m, mi }
+    }
+
+    #[inline]
+    fn square(self) -> Self {
+        let Self { a, m, mi } = self;
+        let a = Montgomery::square(&a, &m, &mi);
+        MontgomeryInt { a, m, mi }
     }
 }
 
@@ -469,6 +495,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
             assert_eq!((-am).residue(), a.negm(&m));
             assert_eq!(am.pow(e).residue(), a.powm(e, &m));
+            assert_eq!(am.double().residue(), a.dblm(&m));
+            assert_eq!(am.square().residue(), a.sqm(&m));
 
             let m = random::<u16>() | 1;
             let e = e as u16;
@@ -480,6 +508,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
             assert_eq!((-am).residue(), a.negm(&m));
             assert_eq!(am.pow(e).residue(), a.powm(e, &m));
+            assert_eq!(am.double().residue(), a.dblm(&m));
+            assert_eq!(am.square().residue(), a.sqm(&m));
 
             let m = random::<u32>() | 1;
             let e = e as u32;
@@ -491,6 +521,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
             assert_eq!((-am).residue(), a.negm(&m));
             assert_eq!(am.pow(e).residue(), a.powm(e, &m));
+            assert_eq!(am.double().residue(), a.dblm(&m));
+            assert_eq!(am.square().residue(), a.sqm(&m));
 
             let m = random::<u64>() | 1;
             let e = e as u64;
@@ -502,6 +534,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
             assert_eq!((-am).residue(), a.negm(&m));
             assert_eq!(am.pow(e).residue(), a.powm(e, &m));
+            assert_eq!(am.double().residue(), a.dblm(&m));
+            assert_eq!(am.square().residue(), a.sqm(&m));
 
             let m = random::<u128>() | 1;
             let e = e as u128;
@@ -513,6 +547,8 @@ mod tests {
             assert_eq!((am * bm).residue(), a.mulm(b, &m));
             assert_eq!((-am).residue(), a.negm(&m));
             assert_eq!(am.pow(e).residue(), a.powm(e, &m));
+            assert_eq!(am.double().residue(), a.dblm(&m));
+            assert_eq!(am.square().residue(), a.sqm(&m));
         }
     }
 }
