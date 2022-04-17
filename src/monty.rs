@@ -6,8 +6,8 @@ use num_traits::Pow;
 #[cfg(std)]
 use std::rc::Rc;
 
-/// Operations of a integer represented in Montgomery form. This data type can
-/// be used in place of a normal integer with regard to modular arithmetics.
+/// Operations of a integer represented in Montgomery form. Types implementing this
+/// trait can be used to construct a [MontgomeryInt].
 ///
 /// The generic type T represents the underlying integer representation, and
 /// R=2^B will be used as the auxiliary modulus, where B is automatically selected

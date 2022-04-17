@@ -132,6 +132,7 @@ impl<T, Rhs, Modulus> ModularOps<Rhs, Modulus> for T where
 {
 }
 
+/// Collection of operations similar to [ModularOps], but takes operands with references
 pub trait ModularRefOps: for<'r> ModularOps<&'r Self, &'r Self> + Sized {}
 impl<T> ModularRefOps for T where T: for<'r> ModularOps<&'r T, &'r T> {}
 
