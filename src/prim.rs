@@ -9,7 +9,7 @@ macro_rules! impl_core_ops_uu {
     ($($T:ty => $Tdouble:ty;)*) => ($(
         impl ModularCoreOps<$T, &$T> for $T {
             type Output = $T;
-            #[inline]
+            #[inline(always)]
             fn addm(self, rhs: $T, m: &$T) -> $T {
                 (((self as $Tdouble) + (rhs as $Tdouble)) % (*m as $Tdouble)) as $T
             }
@@ -22,7 +22,7 @@ macro_rules! impl_core_ops_uu {
                     m - (rhs - lhs)
                 }
             }
-            #[inline]
+            #[inline(always)]
             fn mulm(self, rhs: $T, m: &$T) -> $T {
                 (((self as $Tdouble) * (rhs as $Tdouble)) % (*m as $Tdouble)) as $T
             }

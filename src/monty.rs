@@ -389,6 +389,8 @@ impl<T: Integer + Montgomery> Mul for MontgomeryInt<T> {
     }
 }
 
+// TODO(v0.4.x): add implementations for ops on reference
+
 impl<T: Integer + Montgomery> Pow<T> for MontgomeryInt<T> {
     type Output = Self;
 

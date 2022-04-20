@@ -127,9 +127,9 @@ mod _num_bigint {
             let a = self % m;
             let b = rhs % m;
 
-            if let Some(sm) = m.to_u64() {
-                let sself = a.to_u64().unwrap();
-                let srhs = b.to_u64().unwrap();
+            if let Some(sm) = m.to_usize() {
+                let sself = a.to_usize().unwrap();
+                let srhs = b.to_usize().unwrap();
                 return BigUint::from(sself.mulm(srhs, &sm));
             }
 
@@ -186,7 +186,7 @@ mod _num_bigint {
 
         #[inline]
         fn sqm(self, m: &BigUint) -> BigUint {
-            self.mulm(self, m)
+            self.modpow(&BigUint::from(2u8), m)
         }
     }
 
