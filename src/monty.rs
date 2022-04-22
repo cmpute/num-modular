@@ -88,13 +88,12 @@ macro_rules! impl_uprim_montgomery_core {
             let (t, overflow) = monty.overflowing_add((tm as Self::Double) * (*m as Self::Double));
             let t = (t >> Self::BITS) as Self;
 
-            // in case of overflow, we need to add another `R mod m` = `R - m`
-            let t = if overflow { t + m.wrapping_neg() } else { t };
-
-            if &t >= m {
-                return t - m;
+            if overflow {
+                t + m.wrapping_neg()
+            } else if &t >= m {
+                t - m
             } else {
-                return t;
+                t
             }
         }
 
@@ -117,6 +116,8 @@ macro_rules! impl_uprim_montgomery {
             let (sum, overflow) = lhs.overflowing_add(*rhs);
             if overflow {
                 sum + m.wrapping_neg()
+            } else if &sum > m {
+                sum - m
             } else {
                 sum
             }
@@ -264,17 +265,12 @@ impl Montgomery for u128 {
         let tm = monty.lo.wrapping_mul(*minv);
         let (t, overflow) = monty.overflowing_add(udouble::widening_mul(tm, *m));
 
-        // in case of overflow, we need to add another `R mod m` = `R - m`
-        let t = if overflow {
+        if overflow {
             t.hi + m.wrapping_neg()
+        } else if &t.hi >= m {
+            t.hi - m
         } else {
             t.hi
-        };
-
-        if &t >= m {
-            return t - m;
-        } else {
-            return t;
         }
     }
 
@@ -314,6 +310,10 @@ impl<T: Integer + Montgomery> MontgomeryInt<T> {
             panic!("The modulus of two operators should be the same!");
         }
     }
+    #[inline(always)]
+    pub fn is_zero(&self) -> bool {
+        self.a.is_zero()
+    }
 }
 
 // TODO(v0.4.x): accept even numbers by removing 2 factors from m and store the exponent
@@ -344,7 +344,6 @@ impl<T: Integer + Montgomery> PartialEq for MontgomeryInt<T> {
 
 impl<T: Integer + Montgomery> Add for MontgomeryInt<T> {
     type Output = Self;
-
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
@@ -354,9 +353,40 @@ impl<T: Integer + Montgomery> Add for MontgomeryInt<T> {
     }
 }
 
+impl<T: Integer + Montgomery> Add<&Self> for MontgomeryInt<T> {
+    type Output = Self;
+    #[inline]
+    fn add(self, rhs: &Self) -> Self::Output {
+        self.check_modulus_eq(rhs);
+        let Self { a, m, mi } = self;
+        let a = Montgomery::add(&a, &rhs.a, &m);
+        MontgomeryInt { a, m, mi }
+    }
+}
+impl<T: Integer + Montgomery> Add<MontgomeryInt<T>> for &MontgomeryInt<T> {
+    type Output = MontgomeryInt<T>;
+    #[inline]
+    fn add(self, rhs: MontgomeryInt<T>) -> Self::Output {
+        self.check_modulus_eq(&rhs);
+        let MontgomeryInt { a, m, mi } = rhs;
+        let a = Montgomery::add(&self.a, &a, &m);
+        MontgomeryInt { a, m, mi }
+    }
+}
+impl<T: Integer + Montgomery + Clone> Add for &MontgomeryInt<T> 
+where T::Inv: Clone {
+    type Output = MontgomeryInt<T>;
+    #[inline]
+    fn add(self, rhs: Self) -> Self::Output {
+        self.check_modulus_eq(rhs);
+        let MontgomeryInt { a, m, mi } = self;
+        let a = Montgomery::add(a, &rhs.a, m);
+        MontgomeryInt { a, m: m.clone(), mi: mi.clone() }
+    }
+}
+
 impl<T: Integer + Montgomery> Sub for MontgomeryInt<T> {
     type Output = Self;
-
     #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
@@ -365,10 +395,40 @@ impl<T: Integer + Montgomery> Sub for MontgomeryInt<T> {
         MontgomeryInt { a, m, mi }
     }
 }
+impl<T: Integer + Montgomery> Sub<&Self> for MontgomeryInt<T> {
+    type Output = Self;
+    #[inline]
+    fn sub(self, rhs: &Self) -> Self::Output {
+        self.check_modulus_eq(rhs);
+        let Self { a, m, mi } = self;
+        let a = Montgomery::sub(&a, &rhs.a, &m);
+        MontgomeryInt { a, m, mi }
+    }
+}
+impl<T: Integer + Montgomery> Sub<MontgomeryInt<T>> for &MontgomeryInt<T> {
+    type Output = MontgomeryInt<T>;
+    #[inline]
+    fn sub(self, rhs: MontgomeryInt<T>) -> Self::Output {
+        self.check_modulus_eq(&rhs);
+        let MontgomeryInt { a, m, mi } = rhs;
+        let a = Montgomery::sub(&self.a, &a, &m);
+        MontgomeryInt { a, m, mi }
+    }
+}
+impl<T: Integer + Montgomery + Clone> Sub for &MontgomeryInt<T> 
+where T::Inv: Clone {
+    type Output = MontgomeryInt<T>;
+    #[inline]
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.check_modulus_eq(rhs);
+        let MontgomeryInt { a, m, mi } = self;
+        let a = Montgomery::sub(a, &rhs.a, m);
+        MontgomeryInt { a, m: m.clone(), mi: mi.clone() }
+    }
+}
 
 impl<T: Integer + Montgomery> Neg for MontgomeryInt<T> {
     type Output = Self;
-
     #[inline]
     fn neg(self) -> Self::Output {
         let Self { a, m, mi } = self;
@@ -379,13 +439,43 @@ impl<T: Integer + Montgomery> Neg for MontgomeryInt<T> {
 
 impl<T: Integer + Montgomery> Mul for MontgomeryInt<T> {
     type Output = Self;
-
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let Self { a, m, mi } = self;
         let a = Montgomery::mul(&a, &rhs.a, &m, &mi);
         MontgomeryInt { a, m, mi }
+    }
+}
+impl<T: Integer + Montgomery> Mul<&Self> for MontgomeryInt<T> {
+    type Output = Self;
+    #[inline]
+    fn mul(self, rhs: &Self) -> Self::Output {
+        self.check_modulus_eq(rhs);
+        let Self { a, m, mi } = self;
+        let a = Montgomery::mul(&a, &rhs.a, &m, &mi);
+        MontgomeryInt { a, m, mi }
+    }
+}
+impl<T: Integer + Montgomery> Mul<MontgomeryInt<T>> for &MontgomeryInt<T> {
+    type Output = MontgomeryInt<T>;
+    #[inline]
+    fn mul(self, rhs: MontgomeryInt<T>) -> Self::Output {
+        self.check_modulus_eq(&rhs);
+        let MontgomeryInt { a, m, mi } = rhs;
+        let a = Montgomery::mul(&self.a, &a, &m, &mi);
+        MontgomeryInt { a, m, mi }
+    }
+}
+impl<T: Integer + Montgomery + Clone> Mul for &MontgomeryInt<T> 
+where T::Inv: Clone {
+    type Output = MontgomeryInt<T>;
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.check_modulus_eq(rhs);
+        let MontgomeryInt { a, m, mi } = self;
+        let a = Montgomery::mul(a, &rhs.a, m, mi);
+        MontgomeryInt { a, m: m.clone(), mi: mi.clone() }
     }
 }
 
