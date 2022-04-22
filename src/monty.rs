@@ -3,9 +3,6 @@ use core::ops::{Add, Mul, Neg, Sub};
 use num_integer::Integer;
 use num_traits::Pow;
 
-#[cfg(std)]
-use std::rc::Rc;
-
 /// Operations of a integer represented in Montgomery form. Types implementing this
 /// trait can be used to construct a [MontgomeryInt].
 ///
