@@ -12,6 +12,7 @@ pub trait Barret {}
 // Version 2: Fixed point barret reduction
 // - Similar to version 1
 // - Ref (u128): https://math.stackexchange.com/questions/3455277/barrett-reduction-possible-without-overflow-and-floating-point-arithmetic
+// - Ref: https://stackoverflow.com/a/58470455
 //
 // Version 3: Floating point barret reduction
 // - Using floating point to store r

@@ -3,6 +3,27 @@ use core::ops::{Add, Mul, Neg, Sub};
 use num_integer::Integer;
 use num_traits::Pow;
 
+// TODO(v0.next): refactor the Montgomery trait into a "Reduction" trait? As both Montgomery reduction and Barret
+// reduction both relies on a separate precomputed value (which is usually single word). If any other reduction method
+// also has a single precomputed value, it's also applicable to use this trait.
+//
+// We just need to ensure that the behavior for multi-precision integers also follow this form, so this refactorization should
+// be done after we have a implementation for big integers.
+//
+// This trait might look like 
+trait Reduction {
+    type Precompute;
+    type Double;
+    
+    // requires reduced target <= m, so that add/sub/neg can be implemented uniformly
+
+    fn transform(target: Self, m: &Self) -> Self;
+    fn mul(lhs: &Self, rhs: &Self, m: &Self, p: &Self::Precompute) -> Self;
+    fn residue(target: Self, m: &Self, p: &Self::Precompute) -> Self;
+}
+// Then struct Montgomery<T>: Reduction, struct Barret<T>: Reduction, struct ReducedInt<Reduction>: ModularInt,
+// type MontgomeryInt<T> = ReducedInt<Montgomery<T>>
+
 /// Operations of a integer represented in Montgomery form. Types implementing this
 /// trait can be used to construct a [MontgomeryInt].
 ///
@@ -475,8 +496,6 @@ where T::Inv: Clone {
         MontgomeryInt { a, m: m.clone(), mi: mi.clone() }
     }
 }
-
-// TODO(v0.4.x): add implementations for ops on reference
 
 impl<T: Integer + Montgomery> Pow<T> for MontgomeryInt<T> {
     type Output = Self;

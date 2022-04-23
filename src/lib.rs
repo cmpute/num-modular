@@ -20,8 +20,11 @@
 //! ```
 //!
 
-// XXX: consider implementing lookup table based modulo?
+// XXX: Other fast modular arithmetic tricks
+// REF: https://github.com/lemire/fastmod & https://arxiv.org/pdf/1902.01961.pdf
 // REF: https://eprint.iacr.org/2014/040.pdf
+// REF: https://github.com/ridiculousfish/libdivide/
+// REF: Faster Interleaved Modular Multiplication Based on Barrett and Montgomery Reduction Methods (work for modulus in certain form)
 
 #![no_std]
 #[cfg(any(feature = "std", test))]
@@ -114,6 +117,7 @@ pub trait ModularSymbols<Modulus = Self> {
 }
 
 // TODO: Discrete log aka index, follow the behavior of FLINT `n_discrete_log_bsgs`
+// REF: https://github.com/vks/discrete-log
 // fn logm(self, base: Modulus, m: Modulus);
 
 /// Collection of common modular arithmetic operations
@@ -177,6 +181,7 @@ pub trait ModularInteger:
 }
 
 // XXX: implement this trait for ff::PrimeField?
+// TODO: implement invm_range (Modular inverse in certain range) and crt (Chinese Remainder Theorem), REF: bubblemath crate
 
 mod barret;
 mod double;
