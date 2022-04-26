@@ -19,6 +19,15 @@
 //! assert_eq!((mx * my).residue(), x * y % m);
 //! ```
 //!
+//! # Comparison of fast division / modular arithmetics
+//! Several fast division / modulo tricks are provided in these crate, the difference of them are listed below:
+//! - [PreInv]: pre-compute modular inverse of the divisor, only applicable to exact division
+//! - Barret (to be implemented): pre-compute (rational approximation of) the reciprocal of the divisor,
+//!     applicable to fast division and modulo
+//! - [Montgomery]: Convert the dividend into a special form by shifting and pre-compute a modular inverse,
+//! -   only applicable to fast modulo, but faster than Barret reduction
+//! - [MersenneInt]: Specialization of modulo in form `2^P-K`
+//! 
 
 // XXX: Other fast modular arithmetic tricks
 // REF: https://github.com/lemire/fastmod & https://arxiv.org/pdf/1902.01961.pdf
@@ -173,15 +182,27 @@ pub trait ModularInteger:
     /// constructor to prevent unnecessary overhead of pre-computation.
     fn convert(&self, n: Self::Base) -> Self;
 
-    // Calculate the value of self + self
+    /// Calculate the value of self + self
     fn double(self) -> Self;
 
-    // Calculate the value of self * self
+    /// Calculate the value of self * self
     fn square(self) -> Self;
 }
-
 // XXX: implement this trait for ff::PrimeField?
 // TODO: implement invm_range (Modular inverse in certain range) and crt (Chinese Remainder Theorem), REF: bubblemath crate
+
+/// Utility function for exact division, with precomputed helper values
+/// 
+/// Available Pre-computation types:
+/// - `()`: No pre-computation, the implementation is based on normal integer division
+/// - [PreInv]: With Pre-computed modular inverse
+pub trait DivExact<Rhs, Precompute> : Sized {
+    type Output;
+
+    /// Check if d divides self with the help of the precomputation. If d divides self,
+    /// then the quotient is returned.
+    fn div_exact(self, d: Rhs, pre: Precompute) -> Option<Self::Output>;
+}
 
 mod barret;
 mod preinv;

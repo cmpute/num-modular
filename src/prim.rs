@@ -1,6 +1,6 @@
 //! Implementations for modular operations on primitive integers
 
-use crate::{ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps};
+use crate::{ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps, DivExact};
 use num_integer::Integer;
 
 // FIXME: implement the modular functions as const after https://github.com/rust-lang/rust/pull/68847
@@ -368,6 +368,24 @@ macro_rules! impl_absm_for_prim {
 impl_absm_for_prim! {
     i8 => u8; i16 => u16; i32 => u32; i64 => u64; i128 => u128; isize => usize;
 }
+
+macro_rules! impl_div_exact_for_prim {
+    ($($t:ty)*) => {$(
+        impl DivExact<$t, ()> for $t {
+            type Output = $t;
+            fn div_exact(self, d: $t, _: ()) -> Option<Self::Output> {
+                let (q, d) = self.div_rem(&d);
+                if d == 0 {
+                    Some(q)
+                } else {
+                    None
+                }
+            }
+        }
+    )*};
+}
+
+impl_div_exact_for_prim!(u8 u16 u32 u64 u128);
 
 #[cfg(test)]
 mod tests {
