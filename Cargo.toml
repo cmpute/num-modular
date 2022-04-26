@@ -1,6 +1,6 @@
 [package]
 name = "num-modular"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2018"
 
 repository = "https://github.com/cmpute/num-modular"
@@ -10,7 +10,7 @@ documentation = "https://docs.rs/num-modular"
 license = "Apache-2.0"
 description = """
 Implementation of efficient integer division and modular arithmetic operations with generic number types.
-Supports various backends including num-bigint, rug, etc..
+Supports various backends including num-bigint, etc..
 """
 readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
