@@ -25,7 +25,7 @@
 //! - Barret (to be implemented): pre-compute (rational approximation of) the reciprocal of the divisor,
 //!     applicable to fast division and modulo
 //! - [Montgomery]: Convert the dividend into a special form by shifting and pre-compute a modular inverse,
-//! -   only applicable to fast modulo, but faster than Barret reduction
+//!     only applicable to fast modulo, but faster than Barret reduction
 //! - [MersenneInt]: Specialization of modulo in form `2^P-K`
 //! 
 
@@ -193,15 +193,15 @@ pub trait ModularInteger:
 
 /// Utility function for exact division, with precomputed helper values
 /// 
-/// Available Pre-computation types:
-/// - `()`: No pre-computation, the implementation is based on normal integer division
+/// # Available Pre-computation types:
+/// - `()`: No pre-computation, the implementation relies on native integer division
 /// - [PreInv]: With Pre-computed modular inverse
 pub trait DivExact<Rhs, Precompute> : Sized {
     type Output;
 
     /// Check if d divides self with the help of the precomputation. If d divides self,
     /// then the quotient is returned.
-    fn div_exact(self, d: Rhs, pre: Precompute) -> Option<Self::Output>;
+    fn div_exact(self, d: Rhs, pre: &Precompute) -> Option<Self::Output>;
 }
 
 mod barret;

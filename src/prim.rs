@@ -373,7 +373,8 @@ macro_rules! impl_div_exact_for_prim {
     ($($t:ty)*) => {$(
         impl DivExact<$t, ()> for $t {
             type Output = $t;
-            fn div_exact(self, d: $t, _: ()) -> Option<Self::Output> {
+            #[inline]
+            fn div_exact(self, d: $t, _: &()) -> Option<Self::Output> {
                 let (q, d) = self.div_rem(&d);
                 if d == 0 {
                     Some(q)
