@@ -3,26 +3,41 @@ use core::ops::{Add, Mul, Neg, Sub};
 use num_integer::Integer;
 use num_traits::Pow;
 
-// TODO(v0.next): refactor the Montgomery trait into a "Reduction" trait? As both Montgomery reduction and Barret
-// reduction both relies on a separate precomputed value (which is usually single word). If any other reduction method
-// also has a single precomputed value, it's also applicable to use this trait.
+// TODO(v0.next): refactor the Montgomery trait into a "Reducer" trait?
 //
 // We just need to ensure that the behavior for multi-precision integers also follow this form, so this refactorization should
 // be done after we have a implementation for big integers.
 //
 // This trait might look like 
-trait Reduction {
-    type Precompute;
-    type Double;
-    
-    // requires reduced target <= m, so that add/sub/neg can be implemented uniformly
+trait Reducer {
+    type Elem;
 
-    fn transform(target: Self, m: &Self) -> Self;
-    fn mul(lhs: &Self, rhs: &Self, m: &Self, p: &Self::Precompute) -> Self;
-    fn residue(target: Self, m: &Self, p: &Self::Precompute) -> Self;
+    fn transform(target: Self::Elem, m: &Self::Elem) -> Self::Elem;
+    fn residue(&self, target: Self::Elem, m: &Self::Elem) -> Self::Elem;
+
+    fn add(&self, lhs: &Self::Elem, rhs: &Self::Elem, m: &Self::Elem) -> Self::Elem;
+    fn double(&self, target: &Self::Elem, m: &Self::Elem) -> Self::Elem;
+    fn sub(&self, lhs: &Self::Elem, rhs: &Self::Elem, m: &Self::Elem) -> Self::Elem;
+    fn neg(&self, target: &Self::Elem, m: &Self::Elem) -> Self::Elem;
+    fn mul(&self, lhs: &Self::Elem, rhs: &Self::Elem, m: &Self::Elem) -> Self::Elem;
+    fn square(&self, target: &Self::Elem, m: &Self::Elem) -> Self::Elem;
+    fn pow(&self, base: &Self, exp: &Self, m: &Self::Elem) -> Self::Elem;
 }
-// Then struct Montgomery<T>: Reduction, struct Barret<T>: Reduction, struct ReducedInt<Reduction>: ModularInt,
-// type MontgomeryInt<T> = ReducedInt<Montgomery<T>>
+// Then
+//
+// struct Vanilla<T>(T): Reducer (trivial modular ring)
+// struct Montgomery<T>(T, TInv): Reducer, implement for primitive integers
+// struct MontgomeryMP<T>(Rc<(T, TInv)>): Reducer, implement for each bigint type, use relaxed form described in https://cetinkayakoc.net/docs/j56.pdf and https://eprint.iacr.org/2011/239.pdf
+// struct Barret<T>(T, TInv): Reducer
+// struct BarretMP<T>(Rc<(T, TInv)>): Reducer, implement for Vec[usize]
+// struct ReducedInt<T, Reducer<Elem = T>>: ModularInteger
+// type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>
+// type BarretInt<T> = ReducedInt<T, Barret<T>>
+//
+// Besides, we could directly base the operations on a specific bigint library (ibig is a good candidate), and convert all other bigint types to this type for arithmetics (rug::Integer::as_limbs, num_bigint::BigUint::to_u32_digits/to_u64_digits)
+//     but there're two problems for ibig-rs now: it's unable to construct and deconstruct big integer by moving, and it has not implemented the Integer trait yet.
+// So the better option is to create a standalone "reduce" function that takes &[usize] as input, and then call this reduce function for each big integer backend.
+// And consider create separate ReducedInt type for small and bigints, as we can provide convenient interface for multi-by-single operators
 
 /// Operations of a integer represented in Montgomery form. Types implementing this
 /// trait can be used to construct a [MontgomeryInt].
@@ -74,6 +89,8 @@ pub trait Montgomery {
 
     /// Calculate base ^ exp mod m in Montgomery form
     fn pow(base: &Self, exp: &Self, m: &Self, minv: &Self::Inv) -> Self;
+
+    // TODO: support montgomery inverse, see http://cetinkayakoc.net/docs/j82.pdf
 }
 
 // Entry i contains (2i+1)^(-1) mod 256.
@@ -332,11 +349,16 @@ impl<T: Integer + Montgomery> MontgomeryInt<T> {
     pub fn is_zero(&self) -> bool {
         self.a.is_zero()
     }
+    #[inline(always)]
+    pub fn repr(&self) -> &T {
+        &self.a
+    }
 }
 
 // TODO(v0.4.x): accept even numbers by removing 2 factors from m and store the exponent
 // Requirement: 1. A separate class to perform modular arithmetics with 2^n as modulus
 //              2. Algorithm for construct residue from two components (see http://koclab.cs.ucsb.edu/teaching/cs154/docx/Notes7-Montgomery.pdf)
+// Or we can just provide crt function, and let the implementation of monty int with full modulus support as an example code.
 
 impl<T: Integer + Montgomery> MontgomeryInt<T>
 where

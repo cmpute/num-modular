@@ -184,6 +184,7 @@ pub trait ModularInteger:
 // TODO: implement invm_range (Modular inverse in certain range) and crt (Chinese Remainder Theorem), REF: bubblemath crate
 
 mod barret;
+mod preinv;
 mod double;
 mod mersenne;
 mod monty;
@@ -191,6 +192,7 @@ mod prim;
 
 pub use double::{udouble, umax};
 pub use mersenne::MersenneInt;
+pub use preinv::PreInv;
 pub use monty::{Montgomery, MontgomeryInt};
 
 #[cfg(feature = "num-bigint")]
