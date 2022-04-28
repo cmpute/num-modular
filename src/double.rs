@@ -44,7 +44,7 @@ impl udouble {
 
     /// Calculate multiplication of two [umax] integers with result represented in double width integer
     // equivalent to umul_ppmm, can be implemented efficiently with carrying_mul and widening_mul implemented (rust#85532)
-    //> (used in MersenneInt, Montgomery::<u128>::{reduce, mul}, num-order::NumHash)
+    //> (used in u128::mulm, MersenneInt, Montgomery::<u128>::{reduce, mul}, num-order::NumHash)
     #[inline]
     pub const fn widening_mul(lhs: umax, rhs: umax) -> Self {
         let ((x1, x0), (y1, y0)) = (split(lhs), split(rhs));

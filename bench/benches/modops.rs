@@ -1,8 +1,33 @@
 #[macro_use]
 extern crate criterion;
+use rand::random;
 use criterion::Criterion;
 use num_modular::{MersenneInt, ModularCoreOps, ModularPow, ModularUnaryOps};
 use num_traits::{Inv, Pow};
+
+pub fn bench_u128(c: &mut Criterion) {
+    const N: usize = 256;
+    let mut cases: [(u128, u128, u128); N] = [(0, 0, 0); N];
+    for i in 0..N {
+        cases[i] = (random(), random(), random());
+    }
+
+    let mut group = c.benchmark_group("u128 modular ops");
+    group.bench_function("addm", |b| {
+        b.iter(|| {
+            cases.iter()
+                .map(|&(a, b, m)| a.addm(b, &m))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.bench_function("mulm", |b| {
+        b.iter(|| {
+            cases.iter()
+                .map(|&(a, b, m)| a.mulm(b, &m))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+}
 
 pub fn bench_modinv(c: &mut Criterion) {
     const M1: u64 = (1 << 56) - 5;
@@ -74,5 +99,5 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_modinv);
+criterion_group!(benches, bench_modinv, bench_u128);
 criterion_main!(benches);

@@ -1,6 +1,7 @@
 //! Implementations for modular operations on primitive integers
 
 use crate::{ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps, DivExact};
+use crate::udouble;
 use num_integer::Integer;
 
 // FIXME: implement the modular functions as const after https://github.com/rust-lang/rust/pull/68847
@@ -36,11 +37,9 @@ impl_core_ops_uu! { usize => u64; }
 #[cfg(target_pointer_width = "64")]
 impl_core_ops_uu! { usize => u128; }
 
-// TODO: benchmark against implementation using udouble
 impl ModularCoreOps<u128, &u128> for u128 {
     type Output = u128;
 
-    // XXX: check if these operations are also faster in u64
     #[inline]
     fn addm(self, rhs: u128, m: &u128) -> u128 {
         if let Some(ab) = self.checked_add(rhs) {
@@ -48,10 +47,13 @@ impl ModularCoreOps<u128, &u128> for u128 {
         }
 
         let (lhs, rhs) = (self % m, rhs % m);
-        if lhs < m - rhs {
-            lhs + rhs
+        let (sum, overflow) = lhs.overflowing_add(rhs);
+        if overflow {
+            sum + m.wrapping_neg()
+        } else if &sum >= m {
+            sum - m
         } else {
-            lhs.min(rhs) - (m - lhs.max(rhs))
+            sum
         }
     }
 
@@ -65,28 +67,12 @@ impl ModularCoreOps<u128, &u128> for u128 {
         }
     }
 
-    // XXX: benchmark against http://www.janfeitsma.nl/math/psp2/expmod
     fn mulm(self, rhs: u128, m: &u128) -> u128 {
         if let Some(ab) = self.checked_mul(rhs) {
-            return ab % m;
+            ab % m
+        } else {
+            udouble::widening_mul(self, rhs) % *m
         }
-
-        let mut a = self % m;
-        let mut b = rhs % m;
-
-        if let Some(ab) = a.checked_mul(b) {
-            return ab % m;
-        }
-
-        let mut result: u128 = 0;
-        while b > 0 {
-            if b & 1 > 0 {
-                result = result.addm(a, m);
-            }
-            a = a.dblm(m);
-            b >>= 1;
-        }
-        result
     }
 }
 
