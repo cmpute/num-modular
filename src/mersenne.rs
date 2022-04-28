@@ -8,7 +8,7 @@ use num_traits::{Inv, Pow};
 /// IMPORTANT NOTE: this class assumes that `2^P-K` is a prime. During compliation, we don't do full check
 /// of the primality of `2^P-K`. If it's not a prime, then the modular division and inverse will panic.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct MersenneInt<const P: u8, const K: umax>(umax); // the underlying integer is in the inclusive range [0, 2^P-K]
+pub struct MersenneInt<const P: u8, const K: umax>(umax); // the underlying integer is in the half-open range [0, 2^P-K)
 
 // XXX: support other primes as modulo, such as solinas prime, proth prime
 
@@ -29,7 +29,7 @@ impl<const P: u8, const K: umax> MersenneInt<P, K> {
         if K == 1 {
             lo
         } else {
-            if lo > Self::MODULUS {
+            if lo >= Self::MODULUS {
                 lo - Self::MODULUS
             } else {
                 lo
@@ -60,7 +60,7 @@ impl<const P: u8, const K: umax> MersenneInt<P, K> {
         if K == 1 {
             lo
         } else {
-            if lo > Self::MODULUS {
+            if lo >= Self::MODULUS {
                 lo - Self::MODULUS
             } else {
                 lo
@@ -102,7 +102,7 @@ impl<const P: u8, const K: umax> Add for MersenneInt<P, K> {
     #[inline]
     fn add(self, rhs: Self) -> Self {
         let sum = self.0 + rhs.0;
-        Self(if sum > Self::MODULUS {
+        Self(if sum >= Self::MODULUS {
             sum - Self::MODULUS
         } else {
             sum
@@ -161,7 +161,11 @@ impl<const P: u8, const K: umax> Pow<umax> for MersenneInt<P, K> {
 impl<const P: u8, const K: umax> Neg for MersenneInt<P, K> {
     type Output = Self;
     fn neg(self) -> Self::Output {
-        Self(Self::MODULUS - self.0)
+        Self(if self.0 == 0 {
+            0
+        } else {
+            Self::MODULUS - self.0
+        })
     }
 }
 

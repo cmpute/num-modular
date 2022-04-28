@@ -22,6 +22,8 @@ trait Reducer {
     fn mul(&self, lhs: &Self::Elem, rhs: &Self::Elem, m: &Self::Elem) -> Self::Elem;
     fn square(&self, target: &Self::Elem, m: &Self::Elem) -> Self::Elem;
     fn pow(&self, base: &Self, exp: &Self, m: &Self::Elem) -> Self::Elem;
+
+    // fn is_zero()?
 }
 // Then
 //
@@ -151,7 +153,7 @@ macro_rules! impl_uprim_montgomery {
             let (sum, overflow) = lhs.overflowing_add(*rhs);
             if overflow {
                 sum + m.wrapping_neg()
-            } else if &sum > m {
+            } else if &sum >= m {
                 sum - m
             } else {
                 sum
@@ -587,6 +589,12 @@ mod tests {
         let m = (0x81u128 << 119) - 1;
         let m = m >> m.trailing_zeros();
         assert_eq!(MontgomeryInt::new(a, m).residue(), a % m);
+
+        // is_zero test
+        assert!(MontgomeryInt::new(0, 11u8).is_zero());
+        let five = MontgomeryInt::new(5, 11u8);
+        let six = MontgomeryInt::new(6, 11u8);
+        assert!((five + six).is_zero());
 
         // random creation test
         for _ in 0..NRANDOM {
