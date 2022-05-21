@@ -204,17 +204,58 @@ pub trait DivExact<Rhs, Precompute> : Sized {
     fn div_exact(self, d: Rhs, pre: &Precompute) -> Option<Self::Output>;
 }
 
+/// A modular reducer that can ensure that the operations on integers are all performed
+/// in a modular ring
+pub trait Reducer<T> {
+    /// Create a reducer based on a modulus
+    fn new(m: &T) -> Self;
+
+    /// Transform a normal integer into reduced form
+    fn transform(target: T, m: &T) -> T;
+
+    /// Transform a reduced form back to normal integer
+    fn residue(&self, target: T, m: &T) -> T;
+
+    /// Test if the residue() == 0
+    fn is_zero(&self, target: &T, m: &T) -> bool;
+
+    /// Calculate (lhs + rhs) mod m in reduced form
+    fn add(&self, lhs: T, rhs: T, m: &T) -> T;
+
+    /// Calculate 2*target mod m
+    fn double(&self, target: T, m: &T) -> T;
+
+    /// Calculate (lhs - rhs) mod m in Montgomery form
+    fn sub(&self, lhs: T, rhs: T, m: &T) -> T;
+
+    /// Calculate -monty mod m in Montgomery form
+    fn neg(&self, target: T, m: &T) -> T;
+
+    /// Calculate (lhs * rhs) mod m in Montgomery form
+    fn mul(&self, lhs: T, rhs: T, m: &T) -> T;
+
+    /// Calculate target^2 mod m in Montgomery form
+    fn square(&self, target: T, m: &T) -> T;
+
+    /// Calculate base ^ exp mod m in Montgomery form
+    fn pow(&self, base: T, exp: T, m: &T) -> T;
+
+    // TODO: support montgomery inverse, see http://cetinkayakoc.net/docs/j82.pdf
+}
+
 mod barret;
 mod preinv;
 mod double;
 mod mersenne;
 mod monty;
 mod prim;
+mod reduced;
 
 pub use double::{udouble, umax};
 pub use mersenne::MersenneInt;
 pub use preinv::PreInv;
-pub use monty::{Montgomery, MontgomeryInt};
+pub use monty::Montgomery;
+pub use reduced::ReducedInt;
 
 #[cfg(feature = "num-bigint")]
 mod bigint;
