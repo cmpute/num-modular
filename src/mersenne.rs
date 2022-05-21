@@ -195,21 +195,22 @@ impl<const P: u8, const K: umax> Div for MersenneInt<P, K> {
 
 impl<const P: u8, const K: umax> ModularInteger for MersenneInt<P, K> {
     type Base = umax;
-    #[inline]
-    fn modulus(&self) -> &Self::Base {
-        &Self::MODULUS
+    #[inline(always)]
+    fn modulus(&self) -> Self::Base {
+        Self::MODULUS
     }
 
-    #[inline]
+    #[inline(always)]
     fn residue(&self) -> Self::Base {
-        if self.0 == Self::MODULUS {
-            0
-        } else {
-            self.0
-        }
+        self.0
     }
 
-    #[inline]
+    #[inline(always)]
+    fn is_zero(&self) -> bool {
+        self.0 == 0
+    }
+
+    #[inline(always)]
     fn convert(&self, n: Self::Base) -> Self {
         Self::new(n)
     }

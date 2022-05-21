@@ -97,11 +97,16 @@ macro_rules! impl_uprim_montgomery_reduce {
 
 macro_rules! impl_uprim_montgomery_core {
     ($single:ty) => {
+        #[inline]
         fn new(m: &$single) -> Self {
             if m & 1 == 0 {
                 panic!("Only odd modulus are supported by the Montgomery form");
             }
             Self(<$single>::neginv(m))
+        }
+        #[inline(always)]
+        fn modulus(m: &$single) -> $single {
+            *m
         }
 
         #[inline]
@@ -171,6 +176,7 @@ macro_rules! impl_uprim_montgomery {
         impl_uprim_montgomery_reduce!($single, $double);
 
         impl Reducer<$single> for Montgomery<$single> {
+            type Modulus = $single;
             impl_uprim_montgomery_core!($single);
 
             #[inline]
@@ -221,6 +227,8 @@ impl Montgomery<u128> {
 }
 
 impl Reducer<u128> for Montgomery<u128> {
+    type Modulus = u128;
+
     #[inline]
     fn transform(target: u128, m: &u128) -> u128 {
         if target == 0 {
@@ -247,21 +255,11 @@ impl Reducer<u128> for Montgomery<u128> {
     impl_uprim_montgomery_core!(u128);
 }
 
+// TODO: support bigints, use relaxed form described in https://cetinkayakoc.net/docs/j56.pdf and https://eprint.iacr.org/2011/239.pdf
 // impl Reducer<BigUInt> for Montgomery<usize>
 // or impl Reducer<&[usize]> for Montgomery<usize> ??
-
-// Then
 //
-// struct Vanilla<T>(T): Reducer (trivial modular ring)
-// struct Montgomery<T>(T, TInv): Reducer, implement for primitive integers
-// struct MontgomeryMP<T>(Rc<(T, TInv)>): Reducer, implement for each bigint type, use relaxed form described in https://cetinkayakoc.net/docs/j56.pdf and https://eprint.iacr.org/2011/239.pdf
-// struct Barret<T>(T, TInv): Reducer
-// struct BarretMP<T>(Rc<(T, TInv)>): Reducer, implement for Vec[usize]
-// struct ReducedInt<T, Reducer<Elem = T>>: ModularInteger
-// type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>
-// type BarretInt<T> = ReducedInt<T, Barret<T>>
-//
-// Besides, we could directly base the operations on a specific bigint library (ibig is a good candidate), and convert all other bigint types to this type for arithmetics (rug::Integer::as_limbs, num_bigint::BigUint::to_u32_digits/to_u64_digits)
+// We could directly base the operations on a specific bigint library (ibig is a good candidate), and convert all other bigint types to this type for arithmetics (rug::Integer::as_limbs, num_bigint::BigUint::to_u32_digits/to_u64_digits)
 //     but there're two problems for ibig-rs now: it's unable to construct and deconstruct big integer by moving, and it has not implemented the Integer trait yet.
 // So the better option is to create a standalone "reduce" function that takes &[usize] as input, and then call this reduce function for each big integer backend.
 // And consider create separate ReducedInt type for small and bigints, as we can provide convenient interface for multi-by-single operators
@@ -292,8 +290,8 @@ mod tests {
         // is_zero test
         let r = Montgomery::new(&11u8);
         assert!(r.is_zero(&Montgomery::transform(0, &11), &11));
-        let five = Montgomery::transform(5, &11u8);
-        let six = Montgomery::transform(6, &11u8);
+        let five = Montgomery::transform(5u8, &11);
+        let six = Montgomery::transform(6u8, &11);
         dbg!(five, six);
         assert!(r.is_zero(&r.add(five, six, &11), &11));
 

@@ -171,10 +171,13 @@ pub trait ModularInteger:
     type Base;
 
     /// Return the modulus of the ring
-    fn modulus(&self) -> &Self::Base;
+    fn modulus(&self) -> Self::Base;
 
     /// Return the normalized residue of this integer in the ring
     fn residue(&self) -> Self::Base;
+
+    /// Check if the integer is zero
+    fn is_zero(&self) -> bool;
 
     /// Convert an normal integer into the same ring.
     ///
@@ -207,38 +210,47 @@ pub trait DivExact<Rhs, Precompute> : Sized {
 /// A modular reducer that can ensure that the operations on integers are all performed
 /// in a modular ring
 pub trait Reducer<T> {
+    /// Type of the modulus, it's usually the same type as T. It can be different
+    /// in some cases. For example, when the modulus needs to be normalized, when
+    /// the modulus is fixed, and when the modulus is large and reference counting
+    /// is preferred.
+    type Modulus;
+
     /// Create a reducer based on a modulus
-    fn new(m: &T) -> Self;
+    fn new(m: &Self::Modulus) -> Self;
 
     /// Transform a normal integer into reduced form
-    fn transform(target: T, m: &T) -> T;
+    fn transform(target: T, m: &Self::Modulus) -> T;
+
+    /// Get the modulus in original integer type
+    fn modulus(m: &Self::Modulus) -> T;
 
     /// Transform a reduced form back to normal integer
-    fn residue(&self, target: T, m: &T) -> T;
+    fn residue(&self, target: T, m: &Self::Modulus) -> T;
 
     /// Test if the residue() == 0
-    fn is_zero(&self, target: &T, m: &T) -> bool;
+    fn is_zero(&self, target: &T, m: &Self::Modulus) -> bool;
 
     /// Calculate (lhs + rhs) mod m in reduced form
-    fn add(&self, lhs: T, rhs: T, m: &T) -> T;
+    fn add(&self, lhs: T, rhs: T, m: &Self::Modulus) -> T;
 
     /// Calculate 2*target mod m
-    fn double(&self, target: T, m: &T) -> T;
+    fn double(&self, target: T, m: &Self::Modulus) -> T;
 
-    /// Calculate (lhs - rhs) mod m in Montgomery form
-    fn sub(&self, lhs: T, rhs: T, m: &T) -> T;
+    /// Calculate (lhs - rhs) mod m in reduced form
+    fn sub(&self, lhs: T, rhs: T, m: &Self::Modulus) -> T;
 
-    /// Calculate -monty mod m in Montgomery form
-    fn neg(&self, target: T, m: &T) -> T;
+    /// Calculate -monty mod m in reduced form
+    fn neg(&self, target: T, m: &Self::Modulus) -> T;
 
-    /// Calculate (lhs * rhs) mod m in Montgomery form
-    fn mul(&self, lhs: T, rhs: T, m: &T) -> T;
+    /// Calculate (lhs * rhs) mod m in reduced form
+    fn mul(&self, lhs: T, rhs: T, m: &Self::Modulus) -> T;
 
-    /// Calculate target^2 mod m in Montgomery form
-    fn square(&self, target: T, m: &T) -> T;
+    /// Calculate target^2 mod m in reduced form
+    fn square(&self, target: T, m: &Self::Modulus) -> T;
 
-    /// Calculate base ^ exp mod m in Montgomery form
-    fn pow(&self, base: T, exp: T, m: &T) -> T;
+    /// Calculate base ^ exp mod m in reduced form
+    fn pow(&self, base: T, exp: T, m: &Self::Modulus) -> T;
 
     // TODO: support montgomery inverse, see http://cetinkayakoc.net/docs/j82.pdf
 }
@@ -255,7 +267,11 @@ pub use double::{udouble, umax};
 pub use mersenne::MersenneInt;
 pub use preinv::PreInv;
 pub use monty::Montgomery;
-pub use reduced::ReducedInt;
+pub use reduced::{ReducedInt, Vanilla};
+
+pub type VanillaInt<T> = ReducedInt<T, Vanilla>;
+pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>;
+// pub type BarretInt<T> = ReducedInt<T, BarretInt<T>>;
 
 #[cfg(feature = "num-bigint")]
 mod bigint;
