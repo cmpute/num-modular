@@ -1,7 +1,7 @@
 //! Implementations for modular operations on primitive integers
 
 use crate::{ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps, DivExact};
-use crate::udouble;
+use crate::{udouble, Vanilla, Reducer};
 use num_integer::Integer;
 
 // FIXME: implement the modular functions as const after https://github.com/rust-lang/rust/pull/68847
@@ -16,11 +16,10 @@ macro_rules! impl_core_ops_uu {
             }
             #[inline]
             fn subm(self, rhs: $T, m: &$T) -> $T {
-                let (lhs, rhs) = (self % m, rhs % m);
-                if lhs >= rhs {
-                    lhs - rhs
+                if self >= rhs {
+                    (self - rhs) % m
                 } else {
-                    m - (rhs - lhs)
+                    ((rhs - self) % m).negm(m)
                 }
             }
             #[inline(always)]
@@ -33,9 +32,9 @@ macro_rules! impl_core_ops_uu {
 impl_core_ops_uu! { u8 => u16; u16 => u32; u32 => u64; u64 => u128; }
 
 #[cfg(target_pointer_width = "32")]
-impl_core_ops_uu! { usize => u64; }
+impl_core_ops_uu! { usize => i64; }
 #[cfg(target_pointer_width = "64")]
-impl_core_ops_uu! { usize => u128; }
+impl_core_ops_uu! { usize => i128; }
 
 impl ModularCoreOps<u128, &u128> for u128 {
     type Output = u128;
@@ -44,29 +43,21 @@ impl ModularCoreOps<u128, &u128> for u128 {
     fn addm(self, rhs: u128, m: &u128) -> u128 {
         if let Some(ab) = self.checked_add(rhs) {
             return ab % m;
-        }
-
-        let (lhs, rhs) = (self % m, rhs % m);
-        let (sum, overflow) = lhs.overflowing_add(rhs);
-        if overflow {
-            sum + m.wrapping_neg()
-        } else if &sum >= m {
-            sum - m
         } else {
-            sum
+            udouble::widening_add(self, rhs) % *m
         }
     }
 
     #[inline]
     fn subm(self, rhs: u128, m: &u128) -> u128 {
-        let (lhs, rhs) = (self % m, rhs % m);
-        if lhs >= rhs {
-            lhs - rhs
+        if self >= rhs {
+            (self - rhs) % m
         } else {
-            m - (rhs - lhs)
+            ((rhs - self) % m).negm(m)
         }
     }
 
+    #[inline]
     fn mulm(self, rhs: u128, m: &u128) -> u128 {
         if let Some(ab) = self.checked_mul(rhs) {
             ab % m
@@ -81,23 +72,7 @@ macro_rules! impl_powm_uprim {
         impl ModularPow<$T, &$T> for $T {
             type Output = $T;
             fn powm(self, exp: $T, m: &$T) -> $T {
-                match exp {
-                    1 => self % m,
-                    2 => self.mulm(self, m),
-                    _ => {
-                        let mut multi = self % m;
-                        let mut exp = exp;
-                        let mut result = 1;
-                        while exp > 0 {
-                            if exp & 1 != 0 {
-                                result = result.mulm(multi, m);
-                            }
-                            multi = multi.sqm(m);
-                            exp >>= 1;
-                        }
-                        result
-                    }
-                }
+                <Vanilla as Reducer<$T>>::new(m).pow(self % m, exp, m)
             }
         }
     )*);
@@ -225,11 +200,11 @@ macro_rules! impl_unary_uprim {
                 }
             }
 
-            #[inline]
+            #[inline(always)]
             fn dblm(self, m: &$T) -> $T {
                 self.addm(self, m)
             }
-            #[inline]
+            #[inline(always)]
             fn sqm(self, m: &$T) -> $T {
                 self.mulm(self, m)
             }

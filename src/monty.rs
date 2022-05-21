@@ -1,4 +1,5 @@
-use crate::{udouble, Reducer};
+use crate::{udouble, Reducer, Vanilla, ModularUnaryOps};
+use crate::reduced::impl_reduced_binary_pow;
 
 /// Negated modular inverse on binary bases
 trait NegModInv {
@@ -108,66 +109,37 @@ macro_rules! impl_uprim_montgomery_core {
         fn modulus(m: &$single) -> $single {
             *m
         }
-
-        #[inline]
-        fn add(&self, lhs: $single, rhs: $single, m: &$single) -> $single {
-            let (sum, overflow) = lhs.overflowing_add(rhs);
-            if overflow {
-                sum + m.wrapping_neg()
-            } else if &sum >= m {
-                sum - m
-            } else {
-                sum
-            }
-        }
-
-        #[inline]
-        fn double(&self, target: $single, m: &$single) -> $single {
-            self.add(target, target, m)
-        }
-
-        #[inline]
-        fn sub(&self, lhs: $single, rhs: $single, m: &$single) -> $single {
-            if lhs >= rhs {
-                lhs - rhs
-            } else {
-                m - (rhs - lhs)
-            }
-        }
-
-        #[inline]
-        fn neg(&self, monty: $single, m: &$single) -> $single {
-            if monty == 0 {
-                0
-            } else {
-                m - monty
-            }
-        }
-        
-        fn pow(&self, base: $single, exp: $single, m: &$single) -> $single {
-            match exp {
-                1 => base,
-                2 => self.square(base, m),
-                e => {
-                    let mut multi = base;
-                    let mut exp = e;
-                    let mut result = Self::transform(1, m);
-                    while exp > 0 {
-                        if exp & 1 != 0 {
-                            result = self.mul(result, multi, m);
-                        }
-                        multi = self.square(multi, m);
-                        exp >>= 1;
-                    }
-                    result
-                }
-            }
-        }
-
         #[inline(always)]
         fn is_zero(&self, target: &$single, _: &$single) -> bool {
             *target == 0
         }
+
+        #[inline(always)]
+        fn add(&self, lhs: $single, rhs: $single, m: &$single) -> $single {
+            <Vanilla as Reducer<$single>>::new(m).add(lhs, rhs, m)
+        }
+
+        #[inline(always)]
+        fn double(&self, target: $single, m: &$single) -> $single {
+            <Vanilla as Reducer<$single>>::new(m).double(target, m)
+        }
+
+        #[inline(always)]
+        fn sub(&self, lhs: $single, rhs: $single, m: &$single) -> $single {
+            <Vanilla as Reducer<$single>>::new(m).sub(lhs, rhs, m)
+        }
+
+        #[inline(always)]
+        fn neg(&self, target: $single, m: &$single) -> $single {
+            <Vanilla as Reducer<$single>>::new(m).neg(target, m)
+        }
+
+        #[inline(always)]
+        fn inv(&self, target: $single, m: &$single) -> Option<$single> {
+            self.residue(target, m).invm(m).map(|v| Self::transform(v, m))
+        }
+
+        impl_reduced_binary_pow!($single);
     }
 }
 
@@ -271,8 +243,6 @@ impl Reducer<u128> for Montgomery<u128> {
 
 #[cfg(test)]
 mod tests {
-    use std::dbg;
-
     use super::*;
     use crate::{ModularCoreOps, ModularPow, ModularUnaryOps};
     use rand::random;
@@ -292,7 +262,6 @@ mod tests {
         assert!(r.is_zero(&Montgomery::transform(0, &11), &11));
         let five = Montgomery::transform(5u8, &11);
         let six = Montgomery::transform(6u8, &11);
-        dbg!(five, six);
         assert!(r.is_zero(&r.add(five, six, &11), &11));
 
         // random creation test

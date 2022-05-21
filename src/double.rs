@@ -32,7 +32,7 @@ pub struct udouble {
 }
 
 impl udouble {
-    //> (not used yet)
+    //> (used in u128::addm)
     #[inline]
     pub const fn widening_add(lhs: umax, rhs: umax) -> Self {
         let (sum, carry) = lhs.overflowing_add(rhs);
@@ -376,7 +376,8 @@ impl udouble {
         }
     }
 
-    // double by double division (long division), listed here in case of future use
+    // double by double division (long division), it's not the most efficient algorithm.
+    // listed here in case of future use
     #[allow(dead_code)]
     fn div_rem(self, other: Self) -> (Self, Self) {
         let mut n = self; // numerator

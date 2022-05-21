@@ -14,7 +14,7 @@
 //! assert_eq!(x.mulm(y, &m), x * y % m);
 //!
 //! // convert integers into ModularInteger
-//! let mx = MontgomeryInt::new(x, m);
+//! let mx = MontgomeryInt::new(x, &m);
 //! let my = mx.convert(y); // faster than static MontgomeryInt::new(y, m)
 //! assert_eq!((mx * my).residue(), x * y % m);
 //! ```
@@ -246,12 +246,17 @@ pub trait Reducer<T> {
     /// Calculate (lhs * rhs) mod m in reduced form
     fn mul(&self, lhs: T, rhs: T, m: &Self::Modulus) -> T;
 
+    /// Calculate target^-1 mod m in reduced form,
+    /// it may return None when there is no modular inverse.
+    fn inv(&self, target: T, m: &Self::Modulus) -> Option<T>;
+
     /// Calculate target^2 mod m in reduced form
     fn square(&self, target: T, m: &Self::Modulus) -> T;
 
     /// Calculate base ^ exp mod m in reduced form
     fn pow(&self, base: T, exp: T, m: &Self::Modulus) -> T;
 
+    // TODO(v0.5): implement inverse
     // TODO: support montgomery inverse, see http://cetinkayakoc.net/docs/j82.pdf
 }
 
@@ -264,13 +269,14 @@ mod prim;
 mod reduced;
 
 pub use double::{udouble, umax};
-pub use mersenne::MersenneInt;
+pub use mersenne::Mersenne;
 pub use preinv::PreInv;
 pub use monty::Montgomery;
-pub use reduced::{ReducedInt, Vanilla};
+pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 
-pub type VanillaInt<T> = ReducedInt<T, Vanilla>;
+/// A integer in modulo ring based on Montgomery form
 pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>;
+pub type MersenneInt<const P: u8, const K: umax> = ReducedInt<umax, Mersenne<P, K>>;
 // pub type BarretInt<T> = ReducedInt<T, BarretInt<T>>;
 
 #[cfg(feature = "num-bigint")]

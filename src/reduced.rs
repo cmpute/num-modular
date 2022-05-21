@@ -1,4 +1,4 @@
-use crate::{Reducer, ModularInteger};
+use crate::{Reducer, ModularInteger, ModularUnaryOps, udouble};
 use core::ops::*;
 use num_traits::Pow;
 
@@ -18,10 +18,10 @@ pub struct ReducedInt<T, R: Reducer<T>> {
 impl<T, R: Reducer<T>> ReducedInt<T, R> {
     /// Convert n into the modulo ring ℤ/mℤ (i.e. `n % m`)
     #[inline]
-    pub fn new(n: T, m: R::Modulus) -> Self {
-        let r = R::new(&m);
-        let a = R::transform(n, &m);
-        ReducedInt { a, m, r }
+    pub fn new(n: T, m: &R::Modulus) -> Self where R::Modulus: Clone{
+        let r = R::new(m);
+        let a = R::transform(n, m);
+        Self { a, m: m.clone(), r }
     }
 
     #[inline(always)]
@@ -104,6 +104,8 @@ impl<T: PartialEq, R: Reducer<T>> Neg for ReducedInt<T, R> {
     }
 }
 
+// TODO(v0.5): implement Inv, Div
+
 impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
@@ -163,6 +165,32 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<
 #[derive(Debug, Clone, Copy)]
 pub struct Vanilla();
 
+macro_rules! impl_reduced_binary_pow {
+    ($T:ty) => {
+        fn pow(&self, base: $T, exp: $T, m: &$T) -> $T {
+            match exp {
+                1 => base,
+                2 => self.square(base, m),
+                e => {
+                    let mut multi = base;
+                    let mut exp = e;
+                    let mut result = Self::transform(1, m);
+                    while exp > 0 {
+                        if exp & 1 != 0 {
+                            result = self.mul(result, multi, m);
+                        }
+                        multi = self.square(multi, m);
+                        exp >>= 1;
+                    }
+                    result
+                }
+            }
+        }
+    };
+}
+
+pub(crate) use impl_reduced_binary_pow;
+
 macro_rules! impl_uprim_vanilla_core {
     ($single:ty) => {
         #[inline(always)]
@@ -220,26 +248,13 @@ macro_rules! impl_uprim_vanilla_core {
                 m - target
             }
         }
-        
-        fn pow(&self, base: $single, exp: $single, m: &$single) -> $single {
-            match exp {
-                1 => base,
-                2 => self.square(base, m),
-                e => {
-                    let mut multi = base;
-                    let mut exp = e;
-                    let mut result = 1;
-                    while exp > 0 {
-                        if exp & 1 != 0 {
-                            result = self.mul(result, multi, m);
-                        }
-                        multi = self.square(multi, m);
-                        exp >>= 1;
-                    }
-                    result
-                }
-            }
+
+        #[inline(always)]
+        fn inv(&self, target: $single, m: &$single) -> Option<$single> {
+            target.invm(m)
         }
+        
+        impl_reduced_binary_pow!($single);
     }
 }
 
@@ -264,5 +279,30 @@ macro_rules! impl_uprim_vanilla {
 }
 
 impl_uprim_vanilla!(u8, u16);
+impl_uprim_vanilla!(u16, u32);
+impl_uprim_vanilla!(u32, u64);
+impl_uprim_vanilla!(u64, u128);
+#[cfg(target_pointer_width = "32")]
+impl_uprim_vanilla!(usize, u64);
+#[cfg(target_pointer_width = "64")]
+impl_uprim_vanilla!(usize, u128);
+
+impl Reducer<u128> for Vanilla {
+    type Modulus = u128;
+    impl_uprim_vanilla_core!(u128);
+
+    #[inline]
+    fn mul(&self, lhs: u128, rhs: u128, m: &u128) -> u128 {
+        udouble::widening_mul(lhs, rhs) % *m
+    }
+
+    #[inline]
+    fn square(&self, target: u128, m: &u128) -> u128 {
+        udouble::widening_square(target) % *m
+    }
+}
+
+/// A integer in modulo ring based on conventional [Rem] operations
+pub type VanillaInt<T> = ReducedInt<T, Vanilla>;
 
 // TODO(v0.5): add test for vanilla integer
