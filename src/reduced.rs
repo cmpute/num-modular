@@ -1,6 +1,6 @@
 use crate::{Reducer, ModularInteger, ModularUnaryOps, udouble};
 use core::ops::*;
-use num_traits::Pow;
+use num_traits::{Inv, Pow};
 
 /// An integer in a modulo ring
 #[derive(Debug, Clone, Copy)]
@@ -104,7 +104,25 @@ impl<T: PartialEq, R: Reducer<T>> Neg for ReducedInt<T, R> {
     }
 }
 
-// TODO(v0.5): implement Inv, Div
+impl<T: PartialEq, R: Reducer<T>> Inv for ReducedInt<T, R> {
+    type Output = Self;
+    #[inline]
+    fn inv(self) -> Self::Output {
+        let Self { a, m, r } = self;
+        let a = r.inv(a, &m).expect("the modular inverse doesn't exists.");
+        Self { a, m, r }
+    }
+}
+
+impl<T: PartialEq, R: Reducer<T>> Div for ReducedInt<T, R> where R::Modulus: PartialEq {
+    type Output = Self;
+    #[inline]
+    fn div(self, rhs: Self) -> Self::Output {
+        self * rhs.inv()
+    }
+}
+
+// TODO(v0.5): implement reference version of neg, inv, div
 
 impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
     type Output = Self;
@@ -302,7 +320,41 @@ impl Reducer<u128> for Vanilla {
     }
 }
 
-/// A integer in modulo ring based on conventional [Rem] operations
+/// An integer in modulo ring based on conventional [Rem] operations
 pub type VanillaInt<T> = ReducedInt<T, Vanilla>;
 
-// TODO(v0.5): add test for vanilla integer
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ModularCoreOps, ModularPow, ModularUnaryOps};
+    use rand::random;
+
+    const NRANDOM: u32 = 10;
+
+    #[test]
+    fn test_against_prim() {
+        macro_rules! tests_for {
+            ($($T:ty)*) => ($(
+                let m = random::<$T>();
+                let e = random::<u8>() as $T;
+                let (a, b) = (random::<$T>(), random::<$T>());
+                let am = VanillaInt::new(a, &m);
+                let bm = VanillaInt::new(b, &m);
+                assert_eq!((am + bm).residue(), a.addm(b, &m));
+                assert_eq!((am - bm).residue(), a.subm(b, &m));
+                assert_eq!((am * bm).residue(), a.mulm(b, &m));
+                assert_eq!(am.neg().residue(), a.negm(&m));
+                assert_eq!(am.double().residue(), a.dblm(&m));
+                assert_eq!(am.square().residue(), a.sqm(&m));
+                assert_eq!(am.pow(e).residue(), a.powm(e, &m));
+                if let Some(v) = a.invm(&m) {
+                    assert_eq!(am.inv().residue(), v);
+                }
+            )*);
+        }
+
+        for _ in 0..NRANDOM {
+            tests_for!(u8 u16 u32 u64 u128 usize);
+        }
+    }
+}

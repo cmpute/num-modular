@@ -32,9 +32,9 @@ macro_rules! impl_core_ops_uu {
 impl_core_ops_uu! { u8 => u16; u16 => u32; u32 => u64; u64 => u128; }
 
 #[cfg(target_pointer_width = "32")]
-impl_core_ops_uu! { usize => i64; }
+impl_core_ops_uu! { usize => u64; }
 #[cfg(target_pointer_width = "64")]
-impl_core_ops_uu! { usize => i128; }
+impl_core_ops_uu! { usize => u128; }
 
 impl ModularCoreOps<u128, &u128> for u128 {
     type Output = u128;

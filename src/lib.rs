@@ -255,9 +255,6 @@ pub trait Reducer<T> {
 
     /// Calculate base ^ exp mod m in reduced form
     fn pow(&self, base: T, exp: T, m: &Self::Modulus) -> T;
-
-    // TODO(v0.5): implement inverse
-    // TODO: support montgomery inverse, see http://cetinkayakoc.net/docs/j82.pdf
 }
 
 mod barret;
@@ -274,9 +271,12 @@ pub use preinv::PreInv;
 pub use monty::Montgomery;
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 
-/// A integer in modulo ring based on Montgomery form
+/// An integer in modulo ring based on Montgomery form
 pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>;
+
+/// An integer in modulo ring with (pseudo) Mersenne number as modulus
 pub type MersenneInt<const P: u8, const K: umax> = ReducedInt<umax, Mersenne<P, K>>;
+
 // pub type BarretInt<T> = ReducedInt<T, BarretInt<T>>;
 
 #[cfg(feature = "num-bigint")]

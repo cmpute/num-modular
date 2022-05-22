@@ -7,7 +7,7 @@
 pub trait Barret {}
 
 // TODO: implement methods with Barret reduction (like) methods
-// Version 1: Original barret reduction (for x mod n)
+// TODO(v0.5.x) Version 1: Original barret reduction (for x mod n)
 // - Choose k = ceil(log2(n))
 // - Precompute r = floor(2^(k+1)/n)
 // - t = x - floor(x*r/2^(k+1)) * n

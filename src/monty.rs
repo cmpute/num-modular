@@ -136,6 +136,8 @@ macro_rules! impl_uprim_montgomery_core {
 
         #[inline(always)]
         fn inv(&self, target: $single, m: &$single) -> Option<$single> {
+            // TODO: support direct montgomery inverse
+            // REF: http://cetinkayakoc.net/docs/j82.pdf
             self.residue(target, m).invm(m).map(|v| Self::transform(v, m))
         }
 
@@ -236,7 +238,7 @@ impl Reducer<u128> for Montgomery<u128> {
 // So the better option is to create a standalone "reduce" function that takes &[usize] as input, and then call this reduce function for each big integer backend.
 // And consider create separate ReducedInt type for small and bigints, as we can provide convenient interface for multi-by-single operators
 
-// TODO(v0.4.x): accept even numbers by removing 2 factors from m and store the exponent
+// TODO(v0.5.x): accept even numbers by removing 2 factors from m and store the exponent
 // Requirement: 1. A separate class to perform modular arithmetics with 2^n as modulus
 //              2. Algorithm for construct residue from two components (see http://koclab.cs.ucsb.edu/teaching/cs154/docx/Notes7-Montgomery.pdf)
 // Or we can just provide crt function, and let the implementation of monty int with full modulus support as an example code.
@@ -290,76 +292,27 @@ mod tests {
 
     #[test]
     fn test_against_prim() {
+        macro_rules! tests_for {
+            ($($T:ty)*) => ($(
+                let m = random::<$T>() | 1;
+                let r = Montgomery::new(&m);
+                let e = random::<$T>() as $T;
+                let (a, b) = (random::<$T>(), random::<$T>());
+                let am = Montgomery::transform(a, &m);
+                let bm = Montgomery::transform(b, &m);
+                assert_eq!(r.residue(r.add(am, bm, &m), &m), a.addm(b, &m));
+                assert_eq!(r.residue(r.sub(am, bm, &m), &m), a.subm(b, &m));
+                assert_eq!(r.residue(r.mul(am, bm, &m), &m), a.mulm(b, &m));
+                assert_eq!(r.residue(r.neg(am, &m), &m), a.negm(&m));
+                assert_eq!(r.inv(am, &m).map(|v| r.residue(v, &m)), a.invm(&m));
+                assert_eq!(r.residue(r.double(am, &m), &m), a.dblm(&m));
+                assert_eq!(r.residue(r.square(am, &m), &m), a.sqm(&m));
+                assert_eq!(r.residue(r.pow(am, e, &m), &m), a.powm(e, &m));
+            )*);
+        }
+
         for _ in 0..NRANDOM {
-            let m = random::<u8>() | 1;
-            let r = Montgomery::new(&m);
-            let e = random::<u8>();
-            let (a, b) = (random::<u8>(), random::<u8>());
-            let am = Montgomery::transform(a, &m);
-            let bm = Montgomery::transform(b, &m);
-            assert_eq!(r.residue(r.add(am, bm, &m), &m), a.addm(b, &m));
-            assert_eq!(r.residue(r.sub(am, bm, &m), &m), a.subm(b, &m));
-            assert_eq!(r.residue(r.mul(am, bm, &m), &m), a.mulm(b, &m));
-            assert_eq!(r.residue(r.neg(am, &m), &m), a.negm(&m));
-            assert_eq!(r.residue(r.double(am, &m), &m), a.dblm(&m));
-            assert_eq!(r.residue(r.square(am, &m), &m), a.sqm(&m));
-            assert_eq!(r.residue(r.pow(am, e, &m), &m), a.powm(e, &m));
-
-            let m = random::<u16>() | 1;
-            let r = Montgomery::new(&m);
-            let e = e as u16;
-            let (a, b) = (random::<u16>(), random::<u16>());
-            let am = Montgomery::transform(a, &m);
-            let bm = Montgomery::transform(b, &m);
-            assert_eq!(r.residue(r.add(am, bm, &m), &m), a.addm(b, &m));
-            assert_eq!(r.residue(r.sub(am, bm, &m), &m), a.subm(b, &m));
-            assert_eq!(r.residue(r.mul(am, bm, &m), &m), a.mulm(b, &m));
-            assert_eq!(r.residue(r.neg(am, &m), &m), a.negm(&m));
-            assert_eq!(r.residue(r.double(am, &m), &m), a.dblm(&m));
-            assert_eq!(r.residue(r.square(am, &m), &m), a.sqm(&m));
-            assert_eq!(r.residue(r.pow(am, e, &m), &m), a.powm(e, &m));
-
-            let m = random::<u32>() | 1;
-            let r = Montgomery::new(&m);
-            let e = e as u32;
-            let (a, b) = (random::<u32>(), random::<u32>());
-            let am = Montgomery::transform(a, &m);
-            let bm = Montgomery::transform(b, &m);
-            assert_eq!(r.residue(r.add(am, bm, &m), &m), a.addm(b, &m));
-            assert_eq!(r.residue(r.sub(am, bm, &m), &m), a.subm(b, &m));
-            assert_eq!(r.residue(r.mul(am, bm, &m), &m), a.mulm(b, &m));
-            assert_eq!(r.residue(r.neg(am, &m), &m), a.negm(&m));
-            assert_eq!(r.residue(r.double(am, &m), &m), a.dblm(&m));
-            assert_eq!(r.residue(r.square(am, &m), &m), a.sqm(&m));
-            assert_eq!(r.residue(r.pow(am, e, &m), &m), a.powm(e, &m));
-
-            let m = random::<u64>() | 1;
-            let r = Montgomery::new(&m);
-            let e = e as u64;
-            let (a, b) = (random::<u64>(), random::<u64>());
-            let am = Montgomery::transform(a, &m);
-            let bm = Montgomery::transform(b, &m);
-            assert_eq!(r.residue(r.add(am, bm, &m), &m), a.addm(b, &m));
-            assert_eq!(r.residue(r.sub(am, bm, &m), &m), a.subm(b, &m));
-            assert_eq!(r.residue(r.mul(am, bm, &m), &m), a.mulm(b, &m));
-            assert_eq!(r.residue(r.neg(am, &m), &m), a.negm(&m));
-            assert_eq!(r.residue(r.double(am, &m), &m), a.dblm(&m));
-            assert_eq!(r.residue(r.square(am, &m), &m), a.sqm(&m));
-            assert_eq!(r.residue(r.pow(am, e, &m), &m), a.powm(e, &m));
-
-            let m = random::<u128>() | 1;
-            let r = Montgomery::new(&m);
-            let e = e as u128;
-            let (a, b) = (random::<u128>(), random::<u128>());
-            let am = Montgomery::transform(a, &m);
-            let bm = Montgomery::transform(b, &m);
-            assert_eq!(r.residue(r.add(am, bm, &m), &m), a.addm(b, &m));
-            assert_eq!(r.residue(r.sub(am, bm, &m), &m), a.subm(b, &m));
-            assert_eq!(r.residue(r.mul(am, bm, &m), &m), a.mulm(b, &m));
-            assert_eq!(r.residue(r.neg(am, &m), &m), a.negm(&m));
-            assert_eq!(r.residue(r.double(am, &m), &m), a.dblm(&m));
-            assert_eq!(r.residue(r.square(am, &m), &m), a.sqm(&m));
-            assert_eq!(r.residue(r.pow(am, e, &m), &m), a.powm(e, &m));
+            tests_for!(u8 u16 u32 u64 u128);
         }
     }
 }
