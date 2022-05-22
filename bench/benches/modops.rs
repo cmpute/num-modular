@@ -50,14 +50,14 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("mersenne + extended gcd", |b| {
         b.iter(|| {
             (100u64..400u64)
-                .map(|n| MersenneInt::<56, 5>::new(n as u128).inv())
+                .map(|n| MersenneInt::<56, 5>::new(n as u128, &()).inv())
                 .reduce(|a, b| a + b)
         })
     });
     group.bench_function("mersenne + fermat theorem", |b| {
         b.iter(|| {
             (100u64..400u64)
-                .map(|n| MersenneInt::<56, 5>::new(n as u128).pow(M1 as u128 - 2))
+                .map(|n| MersenneInt::<56, 5>::new(n as u128, &()).pow(M1 as u128 - 2))
                 .reduce(|a, b| a + b)
         })
     });
@@ -84,14 +84,14 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("mersenne + extended gcd", |b| {
         b.iter(|| {
             (1_000_000_000u128..1_000_000_300u128)
-                .map(|n| MersenneInt::<94, 3>::new(n).inv())
+                .map(|n| MersenneInt::<94, 3>::new(n, &()).inv())
                 .reduce(|a, b| a + b)
         })
     });
     group.bench_function("mersenne + fermat theorem", |b| {
         b.iter(|| {
             (1_000_000_000u128..1_000_000_300u128)
-                .map(|n| MersenneInt::<94, 3>::new(n).pow(M2 - 2))
+                .map(|n| MersenneInt::<94, 3>::new(n, &()).pow(M2 - 2))
                 .reduce(|a, b| a + b)
         })
     });

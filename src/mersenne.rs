@@ -12,7 +12,7 @@ pub struct Mersenne<const P: u8, const K: umax>();
 
 impl<const P: u8, const K: umax> Mersenne<P, K> {
     const BITMASK: umax = (1 << P) - 1;
-    const MODULUS: umax = (1 << P) - K;
+    pub const MODULUS: umax = (1 << P) - K;
 
     // Calculate v % Self::MODULUS, where v is a umax integer
     const fn reduce_single(v: umax) -> umax {
@@ -68,11 +68,10 @@ impl<const P: u8, const K: umax> Mersenne<P, K> {
 }
 
 impl<const P: u8, const K: umax> Reducer<umax> for Mersenne<P, K> {
-    type Modulus = umax;
+    type Modulus = ();
 
     #[inline]
-    fn new(m: &Self::Modulus) -> Self {
-        debug_assert!(m == &Self::MODULUS);
+    fn new(_: &()) -> Self {
         assert!(P <= 127);
         assert!(K > 0 && K < (2 as umax).pow(P as u32 - 1) && K % 2 == 1);
         assert!(
@@ -85,29 +84,24 @@ impl<const P: u8, const K: umax> Reducer<umax> for Mersenne<P, K> {
         Self {}
     }
     #[inline]
-    fn transform(target: umax, m: &Self::Modulus) -> umax {
-        debug_assert!(m == &Self::MODULUS);
+    fn transform(target: umax, _: &()) -> umax {
         Self::reduce_single(target)
     }
     #[inline]
-    fn residue(&self, target: umax, m: &Self::Modulus) -> umax {
-        debug_assert!(m == &Self::MODULUS);
+    fn residue(&self, target: umax, _: &()) -> umax {
         target
     }
     #[inline]
-    fn modulus(m: &Self::Modulus) -> umax {
-        debug_assert!(m == &Self::MODULUS);
+    fn modulus(_: &()) -> umax {
         Self::MODULUS
     }
     #[inline]
-    fn is_zero(&self, target: &umax, m: &Self::Modulus) -> bool {
-        debug_assert!(m == &Self::MODULUS);
+    fn is_zero(&self, target: &umax, _: &()) -> bool {
         target == &0
     }
 
     #[inline]
-    fn add(&self, lhs: umax, rhs: umax, m: &Self::Modulus) -> umax {
-        debug_assert!(m == &Self::MODULUS);
+    fn add(&self, lhs: umax, rhs: umax, _: &()) -> umax {
         let mut sum = lhs + rhs;
         if sum >= Self::MODULUS {
             sum -= Self::MODULUS
@@ -115,8 +109,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for Mersenne<P, K> {
         sum
     }
     #[inline]
-    fn sub(&self, lhs: umax, rhs: umax, m: &Self::Modulus) -> umax {
-        debug_assert!(m == &Self::MODULUS);
+    fn sub(&self, lhs: umax, rhs: umax, _: &()) -> umax {
         if lhs >= rhs {
             lhs - rhs
         } else {
@@ -124,13 +117,11 @@ impl<const P: u8, const K: umax> Reducer<umax> for Mersenne<P, K> {
         }
     }
     #[inline]
-    fn double(&self, target: umax, m: &Self::Modulus) -> umax {
-        debug_assert!(m == &Self::MODULUS);
-        self.add(target, target, &Self::MODULUS)
+    fn double(&self, target: umax, _: &()) -> umax {
+        self.add(target, target, &())
     }
     #[inline]
-    fn neg(&self, target: umax, m: &Self::Modulus) -> umax {
-        debug_assert!(m == &Self::MODULUS);
+    fn neg(&self, target: umax, _: &()) -> umax {
         if target == 0 {
             0
         } else {
@@ -138,8 +129,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for Mersenne<P, K> {
         }
     }
     #[inline]
-    fn mul(&self, lhs: umax, rhs: umax, m: &Self::Modulus) -> umax {
-        debug_assert!(m == &Self::MODULUS);
+    fn mul(&self, lhs: umax, rhs: umax, _: &()) -> umax {
         if (P as u32) < (umax::BITS / 2) {
             Self::reduce_single(lhs * rhs)
         } else {
@@ -147,8 +137,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for Mersenne<P, K> {
         }
     }
     #[inline]
-    fn inv(&self, target: umax, m: &Self::Modulus) -> Option<umax> {
-        debug_assert!(m == &Self::MODULUS);
+    fn inv(&self, target: umax, _: &()) -> Option<umax> {
         if (P as u32) < usize::BITS {
             (target as usize)
                 .invm(&(Self::MODULUS as usize))
@@ -158,8 +147,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for Mersenne<P, K> {
         }
     }
     #[inline]
-    fn square(&self, target: umax, m: &Self::Modulus) -> umax {
-        debug_assert!(m == &Self::MODULUS);
+    fn square(&self, target: umax, _: &()) -> umax {
         if (P as u32) < (umax::BITS / 2) {
             Self::reduce_single(target * target)
         } else {
@@ -167,7 +155,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for Mersenne<P, K> {
         }
     }
 
-    impl_reduced_binary_pow!(umax);
+    impl_reduced_binary_pow!(umax, ());
 }
 
 #[cfg(test)]
@@ -192,17 +180,17 @@ mod tests {
             let a = random::<umax>();
 
             const P1: umax = (1 << 31) - 1;
-            assert_eq!(M1::new(&P1).residue(M1::transform(a, &P1), &P1), a % P1);
+            assert_eq!(M1::new(&()).residue(M1::transform(a, &()), &()), a % P1);
             const P2: umax = (1 << 61) - 1;
-            assert_eq!(M2::new(&P2).residue(M2::transform(a, &P2), &P2), a % P2);
+            assert_eq!(M2::new(&()).residue(M2::transform(a, &()), &()), a % P2);
             const P3: umax = (1 << 127) - 1;
-            assert_eq!(M3::new(&P3).residue(M3::transform(a, &P3), &P3), a % P3);
+            assert_eq!(M3::new(&()).residue(M3::transform(a, &()), &()), a % P3);
             const P4: umax = (1 << 32) - 5;
-            assert_eq!(M4::new(&P4).residue(M4::transform(a, &P4), &P4), a % P4);
+            assert_eq!(M4::new(&()).residue(M4::transform(a, &()), &()), a % P4);
             const P5: umax = (1 << 56) - 5;
-            assert_eq!(M5::new(&P5).residue(M5::transform(a, &P5), &P5), a % P5);
+            assert_eq!(M5::new(&()).residue(M5::transform(a, &()), &()), a % P5);
             const P6: umax = (1 << 122) - 3;
-            assert_eq!(M6::new(&P6).residue(M6::transform(a, &P6), &P6), a % P6);
+            assert_eq!(M6::new(&()).residue(M6::transform(a, &()), &()), a % P6);
         }
     }
 
@@ -211,17 +199,17 @@ mod tests {
         macro_rules! tests_for {
             ($a:tt, $b:tt, $e:tt; $($M:ty)*) => ($({
                 const P: umax = <$M>::MODULUS;
-                let am = <$M>::transform($a, &P);
-                let bm = <$M>::transform($b, &P);
-                let r = <$M>::new(&P);
-                assert_eq!(r.add(am, bm, &P), $a.addm($b, &P));
-                assert_eq!(r.sub(am, bm, &P), $a.subm($b, &P));
-                assert_eq!(r.mul(am, bm, &P), $a.mulm($b, &P));
-                assert_eq!(r.neg(am, &P), $a.negm(&P));
-                assert_eq!(r.inv(am, &P), $a.invm(&P));
-                assert_eq!(r.double(am, &P), $a.dblm(&P));
-                assert_eq!(r.square(am, &P), $a.sqm(&P));
-                assert_eq!(r.pow(am, $e, &P), $a.powm($e, &P));
+                let am = <$M>::transform($a, &());
+                let bm = <$M>::transform($b, &());
+                let r = <$M>::new(&());
+                assert_eq!(r.add(am, bm, &()), $a.addm($b, &P));
+                assert_eq!(r.sub(am, bm, &()), $a.subm($b, &P));
+                assert_eq!(r.mul(am, bm, &()), $a.mulm($b, &P));
+                assert_eq!(r.neg(am, &()), $a.negm(&P));
+                assert_eq!(r.inv(am, &()), $a.invm(&P));
+                assert_eq!(r.double(am, &()), $a.dblm(&P));
+                assert_eq!(r.square(am, &()), $a.sqm(&P));
+                assert_eq!(r.pow(am, $e, &()), $a.powm($e, &P));
             })*);
         }
 

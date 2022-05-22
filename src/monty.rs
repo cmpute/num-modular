@@ -141,7 +141,7 @@ macro_rules! impl_uprim_montgomery_core {
             self.residue(target, m).invm(m).map(|v| Self::transform(v, m))
         }
 
-        impl_reduced_binary_pow!($single);
+        impl_reduced_binary_pow!($single, $single);
     }
 }
 

@@ -25,8 +25,9 @@ impl<T, R: Reducer<T>> ReducedInt<T, R> {
     }
 
     #[inline(always)]
-    fn check_modulus_eq(&self, rhs: &Self) where R::Modulus: PartialEq {
-        if cfg!(debug_assertions) && self.m != rhs.m {
+    fn check_modulus_eq(&self, rhs: &Self) where T: PartialEq {
+        // we don't directly compare m because m could be empty in case of Mersenne modular integer
+        if cfg!(debug_assertions) && R::modulus(&self.m) != R::modulus(&rhs.m) {
             panic!("The modulus of two operators should be the same!");
         }
     }
@@ -37,7 +38,7 @@ impl<T, R: Reducer<T>> ReducedInt<T, R> {
     }
 }
 
-impl<T: PartialEq, R: Reducer<T>> PartialEq for ReducedInt<T, R> where R::Modulus: PartialEq {
+impl<T: PartialEq, R: Reducer<T>> PartialEq for ReducedInt<T, R> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.check_modulus_eq(other);
@@ -47,7 +48,7 @@ impl<T: PartialEq, R: Reducer<T>> PartialEq for ReducedInt<T, R> where R::Modulu
 
 macro_rules! impl_binops {
     ($method:ident, impl $op:ident) => {        
-        impl<T: PartialEq, R: Reducer<T>> $op for ReducedInt<T, R> where R::Modulus: PartialEq {
+        impl<T: PartialEq, R: Reducer<T>> $op for ReducedInt<T, R> {
             type Output = Self;
             fn $method(self, rhs: Self) -> Self::Output {
                 self.check_modulus_eq(&rhs);
@@ -57,7 +58,7 @@ macro_rules! impl_binops {
             }
         }
 
-        impl<T: PartialEq + Clone, R: Reducer<T>> $op<&Self> for ReducedInt<T, R> where R::Modulus: PartialEq {
+        impl<T: PartialEq + Clone, R: Reducer<T>> $op<&Self> for ReducedInt<T, R> {
             type Output = Self;
             #[inline]
             fn $method(self, rhs: &Self) -> Self::Output {
@@ -68,7 +69,7 @@ macro_rules! impl_binops {
             }
         }
 
-        impl<T: PartialEq + Clone, R: Reducer<T>> $op<ReducedInt<T, R>> for &ReducedInt<T, R> where R::Modulus: PartialEq {
+        impl<T: PartialEq + Clone, R: Reducer<T>> $op<ReducedInt<T, R>> for &ReducedInt<T, R> {
             type Output = ReducedInt<T, R>;
             #[inline]
             fn $method(self, rhs: ReducedInt<T, R>) -> Self::Output {
@@ -79,7 +80,7 @@ macro_rules! impl_binops {
             }
         }
 
-        impl<T: PartialEq + Clone, R: Reducer<T> + Clone> $op<&ReducedInt<T, R>> for &ReducedInt<T, R> where R::Modulus: PartialEq + Clone {
+        impl<T: PartialEq + Clone, R: Reducer<T> + Clone> $op<&ReducedInt<T, R>> for &ReducedInt<T, R> where R::Modulus: Clone {
             type Output = ReducedInt<T, R>;
             #[inline]
             fn $method(self, rhs: &ReducedInt<T, R>) -> Self::Output {
@@ -103,6 +104,14 @@ impl<T: PartialEq, R: Reducer<T>> Neg for ReducedInt<T, R> {
         Self { a, m, r }
     }
 }
+impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Neg for &ReducedInt<T, R> where R::Modulus: Clone {
+    type Output = ReducedInt<T, R>;
+    #[inline]
+    fn neg(self) -> Self::Output {
+        let a = self.r.neg(self.a.clone(), &self.m);
+        ReducedInt { a, m: self.m.clone(), r: self.r.clone() }
+    }
+}
 
 impl<T: PartialEq, R: Reducer<T>> Inv for ReducedInt<T, R> {
     type Output = Self;
@@ -113,16 +122,43 @@ impl<T: PartialEq, R: Reducer<T>> Inv for ReducedInt<T, R> {
         Self { a, m, r }
     }
 }
+impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Inv for &ReducedInt<T, R> where R::Modulus: Clone {
+    type Output = ReducedInt<T, R>;
+    #[inline]
+    fn inv(self) -> Self::Output {
+        let a = self.r.inv(self.a.clone(), &self.m).expect("the modular inverse doesn't exists.");
+        ReducedInt { a, m: self.m.clone(), r: self.r.clone() }
+    }
+}
 
-impl<T: PartialEq, R: Reducer<T>> Div for ReducedInt<T, R> where R::Modulus: PartialEq {
+impl<T: PartialEq, R: Reducer<T>> Div for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
     fn div(self, rhs: Self) -> Self::Output {
         self * rhs.inv()
     }
 }
-
-// TODO(v0.5): implement reference version of neg, inv, div
+impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Div<&ReducedInt<T, R>> for ReducedInt<T, R> where R::Modulus: Clone {
+    type Output = Self;
+    #[inline]
+    fn div(self, rhs: &Self) -> Self::Output {
+        self * rhs.inv()
+    }
+}
+impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Div<ReducedInt<T, R>> for &ReducedInt<T, R> where R::Modulus: Clone {
+    type Output = ReducedInt<T, R>;
+    #[inline]
+    fn div(self, rhs: ReducedInt<T, R>) -> Self::Output {
+        self.clone() * rhs.inv()
+    }
+}
+impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Div<&ReducedInt<T, R>> for &ReducedInt<T, R> where R::Modulus: Clone {
+    type Output = ReducedInt<T, R>;
+    #[inline]
+    fn div(self, rhs: &ReducedInt<T, R>) -> Self::Output {
+        self.clone() * rhs.inv()
+    }
+}
 
 impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
     type Output = Self;
@@ -134,7 +170,9 @@ impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
     }
 }
 
-impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<T, R> where R::Modulus: PartialEq + Clone
+// TODO(v0.5): implement reference version of pow
+
+impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<T, R> where R::Modulus: Clone
 {
     type Base = T;
 
@@ -184,8 +222,8 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<
 pub struct Vanilla();
 
 macro_rules! impl_reduced_binary_pow {
-    ($T:ty) => {
-        fn pow(&self, base: $T, exp: $T, m: &$T) -> $T {
+    ($T:ty, $M:ty) => {
+        fn pow(&self, base: $T, exp: $T, m: &$M) -> $T {
             match exp {
                 1 => base,
                 2 => self.square(base, m),
@@ -272,7 +310,7 @@ macro_rules! impl_uprim_vanilla_core {
             target.invm(m)
         }
         
-        impl_reduced_binary_pow!($single);
+        impl_reduced_binary_pow!($single, $single);
     }
 }
 
