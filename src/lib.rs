@@ -26,7 +26,7 @@
 //!     applicable to fast division and modulo
 //! - [Montgomery]: Convert the dividend into a special form by shifting and pre-compute a modular inverse,
 //!     only applicable to fast modulo, but faster than Barret reduction
-//! - [MersenneInt]: Specialization of modulo in form `2^P-K`
+//! - [FixedMersenne]: Specialization of modulo in form `2^P-K` under 2^127.
 //! 
 
 // XXX: Other fast modular arithmetic tricks
@@ -266,16 +266,16 @@ mod prim;
 mod reduced;
 
 pub use double::{udouble, umax};
-pub use mersenne::Mersenne;
+pub use mersenne::FixedMersenne;
 pub use preinv::PreInv;
 pub use monty::Montgomery;
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 
-/// An integer in modulo ring based on Montgomery form
+/// An integer in modulo ring based on [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form)
 pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>;
 
-/// An integer in modulo ring with (pseudo) Mersenne number as modulus
-pub type MersenneInt<const P: u8, const K: umax> = ReducedInt<umax, Mersenne<P, K>>;
+/// An integer in modulo ring with a fixed (pseudo) Mersenne number as modulus
+pub type FixedMersenneInt<const P: u8, const K: umax> = ReducedInt<umax, FixedMersenne<P, K>>;
 
 // pub type BarretInt<T> = ReducedInt<T, BarretInt<T>>;
 

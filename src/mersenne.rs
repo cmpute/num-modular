@@ -7,10 +7,12 @@ use crate::reduced::impl_reduced_binary_pow;
 /// The `P` is limited to 127 so that it's not necessary to check overflow. This limit won't be a problem for any
 /// Mersenne primes within the range of [umax] (i.e. [u128]).
 #[derive(Debug, Clone, Copy)]
-pub struct Mersenne<const P: u8, const K: umax>();
-// XXX: support other primes as modulo, such as solinas prime, proth prime
+pub struct FixedMersenne<const P: u8, const K: umax>();
 
-impl<const P: u8, const K: umax> Mersenne<P, K> {
+// XXX: support other primes as modulo, such as solinas prime, proth prime and support multi precision
+// REF: Handbook of Cryptography 14.3.4
+
+impl<const P: u8, const K: umax> FixedMersenne<P, K> {
     const BITMASK: umax = (1 << P) - 1;
     pub const MODULUS: umax = (1 << P) - K;
 
@@ -67,7 +69,7 @@ impl<const P: u8, const K: umax> Mersenne<P, K> {
     }
 }
 
-impl<const P: u8, const K: umax> Reducer<umax> for Mersenne<P, K> {
+impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
     type Modulus = ();
 
     #[inline]
@@ -164,12 +166,12 @@ mod tests {
     use crate::{ModularCoreOps, ModularPow};
     use rand::random;
 
-    type M1 = Mersenne::<31, 1>;
-    type M2 = Mersenne::<61, 1>;
-    type M3 = Mersenne::<127, 1>;
-    type M4 = Mersenne::<32, 5>;
-    type M5 = Mersenne::<56, 5>;
-    type M6 = Mersenne::<122, 3>;
+    type M1 = FixedMersenne::<31, 1>;
+    type M2 = FixedMersenne::<61, 1>;
+    type M3 = FixedMersenne::<127, 1>;
+    type M4 = FixedMersenne::<32, 5>;
+    type M5 = FixedMersenne::<56, 5>;
+    type M6 = FixedMersenne::<122, 3>;
 
     const NRANDOM: u32 = 10;
 

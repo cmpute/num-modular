@@ -3,7 +3,7 @@ use crate::reduced::impl_reduced_binary_pow;
 
 /// Negated modular inverse on binary bases
 trait NegModInv {
-    /// Calculate -(m^-1) mod R = 2^k. If m is odd, then result of m + 1 will be returned.
+    /// Calculate `-(m^-1) mod R`, `R = 2^k. If m is odd, then result of m + 1 will be returned.
     fn neginv(m: &Self) -> Self;
 }
 
@@ -67,8 +67,8 @@ impl NegModInv for u128 {
 
 /// Operations of a integer represented in [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form).
 ///
-/// The generic type T represents the underlying integer representation for modular inverse -m^-1 mod R,
-/// and R=2^B will be used as the auxiliary modulus, where B is automatically selected
+/// The generic type T represents the underlying integer representation for modular inverse `-m^-1 mod R`,
+/// and `R=2^B` will be used as the auxiliary modulus, where B is automatically selected
 /// based on the size of T.
 #[derive(Debug, Clone, Copy)]
 pub struct Montgomery<I>(I);

@@ -169,8 +169,14 @@ impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
         Self { a, m, r }
     }
 }
-
-// TODO(v0.5): implement reference version of pow
+impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Pow<T> for &ReducedInt<T, R> where R::Modulus: Clone {
+    type Output = ReducedInt<T, R>;
+    #[inline]
+    fn pow(self, rhs: T) -> Self::Output {
+        let a = self.r.pow(self.a.clone(), rhs, &self.m);
+        ReducedInt { a, m: self.m.clone(), r: self.r.clone() }
+    }
+}
 
 impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<T, R> where R::Modulus: Clone
 {
