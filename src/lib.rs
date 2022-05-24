@@ -208,53 +208,49 @@ pub trait DivExact<Rhs, Precompute> : Sized {
 }
 
 /// A modular reducer that can ensure that the operations on integers are all performed
-/// in a modular ring
+/// in a modular ring.
+/// 
+/// Essential information for performing the modulo operation will be stored in the reducer.
 pub trait Reducer<T> {
-    /// Type of the modulus, it's usually the same type as T. It can be different
-    /// in some cases. For example, when the modulus needs to be normalized, when
-    /// the modulus is fixed, and when the modulus is large and reference counting
-    /// is preferred.
-    type Modulus;
-
-    /// Create a reducer based on a modulus
-    fn new(m: &Self::Modulus) -> Self;
+    /// Create a reducer for a modulus m
+    fn new(m: &T) -> Self;
 
     /// Transform a normal integer into reduced form
-    fn transform(target: T, m: &Self::Modulus) -> T;
+    fn transform(&self, target: T) -> T;
 
     /// Get the modulus in original integer type
-    fn modulus(m: &Self::Modulus) -> T;
+    fn modulus(&self) -> T;
 
     /// Transform a reduced form back to normal integer
-    fn residue(&self, target: T, m: &Self::Modulus) -> T;
+    fn residue(&self, target: T) -> T;
 
     /// Test if the residue() == 0
-    fn is_zero(&self, target: &T, m: &Self::Modulus) -> bool;
+    fn is_zero(&self, target: &T) -> bool;
 
     /// Calculate (lhs + rhs) mod m in reduced form
-    fn add(&self, lhs: T, rhs: T, m: &Self::Modulus) -> T;
+    fn add(&self, lhs: T, rhs: T) -> T;
 
     /// Calculate 2*target mod m
-    fn double(&self, target: T, m: &Self::Modulus) -> T;
+    fn double(&self, target: T) -> T;
 
     /// Calculate (lhs - rhs) mod m in reduced form
-    fn sub(&self, lhs: T, rhs: T, m: &Self::Modulus) -> T;
+    fn sub(&self, lhs: T, rhs: T) -> T;
 
     /// Calculate -monty mod m in reduced form
-    fn neg(&self, target: T, m: &Self::Modulus) -> T;
+    fn neg(&self, target: T) -> T;
 
     /// Calculate (lhs * rhs) mod m in reduced form
-    fn mul(&self, lhs: T, rhs: T, m: &Self::Modulus) -> T;
+    fn mul(&self, lhs: T, rhs: T) -> T;
 
     /// Calculate target^-1 mod m in reduced form,
     /// it may return None when there is no modular inverse.
-    fn inv(&self, target: T, m: &Self::Modulus) -> Option<T>;
+    fn inv(&self, target: T) -> Option<T>;
 
     /// Calculate target^2 mod m in reduced form
-    fn square(&self, target: T, m: &Self::Modulus) -> T;
+    fn square(&self, target: T) -> T;
 
     /// Calculate base ^ exp mod m in reduced form
-    fn pow(&self, base: T, exp: T, m: &Self::Modulus) -> T;
+    fn pow(&self, base: T, exp: T) -> T;
 }
 
 mod barret;
@@ -272,7 +268,7 @@ pub use monty::Montgomery;
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 
 /// An integer in modulo ring based on [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form)
-pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>;
+pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T, T>>;
 
 /// An integer in modulo ring with a fixed (pseudo) Mersenne number as modulus
 pub type FixedMersenneInt<const P: u8, const K: umax> = ReducedInt<umax, FixedMersenne<P, K>>;

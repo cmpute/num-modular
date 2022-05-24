@@ -71,22 +71,23 @@ impl NegModInv for u128 {
 /// and `R=2^B` will be used as the auxiliary modulus, where B is automatically selected
 /// based on the size of T.
 #[derive(Debug, Clone, Copy)]
-pub struct Montgomery<I>(I);
+pub struct Montgomery<I, M>(I, M); // modular inverse of the modulus, modulus itself
 
 macro_rules! impl_uprim_montgomery_reduce {
     ($t:ty, $double:ty) => {
-        impl Montgomery<$t> {
-            fn reduce(&self, monty: $double, m: &$t) -> $t {
-                debug_assert!(monty < ((*m as $double) << <$t>::BITS));
+        impl Montgomery<$t, $t> {
+            fn reduce(&self, monty: $double) -> $t {
+                debug_assert!(monty < ((self.1 as $double) << <$t>::BITS));
 
                 // REDC algorithm
+                let m = self.1;
                 let tm = (monty as $t).wrapping_mul(self.0);
-                let (t, overflow) = monty.overflowing_add((tm as $double) * (*m as $double));
+                let (t, overflow) = monty.overflowing_add((tm as $double) * (m as $double));
                 let t = (t >> <$t>::BITS) as $t;
         
                 if overflow {
                     t + m.wrapping_neg()
-                } else if t >= *m {
+                } else if t >= m {
                     t - m
                 } else {
                     t
@@ -103,42 +104,42 @@ macro_rules! impl_uprim_montgomery_core {
             if m & 1 == 0 {
                 panic!("Only odd modulus are supported by the Montgomery form");
             }
-            Self(<$single>::neginv(m))
+            Self(<$single>::neginv(m), *m)
         }
         #[inline(always)]
-        fn modulus(m: &$single) -> $single {
-            *m
+        fn modulus(&self) -> $single {
+            self.1
         }
         #[inline(always)]
-        fn is_zero(&self, target: &$single, _: &$single) -> bool {
+        fn is_zero(&self, target: &$single) -> bool {
             *target == 0
         }
 
         #[inline(always)]
-        fn add(&self, lhs: $single, rhs: $single, m: &$single) -> $single {
-            <Vanilla as Reducer<$single>>::new(m).add(lhs, rhs, m)
+        fn add(&self, lhs: $single, rhs: $single) -> $single {
+            Vanilla::<$single>::new(&self.1).add(lhs, rhs)
         }
 
         #[inline(always)]
-        fn double(&self, target: $single, m: &$single) -> $single {
-            <Vanilla as Reducer<$single>>::new(m).double(target, m)
+        fn double(&self, target: $single) -> $single {
+            Vanilla::<$single>::new(&self.1).double(target)
         }
 
         #[inline(always)]
-        fn sub(&self, lhs: $single, rhs: $single, m: &$single) -> $single {
-            <Vanilla as Reducer<$single>>::new(m).sub(lhs, rhs, m)
+        fn sub(&self, lhs: $single, rhs: $single) -> $single {
+            Vanilla::<$single>::new(&self.1).sub(lhs, rhs)
         }
 
         #[inline(always)]
-        fn neg(&self, target: $single, m: &$single) -> $single {
-            <Vanilla as Reducer<$single>>::new(m).neg(target, m)
+        fn neg(&self, target: $single) -> $single {
+            Vanilla::<$single>::new(&self.1).neg(target)
         }
 
         #[inline(always)]
-        fn inv(&self, target: $single, m: &$single) -> Option<$single> {
+        fn inv(&self, target: $single) -> Option<$single> {
             // TODO: support direct montgomery inverse
             // REF: http://cetinkayakoc.net/docs/j82.pdf
-            self.residue(target, m).invm(m).map(|v| Self::transform(v, m))
+            self.residue(target).invm(&self.1).map(|v| self.transform(v))
         }
 
         impl_reduced_binary_pow!($single, $single);
@@ -149,29 +150,28 @@ macro_rules! impl_uprim_montgomery {
     ($single:ty, $double:ty) => {
         impl_uprim_montgomery_reduce!($single, $double);
 
-        impl Reducer<$single> for Montgomery<$single> {
-            type Modulus = $single;
+        impl Reducer<$single> for Montgomery<$single, $single> {
             impl_uprim_montgomery_core!($single);
 
             #[inline]
-            fn transform(target: $single, m: &$single) -> $single {
-                (((target as $double) << <$single>::BITS) % (*m as $double)) as _
+            fn transform(&self, target: $single) -> $single {
+                (((target as $double) << <$single>::BITS) % (self.1 as $double)) as _
             }
 
             #[inline]
-            fn residue(&self, target: $single, m: &$single) -> $single {
-                self.reduce(target as $double, m)
+            fn residue(&self, target: $single) -> $single {
+                self.reduce(target as $double)
             }
 
             #[inline]
-            fn mul(&self, lhs: $single, rhs: $single, m: &$single) -> $single {
-                self.reduce((lhs as $double) * (rhs as $double), m)
+            fn mul(&self, lhs: $single, rhs: $single) -> $single {
+                self.reduce((lhs as $double) * (rhs as $double))
             }
 
             #[inline]
-            fn square(&self, target: $single, m: &$single) -> $single {
+            fn square(&self, target: $single) -> $single {
                 let d = target as $double;
-                self.reduce(d * d, m)
+                self.reduce(d * d)
             }
         }
     };
@@ -182,17 +182,18 @@ impl_uprim_montgomery!(u16, u32);
 impl_uprim_montgomery!(u32, u64);
 impl_uprim_montgomery!(u64, u128);
 
-impl Montgomery<u128> {
-    fn reduce(&self, monty: udouble, m: &u128) -> u128 {
-        debug_assert!(monty < udouble { hi: *m, lo: 0 });
+impl Montgomery<u128, u128> {
+    fn reduce(&self, monty: udouble) -> u128 {
+        debug_assert!(monty < udouble { hi: self.1, lo: 0 });
 
         // REDC algorithm
+        let m = self.1;
         let tm = monty.lo.wrapping_mul(self.0);
-        let (t, overflow) = monty.overflowing_add(udouble::widening_mul(tm, *m));
+        let (t, overflow) = monty.overflowing_add(udouble::widening_mul(tm, m));
 
         if overflow {
             t.hi + m.wrapping_neg()
-        } else if &t.hi >= m {
+        } else if t.hi >= m {
             t.hi - m
         } else {
             t.hi
@@ -200,30 +201,28 @@ impl Montgomery<u128> {
     }
 }
 
-impl Reducer<u128> for Montgomery<u128> {
-    type Modulus = u128;
-
+impl Reducer<u128> for Montgomery<u128, u128> {
     #[inline]
-    fn transform(target: u128, m: &u128) -> u128 {
+    fn transform(&self, target: u128) -> u128 {
         if target == 0 {
             return 0;
         }
-        udouble { hi: target, lo: 0 } % *m
+        udouble { hi: target, lo: 0 } % self.1
     }
     
     #[inline]
-    fn residue(&self, target: u128, m: &u128) -> u128 {
-        self.reduce(target.into(), m)
+    fn residue(&self, target: u128) -> u128 {
+        self.reduce(target.into())
     }
 
     #[inline]
-    fn mul(&self, lhs: u128, rhs: u128, m: &u128) -> u128 {
-        self.reduce(udouble::widening_mul(lhs, rhs), m)
+    fn mul(&self, lhs: u128, rhs: u128) -> u128 {
+        self.reduce(udouble::widening_mul(lhs, rhs))
     }
 
     #[inline]
-    fn square(&self, target: u128, m: &u128) -> u128 {
-        self.reduce(udouble::widening_square(target), m)
+    fn square(&self, target: u128) -> u128 {
+        self.reduce(udouble::widening_square(target))
     }
 
     impl_uprim_montgomery_core!(u128);
@@ -257,36 +256,42 @@ mod tests {
         let a = (0x81u128 << 120) - 1;
         let m = (0x81u128 << 119) - 1;
         let m = m >> m.trailing_zeros();
-        assert_eq!(Montgomery::new(&m).residue(Montgomery::transform(a, &m), &m), a % m);
+        let r = Montgomery::new(&m);
+        assert_eq!(r.residue(r.transform(a)), a % m);
 
         // is_zero test
         let r = Montgomery::new(&11u8);
-        assert!(r.is_zero(&Montgomery::transform(0, &11), &11));
-        let five = Montgomery::transform(5u8, &11);
-        let six = Montgomery::transform(6u8, &11);
-        assert!(r.is_zero(&r.add(five, six, &11), &11));
+        assert!(r.is_zero(&r.transform(0)));
+        let five = r.transform(5u8);
+        let six = r.transform(6u8);
+        assert!(r.is_zero(&r.add(five, six)));
 
         // random creation test
         for _ in 0..NRANDOM {
             let a = random::<u8>();
             let m = random::<u8>() | 1;
-            assert_eq!(Montgomery::new(&m).residue(Montgomery::transform(a, &m), &m), a % m);
+            let r = Montgomery::new(&m);
+            assert_eq!(r.residue(r.transform(a)), a % m);
 
             let a = random::<u16>();
             let m = random::<u16>() | 1;
-            assert_eq!(Montgomery::new(&m).residue(Montgomery::transform(a, &m), &m), a % m);
+            let r = Montgomery::new(&m);
+            assert_eq!(r.residue(r.transform(a)), a % m);
 
             let a = random::<u32>();
             let m = random::<u32>() | 1;
-            assert_eq!(Montgomery::new(&m).residue(Montgomery::transform(a, &m), &m), a % m);
+            let r = Montgomery::new(&m);
+            assert_eq!(r.residue(r.transform(a)), a % m);
 
             let a = random::<u64>();
             let m = random::<u64>() | 1;
-            assert_eq!(Montgomery::new(&m).residue(Montgomery::transform(a, &m), &m), a % m);
+            let r = Montgomery::new(&m);
+            assert_eq!(r.residue(r.transform(a)), a % m);
 
             let a = random::<u128>();
             let m = random::<u128>() | 1;
-            assert_eq!(Montgomery::new(&m).residue(Montgomery::transform(a, &m), &m), a % m);
+            let r = Montgomery::new(&m);
+            assert_eq!(r.residue(r.transform(a)), a % m);
         }
     }
 
@@ -298,16 +303,16 @@ mod tests {
                 let r = Montgomery::new(&m);
                 let e = random::<$T>() as $T;
                 let (a, b) = (random::<$T>(), random::<$T>());
-                let am = Montgomery::transform(a, &m);
-                let bm = Montgomery::transform(b, &m);
-                assert_eq!(r.residue(r.add(am, bm, &m), &m), a.addm(b, &m));
-                assert_eq!(r.residue(r.sub(am, bm, &m), &m), a.subm(b, &m));
-                assert_eq!(r.residue(r.mul(am, bm, &m), &m), a.mulm(b, &m));
-                assert_eq!(r.residue(r.neg(am, &m), &m), a.negm(&m));
-                assert_eq!(r.inv(am, &m).map(|v| r.residue(v, &m)), a.invm(&m));
-                assert_eq!(r.residue(r.double(am, &m), &m), a.dblm(&m));
-                assert_eq!(r.residue(r.square(am, &m), &m), a.sqm(&m));
-                assert_eq!(r.residue(r.pow(am, e, &m), &m), a.powm(e, &m));
+                let am = r.transform(a);
+                let bm = r.transform(b);
+                assert_eq!(r.residue(r.add(am, bm)), a.addm(b, &m));
+                assert_eq!(r.residue(r.sub(am, bm)), a.subm(b, &m));
+                assert_eq!(r.residue(r.mul(am, bm)), a.mulm(b, &m));
+                assert_eq!(r.residue(r.neg(am)), a.negm(&m));
+                assert_eq!(r.inv(am).map(|v| r.residue(v)), a.invm(&m));
+                assert_eq!(r.residue(r.double(am)), a.dblm(&m));
+                assert_eq!(r.residue(r.square(am)), a.sqm(&m));
+                assert_eq!(r.residue(r.pow(am, e)), a.powm(e, &m));
             )*);
         }
 

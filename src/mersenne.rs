@@ -70,13 +70,12 @@ impl<const P: u8, const K: umax> FixedMersenne<P, K> {
 }
 
 impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
-    type Modulus = ();
-
     #[inline]
-    fn new(_: &()) -> Self {
-        assert!(P <= 127);
-        assert!(K > 0 && K < (2 as umax).pow(P as u32 - 1) && K % 2 == 1);
-        assert!(
+    fn new(m: &umax) -> Self {
+        assert!(*m == Self::MODULUS, "the given modulus doesn't match with the generic params");
+        debug_assert!(P <= 127);
+        debug_assert!(K > 0 && K < (2 as umax).pow(P as u32 - 1) && K % 2 == 1);
+        debug_assert!(
             Self::MODULUS % 3 != 0
                 && Self::MODULUS % 5 != 0
                 && Self::MODULUS % 7 != 0
@@ -86,24 +85,24 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         Self {}
     }
     #[inline]
-    fn transform(target: umax, _: &()) -> umax {
+    fn transform(&self, target: umax) -> umax {
         Self::reduce_single(target)
     }
     #[inline]
-    fn residue(&self, target: umax, _: &()) -> umax {
+    fn residue(&self, target: umax) -> umax {
         target
     }
     #[inline]
-    fn modulus(_: &()) -> umax {
+    fn modulus(&self) -> umax {
         Self::MODULUS
     }
     #[inline]
-    fn is_zero(&self, target: &umax, _: &()) -> bool {
+    fn is_zero(&self, target: &umax) -> bool {
         target == &0
     }
 
     #[inline]
-    fn add(&self, lhs: umax, rhs: umax, _: &()) -> umax {
+    fn add(&self, lhs: umax, rhs: umax) -> umax {
         let mut sum = lhs + rhs;
         if sum >= Self::MODULUS {
             sum -= Self::MODULUS
@@ -111,7 +110,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         sum
     }
     #[inline]
-    fn sub(&self, lhs: umax, rhs: umax, _: &()) -> umax {
+    fn sub(&self, lhs: umax, rhs: umax) -> umax {
         if lhs >= rhs {
             lhs - rhs
         } else {
@@ -119,11 +118,11 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         }
     }
     #[inline]
-    fn double(&self, target: umax, _: &()) -> umax {
-        self.add(target, target, &())
+    fn double(&self, target: umax) -> umax {
+        self.add(target, target)
     }
     #[inline]
-    fn neg(&self, target: umax, _: &()) -> umax {
+    fn neg(&self, target: umax) -> umax {
         if target == 0 {
             0
         } else {
@@ -131,7 +130,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         }
     }
     #[inline]
-    fn mul(&self, lhs: umax, rhs: umax, _: &()) -> umax {
+    fn mul(&self, lhs: umax, rhs: umax) -> umax {
         if (P as u32) < (umax::BITS / 2) {
             Self::reduce_single(lhs * rhs)
         } else {
@@ -139,7 +138,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         }
     }
     #[inline]
-    fn inv(&self, target: umax, _: &()) -> Option<umax> {
+    fn inv(&self, target: umax) -> Option<umax> {
         if (P as u32) < usize::BITS {
             (target as usize)
                 .invm(&(Self::MODULUS as usize))
@@ -149,7 +148,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         }
     }
     #[inline]
-    fn square(&self, target: umax, _: &()) -> umax {
+    fn square(&self, target: umax) -> umax {
         if (P as u32) < (umax::BITS / 2) {
             Self::reduce_single(target * target)
         } else {
@@ -182,17 +181,23 @@ mod tests {
             let a = random::<umax>();
 
             const P1: umax = (1 << 31) - 1;
-            assert_eq!(M1::new(&()).residue(M1::transform(a, &()), &()), a % P1);
+            let m1 = M1::new(&P1);
+            assert_eq!(m1.residue(m1.transform(a)), a % P1);
             const P2: umax = (1 << 61) - 1;
-            assert_eq!(M2::new(&()).residue(M2::transform(a, &()), &()), a % P2);
+            let m2 = M2::new(&P2);
+            assert_eq!(m2.residue(m2.transform(a)), a % P2);
             const P3: umax = (1 << 127) - 1;
-            assert_eq!(M3::new(&()).residue(M3::transform(a, &()), &()), a % P3);
+            let m3 = M3::new(&P3);
+            assert_eq!(m3.residue(m3.transform(a)), a % P3);
             const P4: umax = (1 << 32) - 5;
-            assert_eq!(M4::new(&()).residue(M4::transform(a, &()), &()), a % P4);
+            let m4 = M4::new(&P4);
+            assert_eq!(m4.residue(m4.transform(a)), a % P4);
             const P5: umax = (1 << 56) - 5;
-            assert_eq!(M5::new(&()).residue(M5::transform(a, &()), &()), a % P5);
+            let m5 = M5::new(&P5);
+            assert_eq!(m5.residue(m5.transform(a)), a % P5);
             const P6: umax = (1 << 122) - 3;
-            assert_eq!(M6::new(&()).residue(M6::transform(a, &()), &()), a % P6);
+            let m6 = M6::new(&P6);
+            assert_eq!(m6.residue(m6.transform(a)), a % P6);
         }
     }
 
@@ -201,17 +206,17 @@ mod tests {
         macro_rules! tests_for {
             ($a:tt, $b:tt, $e:tt; $($M:ty)*) => ($({
                 const P: umax = <$M>::MODULUS;
-                let am = <$M>::transform($a, &());
-                let bm = <$M>::transform($b, &());
-                let r = <$M>::new(&());
-                assert_eq!(r.add(am, bm, &()), $a.addm($b, &P));
-                assert_eq!(r.sub(am, bm, &()), $a.subm($b, &P));
-                assert_eq!(r.mul(am, bm, &()), $a.mulm($b, &P));
-                assert_eq!(r.neg(am, &()), $a.negm(&P));
-                assert_eq!(r.inv(am, &()), $a.invm(&P));
-                assert_eq!(r.double(am, &()), $a.dblm(&P));
-                assert_eq!(r.square(am, &()), $a.sqm(&P));
-                assert_eq!(r.pow(am, $e, &()), $a.powm($e, &P));
+                let r = <$M>::new(&P);
+                let am = r.transform($a);
+                let bm = r.transform($b);
+                assert_eq!(r.add(am, bm), $a.addm($b, &P));
+                assert_eq!(r.sub(am, bm), $a.subm($b, &P));
+                assert_eq!(r.mul(am, bm), $a.mulm($b, &P));
+                assert_eq!(r.neg(am), $a.negm(&P));
+                assert_eq!(r.inv(am), $a.invm(&P));
+                assert_eq!(r.double(am), $a.dblm(&P));
+                assert_eq!(r.square(am), $a.sqm(&P));
+                assert_eq!(r.pow(am, $e), $a.powm($e, &P));
             })*);
         }
 
