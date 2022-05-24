@@ -27,7 +27,7 @@
 //! - [Montgomery]: Convert the dividend into a special form by shifting and pre-compute a modular inverse,
 //!     only applicable to fast modulo, but faster than Barret reduction
 //! - [FixedMersenne]: Specialization of modulo in form `2^P-K` under 2^127.
-//! 
+//!
 
 // XXX: Other fast modular arithmetic tricks
 // REF: https://github.com/lemire/fastmod & https://arxiv.org/pdf/1902.01961.pdf
@@ -195,11 +195,11 @@ pub trait ModularInteger:
 // TODO: implement invm_range (Modular inverse in certain range) and crt (Chinese Remainder Theorem), REF: bubblemath crate
 
 /// Utility function for exact division, with precomputed helper values
-/// 
+///
 /// # Available Pre-computation types:
 /// - `()`: No pre-computation, the implementation relies on native integer division
 /// - [PreInv]: With Pre-computed modular inverse
-pub trait DivExact<Rhs, Precompute> : Sized {
+pub trait DivExact<Rhs, Precompute>: Sized {
     type Output;
 
     /// Check if d divides self with the help of the precomputation. If d divides self,
@@ -209,7 +209,7 @@ pub trait DivExact<Rhs, Precompute> : Sized {
 
 /// A modular reducer that can ensure that the operations on integers are all performed
 /// in a modular ring.
-/// 
+///
 /// Essential information for performing the modulo operation will be stored in the reducer.
 pub trait Reducer<T> {
     /// Create a reducer for a modulus m
@@ -254,17 +254,17 @@ pub trait Reducer<T> {
 }
 
 mod barret;
-mod preinv;
 mod double;
 mod mersenne;
 mod monty;
+mod preinv;
 mod prim;
 mod reduced;
 
 pub use double::{udouble, umax};
 pub use mersenne::FixedMersenne;
-pub use preinv::PreInv;
 pub use monty::Montgomery;
+pub use preinv::PreInv;
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 
 /// An integer in modulo ring based on [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form)

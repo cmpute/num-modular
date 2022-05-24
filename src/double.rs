@@ -56,7 +56,7 @@ impl udouble {
         let (c1, z1) = split(x0 * y1 + z1);
         Self {
             hi: z2 + c1,
-            lo: z0 | z1 << HALF_BITS
+            lo: z0 | z1 << HALF_BITS,
         }
     }
 
@@ -75,7 +75,7 @@ impl udouble {
         let (c1, z1) = split(m + z1);
         Self {
             hi: z2 + c1,
-            lo: z0 | z1 << HALF_BITS
+            lo: z0 | z1 << HALF_BITS,
         }
     }
 
@@ -222,7 +222,9 @@ impl SubAssign<umax> for udouble {
     fn sub_assign(&mut self, rhs: umax) {
         let carry = self.lo < rhs;
         self.lo = self.lo.wrapping_sub(rhs);
-        if carry { self.hi -= 1; }
+        if carry {
+            self.hi -= 1;
+        }
     }
 }
 
@@ -382,7 +384,7 @@ impl udouble {
     fn div_rem(self, other: Self) -> (Self, Self) {
         let mut n = self; // numerator
         let mut d = other; // denominator
-        let mut q = Self{ lo: 0, hi: 0 }; // quotient
+        let mut q = Self { lo: 0, hi: 0 }; // quotient
 
         let nbits = (2 * umax::BITS - n.leading_zeros()) as u16; // assuming umax = u128
         let dbits = (2 * umax::BITS - d.leading_zeros()) as u16;
@@ -437,14 +439,14 @@ impl udouble {
             }
         }
 
-        let r21 = n.hi
-            .wrapping_mul(B)
-            .wrapping_add(n1)
-            .wrapping_sub(q1.wrapping_mul(d));
+        let r21 =
+            n.hi.wrapping_mul(B)
+                .wrapping_add(n1)
+                .wrapping_sub(q1.wrapping_mul(d));
 
         // Compute the second quotient digit q0.
         let (mut q0, mut rhat) = r21.div_rem(&d1);
-    
+
         // q0 has at most error 2. No more than 2 iterations.
         while q0 >= B || q0 * d0 > B * rhat + n0 {
             q0 -= 1;
@@ -453,7 +455,7 @@ impl udouble {
                 break;
             }
         }
-    
+
         let r = (r21
             .wrapping_mul(B)
             .wrapping_add(n0)
@@ -484,7 +486,7 @@ impl Div<umax> for udouble {
             let (q, r) = self.hi.div_rem(&rhs);
             Self {
                 lo: Self { lo: self.lo, hi: r }.div_rem1(rhs).0,
-                hi: q
+                hi: q,
             }
         }
     }
@@ -499,7 +501,7 @@ impl Rem<umax> for udouble {
             // The result fits in 128 bits.
             self.div_rem1(rhs).1
         } else {
-            Self { lo: self.lo, hi: self.hi % rhs}.div_rem1(rhs).1
+            Self { lo: self.lo, hi: self.hi % rhs }.div_rem1(rhs).1
         }
     }
 }

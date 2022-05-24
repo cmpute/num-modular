@@ -1,6 +1,6 @@
 //! All methods that using pre-computed inverse of the modulus will be contained in this module,
 //! as it shares the idea of barret reduction.
-//! 
+//!
 //! Version 1: Vanilla barret reduction (for x mod n, x < n^2)
 //! - Choose k = ceil(log2(n))
 //! - Precompute r = floor(2^(k+1)/n)
@@ -19,11 +19,11 @@
 //! Version 4: "Improved division by invariant integers" by Granlund
 //! - Ref: <https://gmplib.org/~tege/division-paper.pdf>
 //!        <https://gmplib.org/~tege/divcnst-pldi94.pdf>
-//! 
+//!
 //! Comparison between vanilla Barret reduction and Montgomery reduction:
 //! - Barret reduction requires one 2k-by-k bits and one k-by-k bits multiplication while Montgomery only involves two k-by-k multiplications
 //! - Extra conversion step is required for Montgomery form to get a normal integer
 //! (Referece: <https://www.nayuki.io/page/barrett-reduction-algorithm>)
-//! 
-//! The latter two versions are efficient and practical for use. 
+//!
+//! The latter two versions are efficient and practical for use.
 // TODO: implement version 3 and version 4

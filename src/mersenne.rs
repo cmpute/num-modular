@@ -1,5 +1,5 @@
-use crate::{udouble, umax, ModularUnaryOps, Reducer};
 use crate::reduced::impl_reduced_binary_pow;
+use crate::{udouble, umax, ModularUnaryOps, Reducer};
 
 // FIXME: use unchecked operators to speed up calculation (after https://github.com/rust-lang/rust/issues/85122)
 /// A modular reducer for (pseudo) Mersenne numbers `2^P - K` as modulus. It supports `P` up to 127 and `K < 2^(P-1)`
@@ -25,7 +25,7 @@ impl<const P: u8, const K: umax> FixedMersenne<P, K> {
             lo = sum & Self::BITMASK;
             hi = sum >> P;
         }
-    
+
         if K == 1 {
             lo
         } else {
@@ -72,7 +72,10 @@ impl<const P: u8, const K: umax> FixedMersenne<P, K> {
 impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
     #[inline]
     fn new(m: &umax) -> Self {
-        assert!(*m == Self::MODULUS, "the given modulus doesn't match with the generic params");
+        assert!(
+            *m == Self::MODULUS,
+            "the given modulus doesn't match with the generic params"
+        );
         debug_assert!(P <= 127);
         debug_assert!(K > 0 && K < (2 as umax).pow(P as u32 - 1) && K % 2 == 1);
         debug_assert!(
@@ -165,12 +168,12 @@ mod tests {
     use crate::{ModularCoreOps, ModularPow};
     use rand::random;
 
-    type M1 = FixedMersenne::<31, 1>;
-    type M2 = FixedMersenne::<61, 1>;
-    type M3 = FixedMersenne::<127, 1>;
-    type M4 = FixedMersenne::<32, 5>;
-    type M5 = FixedMersenne::<56, 5>;
-    type M6 = FixedMersenne::<122, 3>;
+    type M1 = FixedMersenne<31, 1>;
+    type M2 = FixedMersenne<61, 1>;
+    type M3 = FixedMersenne<127, 1>;
+    type M4 = FixedMersenne<32, 5>;
+    type M5 = FixedMersenne<56, 5>;
+    type M6 = FixedMersenne<122, 3>;
 
     const NRANDOM: u32 = 10;
 

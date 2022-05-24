@@ -1,7 +1,7 @@
 //! Implementations for modular operations on primitive integers
 
-use crate::{ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps, DivExact};
-use crate::{udouble, Vanilla, Reducer};
+use crate::{udouble, Reducer, Vanilla};
+use crate::{DivExact, ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps};
 use num_integer::Integer;
 
 // FIXME: implement the modular functions as const after https://github.com/rust-lang/rust/pull/68847

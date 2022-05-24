@@ -1,4 +1,4 @@
-use crate::{Reducer, ModularInteger, ModularUnaryOps, udouble};
+use crate::{udouble, ModularInteger, ModularUnaryOps, Reducer};
 use core::ops::*;
 use num_traits::{Inv, Pow};
 
@@ -15,14 +15,17 @@ pub struct ReducedInt<T, R: Reducer<T>> {
 impl<T, R: Reducer<T>> ReducedInt<T, R> {
     /// Convert n into the modulo ring ℤ/mℤ (i.e. `n % m`)
     #[inline]
-    pub fn new(n: T, m: &T) -> Self{
+    pub fn new(n: T, m: &T) -> Self {
         let r = R::new(m);
         let a = r.transform(n);
         Self { a, r }
     }
 
     #[inline(always)]
-    fn check_modulus_eq(&self, rhs: &Self) where T: PartialEq {
+    fn check_modulus_eq(&self, rhs: &Self)
+    where
+        T: PartialEq,
+    {
         // we don't directly compare m because m could be empty in case of Mersenne modular integer
         if cfg!(debug_assertions) && self.r.modulus() != rhs.r.modulus() {
             panic!("The modulus of two operators should be the same!");
@@ -44,7 +47,7 @@ impl<T: PartialEq, R: Reducer<T>> PartialEq for ReducedInt<T, R> {
 }
 
 macro_rules! impl_binops {
-    ($method:ident, impl $op:ident) => {        
+    ($method:ident, impl $op:ident) => {
         impl<T: PartialEq, R: Reducer<T>> $op for ReducedInt<T, R> {
             type Output = Self;
             fn $method(self, rhs: Self) -> Self::Output {
@@ -77,13 +80,18 @@ macro_rules! impl_binops {
             }
         }
 
-        impl<T: PartialEq + Clone, R: Reducer<T> + Clone> $op<&ReducedInt<T, R>> for &ReducedInt<T, R> {
+        impl<T: PartialEq + Clone, R: Reducer<T> + Clone> $op<&ReducedInt<T, R>>
+            for &ReducedInt<T, R>
+        {
             type Output = ReducedInt<T, R>;
             #[inline]
             fn $method(self, rhs: &ReducedInt<T, R>) -> Self::Output {
                 self.check_modulus_eq(&rhs);
                 let a = self.r.$method(self.a.clone(), rhs.a.clone());
-                ReducedInt { a, r: self.r.clone() }
+                ReducedInt {
+                    a,
+                    r: self.r.clone(),
+                }
             }
         }
 
@@ -133,7 +141,10 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Inv for &ReducedInt<T, R> {
     type Output = ReducedInt<T, R>;
     #[inline]
     fn inv(self) -> Self::Output {
-        let a = self.r.inv(self.a.clone()).expect("the modular inverse doesn't exists.");
+        let a = self
+            .r
+            .inv(self.a.clone())
+            .expect("the modular inverse doesn't exists.");
         ReducedInt { a, r: self.r.clone() }
     }
 }
@@ -185,8 +196,7 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Pow<T> for &ReducedInt<T, R> {
     }
 }
 
-impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<T, R>
-{
+impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<T, R> {
     type Base = T;
 
     #[inline]
@@ -198,7 +208,7 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<
     fn residue(&self) -> T {
         self.r.residue(self.a.clone())
     }
-    
+
     #[inline(always)]
     fn is_zero(&self) -> bool {
         self.r.is_zero(&self.a)
@@ -321,9 +331,9 @@ macro_rules! impl_uprim_vanilla_core {
         fn inv(&self, target: $single) -> Option<$single> {
             target.invm(&self.0)
         }
-        
+
         impl_reduced_binary_pow!($single, $single);
-    }
+    };
 }
 
 macro_rules! impl_uprim_vanilla {

@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate criterion;
-use rand::random;
 use criterion::Criterion;
 use num_modular::{FixedMersenneInt, ModularCoreOps, ModularPow, ModularUnaryOps};
 use num_traits::{Inv, Pow};
+use rand::random;
 
 pub fn bench_u128(c: &mut Criterion) {
     const N: usize = 256;
@@ -15,14 +15,16 @@ pub fn bench_u128(c: &mut Criterion) {
     let mut group = c.benchmark_group("u128 modular ops");
     group.bench_function("addm", |b| {
         b.iter(|| {
-            cases.iter()
+            cases
+                .iter()
                 .map(|&(a, b, m)| a.addm(b, &m))
                 .reduce(|a, b| a.wrapping_add(b))
         })
     });
     group.bench_function("mulm", |b| {
         b.iter(|| {
-            cases.iter()
+            cases
+                .iter()
                 .map(|&(a, b, m)| a.mulm(b, &m))
                 .reduce(|a, b| a.wrapping_add(b))
         })
@@ -57,7 +59,9 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("mersenne + fermat theorem", |b| {
         b.iter(|| {
             (100u64..400u64)
-                .map(|n| FixedMersenneInt::<56, 5>::new(n as u128, &(M1 as u128)).pow(M1 as u128 - 2))
+                .map(|n| {
+                    FixedMersenneInt::<56, 5>::new(n as u128, &(M1 as u128)).pow(M1 as u128 - 2)
+                })
                 .reduce(|a, b| a + b)
         })
     });

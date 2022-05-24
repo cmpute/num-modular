@@ -1,5 +1,5 @@
-use crate::{udouble, Reducer, Vanilla, ModularUnaryOps};
 use crate::reduced::impl_reduced_binary_pow;
+use crate::{udouble, ModularUnaryOps, Reducer, Vanilla};
 
 /// Negated modular inverse on binary bases
 trait NegModInv {
@@ -84,7 +84,7 @@ macro_rules! impl_uprim_montgomery_reduce {
                 let tm = (monty as $t).wrapping_mul(self.0);
                 let (t, overflow) = monty.overflowing_add((tm as $double) * (m as $double));
                 let t = (t >> <$t>::BITS) as $t;
-        
+
                 if overflow {
                     t + m.wrapping_neg()
                 } else if t >= m {
@@ -139,11 +139,13 @@ macro_rules! impl_uprim_montgomery_core {
         fn inv(&self, target: $single) -> Option<$single> {
             // TODO: support direct montgomery inverse
             // REF: http://cetinkayakoc.net/docs/j82.pdf
-            self.residue(target).invm(&self.1).map(|v| self.transform(v))
+            self.residue(target)
+                .invm(&self.1)
+                .map(|v| self.transform(v))
         }
 
         impl_reduced_binary_pow!($single, $single);
-    }
+    };
 }
 
 macro_rules! impl_uprim_montgomery {
@@ -209,7 +211,7 @@ impl Reducer<u128> for Montgomery<u128, u128> {
         }
         udouble { hi: target, lo: 0 } % self.1
     }
-    
+
     #[inline]
     fn residue(&self, target: u128) -> u128 {
         self.reduce(target.into())
