@@ -3,7 +3,7 @@
 //!
 //! To achieve fast modular arithmetics, convert integers to any [ModularInteger] implementation
 //! use static `new()` or associated [ModularInteger::convert()] functions. Some builtin implementations
-//! of [ModularInteger] includes [MontgomeryInt] and [MersenneInt].
+//! of [ModularInteger] includes [MontgomeryInt] and [FixedMersenneInt].
 //!
 //! Example code:
 //! ```rust

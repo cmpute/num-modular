@@ -65,7 +65,7 @@ impl NegModInv for u128 {
     }
 }
 
-/// Operations of a integer represented in [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form).
+/// A modular reducer based on [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form), only supports odd modulus.
 ///
 /// The generic type T represents the underlying integer representation for modular inverse `-m^-1 mod R`,
 /// and `R=2^B` will be used as the auxiliary modulus, where B is automatically selected

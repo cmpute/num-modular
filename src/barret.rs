@@ -23,7 +23,7 @@
 //! Comparison between vanilla Barret reduction and Montgomery reduction:
 //! - Barret reduction requires one 2k-by-k bits and one k-by-k bits multiplication while Montgomery only involves two k-by-k multiplications
 //! - Extra conversion step is required for Montgomery form to get a normal integer
-//! (Referece: https://www.nayuki.io/page/barrett-reduction-algorithm)
+//! (Referece: <https://www.nayuki.io/page/barrett-reduction-algorithm>)
 //! 
 //! The latter two versions are efficient and practical for use. 
 // TODO: implement version 3 and version 4

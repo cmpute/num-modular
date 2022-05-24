@@ -2,7 +2,7 @@ use crate::{udouble, umax, ModularUnaryOps, Reducer};
 use crate::reduced::impl_reduced_binary_pow;
 
 // FIXME: use unchecked operators to speed up calculation (after https://github.com/rust-lang/rust/issues/85122)
-/// An unsigned integer modulo (pseudo) Mersenne numbers `2^P - K`, it supports `P` up to 127 and `K < 2^(P-1)`
+/// A modular reducer for (pseudo) Mersenne numbers `2^P - K` as modulus. It supports `P` up to 127 and `K < 2^(P-1)`
 ///
 /// The `P` is limited to 127 so that it's not necessary to check overflow. This limit won't be a problem for any
 /// Mersenne primes within the range of [umax] (i.e. [u128]).

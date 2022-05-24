@@ -1,6 +1,6 @@
 [package]
 name = "num-modular"
-version = "0.5.0-alpha"
+version = "0.5.0"
 edition = "2018"
 
 repository = "https://github.com/cmpute/num-modular"
