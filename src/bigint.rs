@@ -1,4 +1,4 @@
-use crate::{ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps};
+use crate::{ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps, ModularAbs};
 use core::convert::TryInto;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
@@ -105,7 +105,8 @@ macro_rules! impl_mod_ops_by_ref {
 #[cfg(feature = "num-bigint")]
 mod _num_bigint {
     use super::*;
-    use num_bigint::BigUint;
+    use num_bigint::{BigUint, BigInt};
+    use num_traits::Signed;
 
     impl ModularCoreOps<&BigUint, &BigUint> for &BigUint {
         type Output = BigUint;
@@ -218,7 +219,11 @@ mod _num_bigint {
                 return None;
             }
             if self.is_zero() {
-                return Some(0);
+                return Some(if n.is_one() {
+                    1
+                } else {
+                    0
+                });
             }
             if self.is_one() {
                 return Some(1);
@@ -261,9 +266,9 @@ mod _num_bigint {
                 } else {
                     let seven = BigUint::from(7u8);
                     if (self & &seven).is_one() || self & &seven == seven {
-                        return 1;
+                        1
                     } else {
-                        return -1;
+                        -1
                     }
                 };
             }
@@ -276,7 +281,76 @@ mod _num_bigint {
         }
     }
 
+    impl ModularSymbols<&BigInt> for BigInt {
+        #[inline]
+        fn checked_legendre(&self, n: &BigInt) -> Option<i8> {
+            if n < &BigInt::one() {
+                return None;
+            }
+            self.mod_floor(n).magnitude().checked_legendre(&n.magnitude())
+        }
+
+        fn checked_jacobi(&self, n: &BigInt) -> Option<i8> {
+            if n < &BigInt::one() {
+                return None;
+            }
+            self.mod_floor(n).magnitude().checked_jacobi(&n.magnitude())
+        }
+
+        #[inline]
+        fn kronecker(&self, n: &BigInt) -> i8 {
+            if n.is_negative() {
+                if n.magnitude().is_one() {
+                    return if self.is_negative() {
+                        -1
+                    } else {
+                        1
+                    }
+                } else {
+                    return self.kronecker(&-BigInt::one()) * self.kronecker(&-n);
+                }
+            }
+
+            // n is positive from now on
+            let n = n.magnitude();
+            if n.is_zero() {
+                return if self.is_one() { 1 } else { 0 };
+            }
+            if n.is_one() {
+                return 1;
+            }
+            if n == &BigUint::from(2u8) {
+                return if self.is_even() {
+                    0
+                } else {
+                    let eight = BigInt::from(8u8);
+                    if (self.mod_floor(&eight)).is_one() || self.mod_floor(&eight) == BigInt::from(7u8) {
+                        1
+                    } else {
+                        -1
+                    }
+                };
+            }
+
+            let f = n.trailing_zeros().unwrap_or(0);
+            let n = n >> f;
+            let t1 = self.kronecker(&BigInt::from(2u8));
+            let t2 = self.jacobi(&n.into());
+            t1.pow(f.try_into().unwrap()) * t2
+        }
+    }
+
     impl_mod_ops_by_ref!(BigUint);
+
+    impl ModularAbs<BigUint> for BigInt {
+        fn absm(self, m: &BigUint) -> BigUint {
+            if self.is_negative() {
+                self.magnitude().negm(m)
+            } else {
+                self.magnitude() % m
+            }
+        }
+    }
 
     #[cfg(test)]
     mod tests {
@@ -328,6 +402,15 @@ mod _num_bigint {
                 let e = random::<u8>();
                 let re = &BigUint::from(e);
                 assert_eq!(ra.powm(re, rm), a.powm(e as u128, &m).into());
+
+                // signed integers
+                let a = random::<i128>();
+                let ra = &BigInt::from(a);
+                let m = random::<i128>();
+                let rm = &BigInt::from(m);
+                assert_eq!(ra.checked_legendre(rm), a.checked_legendre(&m));
+                assert_eq!(ra.checked_jacobi(rm), a.checked_jacobi(&m));
+                assert_eq!(ra.kronecker(rm), a.kronecker(&m));
             }
         }
     }

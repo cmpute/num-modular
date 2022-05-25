@@ -85,7 +85,7 @@ macro_rules! impl_symbols_uprim {
         impl ModularSymbols<&$T> for $T {
             #[inline]
             fn checked_legendre(&self, n: &$T) -> Option<i8> {
-                match self.powm((n - 1) >> 1, &n) {
+                match self.powm((n - 1)/2, &n) {
                     0 => Some(0),
                     1 => Some(1),
                     x if x == n - 1 => Some(-1),
@@ -93,30 +93,33 @@ macro_rules! impl_symbols_uprim {
                 }
             }
 
-            #[inline]
             fn checked_jacobi(&self, n: &$T) -> Option<i8> {
-                if n % 2 == 0 || n < &0 {
+                if n % 2 == 0 {
                     return None;
                 }
                 if self == &0 {
-                    return Some(0);
+                    return Some(if n == &1 {
+                        1
+                    } else {
+                        0
+                    });
                 }
                 if self == &1 {
                     return Some(1);
                 }
 
                 let mut a = self % n;
-                let mut n = n.clone();
+                let mut n = *n;
                 let mut t = 1;
                 while a > 0 {
-                    while (a & 1) == 0 {
+                    while a % 2 == 0 {
                         a = a / 2;
-                        if n & 7 == 3 || n & 7 == 5 {
+                        if n % 8 == 3 || n % 8 == 5 {
                             t *= -1;
                         }
                     }
                     core::mem::swap(&mut a, &mut n);
-                    if (a & 3) == 3 && (n & 3) == 3 {
+                    if a % 4 == 3 && n % 4 == 3 {
                         t *= -1;
                     }
                     a = a % n;
@@ -128,7 +131,6 @@ macro_rules! impl_symbols_uprim {
                 })
             }
 
-            #[inline]
             fn kronecker(&self, n: &$T) -> i8 {
                 match n {
                     0 => {
@@ -140,9 +142,9 @@ macro_rules! impl_symbols_uprim {
                     }
                     1 => 1,
                     2 => {
-                        if self & 1 == 0 {
+                        if self % 2 == 0 {
                             0
-                        } else if self & 7 == 1 || self & 7 == 7 {
+                        } else if self % 8 == 1 || self % 8 == 7 {
                             1
                         } else {
                             -1
@@ -160,6 +162,70 @@ macro_rules! impl_symbols_uprim {
     )*);
 }
 impl_symbols_uprim!(u8 u16 u32 u64 u128 usize);
+
+macro_rules! impl_symbols_iprim {
+    ($($T:ty, $U:ty;)*) => ($(
+        impl ModularSymbols<&$T> for $T {
+            #[inline]
+            fn checked_legendre(&self, n: &$T) -> Option<i8> {
+                if n < &1 {
+                    return None;
+                }
+                let a = self.rem_euclid(*n) as $U;
+                a.checked_legendre(&(*n as $U))
+            }
+
+            #[inline]
+            fn checked_jacobi(&self, n: &$T) -> Option<i8> {
+                if n < &1 {
+                    return None;
+                }
+                let a = self.rem_euclid(*n) as $U;
+                a.checked_jacobi(&(*n as $U))
+            }
+
+            #[inline]
+            fn kronecker(&self, n: &$T) -> i8 {
+                match n {
+                    -1 => {
+                        if self < &0 {
+                            -1
+                        } else {
+                            1
+                        }
+                    }
+                    0 => {
+                        if self == &1 {
+                            1
+                        } else {
+                            0
+                        }
+                    }
+                    1 => 1,
+                    2 => {
+                        if self % 2 == 0 {
+                            0
+                        } else if self.rem_euclid(8) == 1 || self.rem_euclid(8) == 7 {
+                            1
+                        } else {
+                            -1
+                        }
+                    },
+                    i if i < &-1 => {
+                        self.kronecker(&-1) * self.kronecker(&-i)
+                    },
+                    _ => {
+                        let f = n.trailing_zeros();
+                        self.kronecker(&2).pow(f)
+                            * self.jacobi(&(n >> f))
+                    }
+                }
+            }
+        }
+    )*);
+}
+
+impl_symbols_iprim!(i8, u8; i16, u16; i32, u32; i64, u64; i128, u128; isize, usize;);
 
 macro_rules! impl_unary_uprim {
     ($($T:ty)*) => ($(
@@ -661,6 +727,32 @@ mod tests {
             assert_eq!((a as u64).legendre(&(n as u64)), res);
             assert_eq!((a as u128).legendre(&(n as u128)), res);
         }
+
+        const SIGNED_CASES: [(i8, i8, i8); 15] = [
+            (-10, 11, 1),
+            (-7, 11, 1),
+            (-4, 11, -1),
+            (-2, 11, 1),
+            (-1, 11, -1),
+            (-10, 17, -1),
+            (-9, 17, 1),
+            (-4, 17, 1),
+            (-2, 17, 1),
+            (-1, 17, 1),
+            (-10, 101, -1),
+            (-9, 101, 1),
+            (-4, 101, 1),
+            (-2, 101, -1),
+            (-1, 101, 1),
+        ];
+        
+        for &(a, n, res) in SIGNED_CASES.iter() {
+            assert_eq!(a.legendre(&n), res);
+            assert_eq!((a as i16).legendre(&(n as i16)), res);
+            assert_eq!((a as i32).legendre(&(n as i32)), res);
+            assert_eq!((a as i64).legendre(&(n as i64)), res);
+            assert_eq!((a as i128).legendre(&(n as i128)), res);
+        }
     }
 
     #[test]
@@ -684,11 +776,37 @@ mod tests {
         ];
 
         for &(a, n, res) in CASES.iter() {
-            assert_eq!(a.jacobi(&n), res);
+            assert_eq!(a.jacobi(&n), res, "{}, {}", a, n);
             assert_eq!((a as u16).jacobi(&(n as u16)), res);
             assert_eq!((a as u32).jacobi(&(n as u32)), res);
             assert_eq!((a as u64).jacobi(&(n as u64)), res);
             assert_eq!((a as u128).jacobi(&(n as u128)), res);
+        }
+
+        const SIGNED_CASES: [(i8, i8, i8); 15] = [
+            (-10, 15, 0),
+            (-7, 15, 1),
+            (-4, 15, -1),
+            (-2, 15, -1),
+            (-1, 15, -1),
+            (-10, 13, 1),
+            (-9, 13, 1),
+            (-4, 13, 1),
+            (-2, 13, -1),
+            (-1, 13, 1),
+            (-10, 11, 1),
+            (-9, 11, -1),
+            (-4, 11, -1),
+            (-2, 11, 1),
+            (-1, 11, -1),
+        ];
+        
+        for &(a, n, res) in SIGNED_CASES.iter() {
+            assert_eq!(a.jacobi(&n), res);
+            assert_eq!((a as i16).jacobi(&(n as i16)), res);
+            assert_eq!((a as i32).jacobi(&(n as i32)), res);
+            assert_eq!((a as i64).jacobi(&(n as i64)), res);
+            assert_eq!((a as i128).jacobi(&(n as i128)), res);
         }
     }
 
@@ -721,6 +839,54 @@ mod tests {
             assert_eq!((a as u32).kronecker(&(n as u32)), res);
             assert_eq!((a as u64).kronecker(&(n as u64)), res);
             assert_eq!((a as u128).kronecker(&(n as u128)), res);
+        }
+
+        const SIGNED_CASES: [(i8, i8, i8); 37] = [
+            (-10, 15, 0),
+            (-7, 15, 1),
+            (-4, 15, -1),
+            (-2, 15, -1),
+            (-1, 15, -1),
+            (-10, 14, 0),
+            (-9, 14, -1),
+            (-4, 14, 0),
+            (-2, 14, 0),
+            (-1, 14, -1),
+            (-10, 11, 1),
+            (-9, 11, -1),
+            (-4, 11, -1),
+            (-2, 11, 1),
+            (-1, 11, -1),
+            (-10, -11, -1),
+            (-9, -11, 1),
+            (-4, -11, 1),
+            (-2, -11, -1),
+            (-1, -11, 1),
+            (0, -11, 0),
+            (1, -11, 1),
+            (2, -11, -1),
+            (4, -11, 1),
+            (9, -11, 1),
+            (10, -11, -1),
+            (-10, 32, 0),
+            (-9, 32, 1),
+            (-4, 32, 0),
+            (-2, 32, 0),
+            (-1, 32, 1),
+            (0, 32, 0),
+            (1, 32, 1),
+            (2, 32, 0),
+            (4, 32, 0),
+            (9, 32, 1),
+            (10, 32, 0),
+        ];
+
+        for &(a, n, res) in SIGNED_CASES.iter() {
+            assert_eq!(a.kronecker(&n), res, "{}, {}", a, n);
+            assert_eq!((a as i16).kronecker(&(n as i16)), res);
+            assert_eq!((a as i32).kronecker(&(n as i32)), res);
+            assert_eq!((a as i64).kronecker(&(n as i64)), res);
+            assert_eq!((a as i128).kronecker(&(n as i128)), res);
         }
     }
 }
