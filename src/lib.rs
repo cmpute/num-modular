@@ -35,6 +35,8 @@
 // REF: https://github.com/ridiculousfish/libdivide/
 // REF: Faster Interleaved Modular Multiplication Based on Barrett and Montgomery Reduction Methods (work for modulus in certain form)
 
+// TODO(0.5.x): Make the dependency on num-integer and num-traits optional (they are only required for num-bigint implementations)
+
 #![no_std]
 #[cfg(any(feature = "std", test))]
 extern crate std;
@@ -93,22 +95,29 @@ pub trait ModularPow<Exp = Self, Modulus = Self> {
 
 /// Math symbols related to modular arithmetics
 pub trait ModularSymbols<Modulus = Self> {
-    /// Calculate Legendre Symbol (a|n), where a is self.
+    /// Calculate Legendre Symbol (a|n), where a is `self`.
     ///
-    /// Note that this function doesn't perform primality check, since
-    /// is costly. So if n is not a prime, the result is not reasonable.
+    /// Note that this function doesn't perform a full primality check, since
+    /// is costly. So if n is not a prime, the result can be not reasonable.
     ///
     /// # Panics
-    /// if n is not prime
+    /// Only if n is not prime
     #[inline]
     fn legendre(&self, n: Modulus) -> i8 {
         self.checked_legendre(n).expect("n shoud be a prime")
     }
 
-    /// Checked version of [legendre()][ModularSymbols::legendre], return [None] if n is not prime
+    /// Calculate Legendre Symbol (a|n), where a is `self`. Returns [None] only if n is
+    /// not a prime.
+    ///
+    /// Note that this function doesn't perform a full primality check, since
+    /// is costly. So if n is not a prime, the result can be not reasonable.
+    ///
+    /// # Panics
+    /// Only if n is not prime
     fn checked_legendre(&self, n: Modulus) -> Option<i8>;
 
-    /// Calculate Jacobi Symbol (a|n), where a is self
+    /// Calculate Jacobi Symbol (a|n), where a is `self`
     ///
     /// # Panics
     /// if n is negative or even
@@ -118,10 +127,10 @@ pub trait ModularSymbols<Modulus = Self> {
             .expect("the Jacobi symbol is only defined for non-negative odd integers")
     }
 
-    /// Checked version of [jacobi()][ModularSymbols::jacobi], return [None] if n is negative or even
+    /// Calculate Jacobi Symbol (a|n), where a is `self`. Returns [None] if n is negative or even.
     fn checked_jacobi(&self, n: Modulus) -> Option<i8>;
 
-    /// Calculate Kronecker Symbol (a|n), where a is self
+    /// Calculate Kronecker Symbol (a|n), where a is `self`
     fn kronecker(&self, n: Modulus) -> i8;
 }
 
@@ -194,6 +203,7 @@ pub trait ModularInteger:
 // XXX: implement this trait for ff::PrimeField?
 // TODO: implement invm_range (Modular inverse in certain range) and crt (Chinese Remainder Theorem), REF: bubblemath crate
 
+// TODO(v0.6): Refactor DivExact to don't take additional Precompute args. Store the divisor directly in PreInv (lib ubig)
 /// Utility function for exact division, with precomputed helper values
 ///
 /// # Available Pre-computation types:

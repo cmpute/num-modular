@@ -1,5 +1,6 @@
 use crate::{DivExact, ModularUnaryOps};
 
+// Rename this to PreModInv, in case the barret divisor will be called PreMulInv
 /// Pre-computation for fast divisibility check.
 ///
 /// This struct stores the modular inverse of a divisor, and a limit for divisibility check.
