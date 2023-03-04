@@ -1,4 +1,4 @@
-use crate::{ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps, ModularAbs};
+use crate::{ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps};
 use core::convert::TryInto;
 use num_integer::Integer;
 use num_traits::{One, ToPrimitive, Zero};
@@ -105,7 +105,7 @@ macro_rules! impl_mod_ops_by_ref {
 #[cfg(feature = "num-bigint")]
 mod _num_bigint {
     use super::*;
-    use num_bigint::{BigUint, BigInt};
+    use num_bigint::{BigInt, BigUint};
     use num_traits::Signed;
 
     impl ModularCoreOps<&BigUint, &BigUint> for &BigUint {
@@ -219,11 +219,7 @@ mod _num_bigint {
                 return None;
             }
             if self.is_zero() {
-                return Some(if n.is_one() {
-                    1
-                } else {
-                    0
-                });
+                return Some(if n.is_one() { 1 } else { 0 });
             }
             if self.is_one() {
                 return Some(1);
@@ -287,7 +283,9 @@ mod _num_bigint {
             if n < &BigInt::one() {
                 return None;
             }
-            self.mod_floor(n).magnitude().checked_legendre(&n.magnitude())
+            self.mod_floor(n)
+                .magnitude()
+                .checked_legendre(&n.magnitude())
         }
 
         fn checked_jacobi(&self, n: &BigInt) -> Option<i8> {
@@ -301,11 +299,7 @@ mod _num_bigint {
         fn kronecker(&self, n: &BigInt) -> i8 {
             if n.is_negative() {
                 if n.magnitude().is_one() {
-                    return if self.is_negative() {
-                        -1
-                    } else {
-                        1
-                    }
+                    return if self.is_negative() { -1 } else { 1 };
                 } else {
                     return self.kronecker(&-BigInt::one()) * self.kronecker(&-n);
                 }
@@ -324,7 +318,9 @@ mod _num_bigint {
                     0
                 } else {
                     let eight = BigInt::from(8u8);
-                    if (self.mod_floor(&eight)).is_one() || self.mod_floor(&eight) == BigInt::from(7u8) {
+                    if (self.mod_floor(&eight)).is_one()
+                        || self.mod_floor(&eight) == BigInt::from(7u8)
+                    {
                         1
                     } else {
                         -1

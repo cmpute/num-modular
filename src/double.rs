@@ -3,8 +3,6 @@
 
 use core::ops::*;
 
-use num_integer::Integer;
-
 /// Alias of the builtin integer type with max width (currently [u128])
 #[allow(non_camel_case_types)]
 pub type umax = u128;
@@ -15,6 +13,11 @@ const HALF_BITS: u32 = umax::BITS / 2;
 #[inline(always)]
 const fn split(v: umax) -> (umax, umax) {
     (v >> HALF_BITS, v & (umax::MAX >> HALF_BITS))
+}
+
+#[inline(always)]
+const fn div_rem(n: umax, d: umax) -> (umax, umax) {
+    (n / d, n % d)
 }
 
 #[allow(non_camel_case_types)]
@@ -428,7 +431,7 @@ impl udouble {
         let (n1, n0) = split(n.lo); // split lower part of dividend
 
         // Compute the first quotient digit q1.
-        let (mut q1, mut rhat) = n.hi.div_rem(&d1);
+        let (mut q1, mut rhat) = div_rem(n.hi, d1);
 
         // q1 has at most error 2. No more than 2 iterations.
         while q1 >= B || q1 * d0 > B * rhat + n1 {
@@ -445,7 +448,7 @@ impl udouble {
                 .wrapping_sub(q1.wrapping_mul(d));
 
         // Compute the second quotient digit q0.
-        let (mut q0, mut rhat) = r21.div_rem(&d1);
+        let (mut q0, mut rhat) = div_rem(r21, d1);
 
         // q0 has at most error 2. No more than 2 iterations.
         while q0 >= B || q0 * d0 > B * rhat + n0 {
@@ -483,7 +486,7 @@ impl Div<umax> for udouble {
             // The result fits in 128 bits.
             Self { lo: self.div_rem1(rhs).0, hi: 0 }
         } else {
-            let (q, r) = self.hi.div_rem(&rhs);
+            let (q, r) = div_rem(self.hi, rhs);
             Self {
                 lo: Self { lo: self.lo, hi: r }.div_rem1(rhs).0,
                 hi: q,

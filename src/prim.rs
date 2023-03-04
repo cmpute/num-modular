@@ -2,7 +2,6 @@
 
 use crate::{udouble, Reducer, Vanilla};
 use crate::{DivExact, ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps};
-use num_integer::Integer;
 
 // FIXME: implement the modular functions as const after https://github.com/rust-lang/rust/pull/68847
 
@@ -250,7 +249,7 @@ macro_rules! impl_unary_uprim {
                 let (mut last_t, mut t) = (0, 1);
 
                 while r > 0 {
-                    let (quo, rem) = last_r.div_rem(&r);
+                    let (quo, rem) = (last_r / r, last_r % r);
                     last_r = r;
                     r = rem;
 
@@ -403,8 +402,8 @@ macro_rules! impl_div_exact_for_prim {
             type Output = $t;
             #[inline]
             fn div_exact(self, d: $t, _: &()) -> Option<Self::Output> {
-                let (q, d) = self.div_rem(&d);
-                if d == 0 {
+                let (q, r) = (self / d, self % d);
+                if r == 0 {
                     Some(q)
                 } else {
                     None
@@ -745,7 +744,7 @@ mod tests {
             (-2, 101, -1),
             (-1, 101, 1),
         ];
-        
+
         for &(a, n, res) in SIGNED_CASES.iter() {
             assert_eq!(a.legendre(&n), res);
             assert_eq!((a as i16).legendre(&(n as i16)), res);
@@ -800,7 +799,7 @@ mod tests {
             (-2, 11, 1),
             (-1, 11, -1),
         ];
-        
+
         for &(a, n, res) in SIGNED_CASES.iter() {
             assert_eq!(a.jacobi(&n), res);
             assert_eq!((a as i16).jacobi(&(n as i16)), res);

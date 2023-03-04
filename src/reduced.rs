@@ -1,5 +1,6 @@
 use crate::{udouble, ModularInteger, ModularUnaryOps, Reducer};
 use core::ops::*;
+#[cfg(feature = "num_traits")]
 use num_traits::{Inv, Pow};
 
 /// An integer in a modulo ring
@@ -35,6 +36,22 @@ impl<T, R: Reducer<T>> ReducedInt<T, R> {
     #[inline(always)]
     pub fn repr(&self) -> &T {
         &self.a
+    }
+
+    #[inline(always)]
+    pub fn inv(self) -> Option<Self> {
+        Some(ReducedInt {
+            a: self.r.inv(self.a)?,
+            r: self.r,
+        })
+    }
+
+    #[inline(always)]
+    pub fn pow(self, exp: T) -> Self {
+        ReducedInt {
+            a: self.r.pow(self.a, exp),
+            r: self.r,
+        }
     }
 }
 
@@ -124,28 +141,29 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Neg for &ReducedInt<T, R> {
     #[inline]
     fn neg(self) -> Self::Output {
         let a = self.r.neg(self.a.clone());
-        ReducedInt { a, r: self.r.clone() }
+        ReducedInt {
+            a,
+            r: self.r.clone(),
+        }
     }
 }
 
+const INV_ERR_MSG: &str = "the modular inverse doesn't exist!";
+
+#[cfg(feature = "num_traits")]
 impl<T: PartialEq, R: Reducer<T>> Inv for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
     fn inv(self) -> Self::Output {
-        let Self { a, r } = self;
-        let a = r.inv(a).expect("the modular inverse doesn't exists.");
-        Self { a, r }
+        self.inv().expect(INV_ERR_MSG)
     }
 }
+#[cfg(feature = "num_traits")]
 impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Inv for &ReducedInt<T, R> {
     type Output = ReducedInt<T, R>;
     #[inline]
     fn inv(self) -> Self::Output {
-        let a = self
-            .r
-            .inv(self.a.clone())
-            .expect("the modular inverse doesn't exists.");
-        ReducedInt { a, r: self.r.clone() }
+        self.clone().inv().expect(INV_ERR_MSG)
     }
 }
 
@@ -153,31 +171,49 @@ impl<T: PartialEq, R: Reducer<T>> Div for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
     fn div(self, rhs: Self) -> Self::Output {
-        self * rhs.inv()
+        self.check_modulus_eq(&rhs);
+        let ReducedInt { a, r } = rhs;
+        let a = r.mul(self.a, r.inv(a).expect(INV_ERR_MSG));
+        ReducedInt { a, r }
     }
 }
-impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Div<&ReducedInt<T, R>> for ReducedInt<T, R> {
+impl<T: PartialEq + Clone, R: Reducer<T>> Div<&ReducedInt<T, R>> for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
     fn div(self, rhs: &Self) -> Self::Output {
-        self * rhs.inv()
+        self.check_modulus_eq(&rhs);
+        let Self { a, r } = self;
+        let a = r.mul(a, r.inv(rhs.a.clone()).expect(INV_ERR_MSG));
+        ReducedInt { a, r }
     }
 }
-impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Div<ReducedInt<T, R>> for &ReducedInt<T, R> {
+impl<T: PartialEq + Clone, R: Reducer<T>> Div<ReducedInt<T, R>> for &ReducedInt<T, R> {
     type Output = ReducedInt<T, R>;
     #[inline]
     fn div(self, rhs: ReducedInt<T, R>) -> Self::Output {
-        self.clone() * rhs.inv()
+        self.check_modulus_eq(&rhs);
+        let ReducedInt { a, r } = rhs;
+        let a = r.mul(self.a.clone(), r.inv(a).expect(INV_ERR_MSG));
+        ReducedInt { a, r }
     }
 }
 impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Div<&ReducedInt<T, R>> for &ReducedInt<T, R> {
     type Output = ReducedInt<T, R>;
     #[inline]
     fn div(self, rhs: &ReducedInt<T, R>) -> Self::Output {
-        self.clone() * rhs.inv()
+        self.check_modulus_eq(&rhs);
+        let a = self.r.mul(
+            self.a.clone(),
+            self.r.inv(rhs.a.clone()).expect(INV_ERR_MSG),
+        );
+        ReducedInt {
+            a,
+            r: self.r.clone(),
+        }
     }
 }
 
+#[cfg(feature = "num_traits")]
 impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
@@ -187,12 +223,16 @@ impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
         Self { a, r }
     }
 }
+#[cfg(feature = "num_traits")]
 impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Pow<T> for &ReducedInt<T, R> {
     type Output = ReducedInt<T, R>;
     #[inline]
     fn pow(self, rhs: T) -> Self::Output {
         let a = self.r.pow(self.a.clone(), rhs);
-        ReducedInt { a, r: self.r.clone() }
+        ReducedInt {
+            a,
+            r: self.r.clone(),
+        }
     }
 }
 
@@ -384,7 +424,7 @@ pub type VanillaInt<T> = ReducedInt<T, Vanilla<T>>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ModularCoreOps, ModularPow, ModularUnaryOps};
+    use crate::{ModularCoreOps, ModularUnaryOps};
     use rand::random;
 
     const NRANDOM: u32 = 10;
@@ -394,7 +434,6 @@ mod tests {
         macro_rules! tests_for {
             ($($T:ty)*) => ($(
                 let m = random::<$T>();
-                let e = random::<u8>() as $T;
                 let (a, b) = (random::<$T>(), random::<$T>());
                 let am = VanillaInt::new(a, &m);
                 let bm = VanillaInt::new(b, &m);
@@ -404,9 +443,14 @@ mod tests {
                 assert_eq!(am.neg().residue(), a.negm(&m));
                 assert_eq!(am.double().residue(), a.dblm(&m));
                 assert_eq!(am.square().residue(), a.sqm(&m));
-                assert_eq!(am.pow(e).residue(), a.powm(e, &m));
-                if let Some(v) = a.invm(&m) {
-                    assert_eq!(am.inv().residue(), v);
+                #[cfg(feature = "num_traits")]
+                {
+                    use crate::ModularPow;
+                    let e = random::<u8>() as $T;
+                    assert_eq!(am.pow(e).residue(), a.powm(e, &m));
+                    if let Some(v) = a.invm(&m) {
+                        assert_eq!(am.inv().residue(), v);
+                    }
                 }
             )*);
         }

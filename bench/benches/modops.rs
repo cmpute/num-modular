@@ -2,7 +2,6 @@
 extern crate criterion;
 use criterion::Criterion;
 use num_modular::{FixedMersenneInt, ModularCoreOps, ModularPow, ModularUnaryOps};
-use num_traits::{Inv, Pow};
 use rand::random;
 
 pub fn bench_u128(c: &mut Criterion) {
@@ -52,7 +51,11 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("mersenne + extended gcd", |b| {
         b.iter(|| {
             (100u64..400u64)
-                .map(|n| FixedMersenneInt::<56, 5>::new(n as u128, &(M1 as u128)).inv())
+                .map(|n| {
+                    FixedMersenneInt::<56, 5>::new(n as u128, &(M1 as u128))
+                        .inv()
+                        .unwrap()
+                })
                 .reduce(|a, b| a + b)
         })
     });
@@ -88,7 +91,11 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.bench_function("mersenne + extended gcd", |b| {
         b.iter(|| {
             (1_000_000_000u128..1_000_000_300u128)
-                .map(|n| FixedMersenneInt::<94, 3>::new(n, &(M2 as u128)).inv())
+                .map(|n| {
+                    FixedMersenneInt::<94, 3>::new(n, &(M2 as u128))
+                        .inv()
+                        .unwrap()
+                })
                 .reduce(|a, b| a + b)
         })
     });

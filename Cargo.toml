@@ -16,8 +16,8 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-num-integer = "0.1.44"
-num-traits = "0.2.14"
+num-integer = { version = "0.1.44", optional = true }
+num-traits = { version = "0.2.14", optional = true }
 
 [dependencies.num-bigint]
 optional = true
