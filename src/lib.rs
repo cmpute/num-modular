@@ -21,7 +21,7 @@
 //!
 //! # Comparison of fast division / modular arithmetics
 //! Several fast division / modulo tricks are provided in these crate, the difference of them are listed below:
-//! - [PreInv]: pre-compute modular inverse of the divisor, only applicable to exact division
+//! - [PreModInv]: pre-compute modular inverse of the divisor, only applicable to exact division
 //! - Barret (to be implemented): pre-compute (rational approximation of) the reciprocal of the divisor,
 //!     applicable to fast division and modulo
 //! - [Montgomery]: Convert the dividend into a special form by shifting and pre-compute a modular inverse,
@@ -203,12 +203,12 @@ pub trait ModularInteger:
 // XXX: implement this trait for ff::PrimeField?
 // TODO: implement invm_range (Modular inverse in certain range) and crt (Chinese Remainder Theorem), REF: bubblemath crate
 
-// TODO(v0.6): Refactor DivExact to don't take additional Precompute args. Store the divisor directly in PreInv (lib ubig)
+// TODO(v0.6): Refactor DivExact to don't take additional Precompute args. Store the divisor directly in PreModInv (lib ubig)
 /// Utility function for exact division, with precomputed helper values
 ///
 /// # Available Pre-computation types:
 /// - `()`: No pre-computation, the implementation relies on native integer division
-/// - [PreInv]: With Pre-computed modular inverse
+/// - [PreModInv]: With Pre-computed modular inverse
 pub trait DivExact<Rhs, Precompute>: Sized {
     type Output;
 
@@ -270,11 +270,15 @@ mod monty;
 mod preinv;
 mod prim;
 mod reduced;
+mod word;
 
+pub use barret::{
+    Normalized2by1Divider, Normalized3by2Divider, PreMulInv1by1, PreMulInv2by1, PreMulInv3by2,
+};
 pub use double::{udouble, umax};
 pub use mersenne::FixedMersenne;
 pub use monty::Montgomery;
-pub use preinv::PreInv;
+pub use preinv::PreModInv;
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 
 /// An integer in modulo ring based on [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form)

@@ -1,19 +1,18 @@
 use crate::{DivExact, ModularUnaryOps};
 
-// Rename this to PreModInv, in case the barret divisor will be called PreMulInv
 /// Pre-computation for fast divisibility check.
 ///
 /// This struct stores the modular inverse of a divisor, and a limit for divisibility check.
 /// See <https://math.stackexchange.com/a/1251328> for the explanation of the trick
 #[derive(Debug, Clone, Copy)]
-pub struct PreInv<T> {
+pub struct PreModInv<T> {
     d_inv: T, // modular inverse of divisor
     q_lim: T, // limit of residue
 }
 
 macro_rules! impl_preinv_for_prim_int {
     ($t:ty, $tdouble:ty) => {
-        impl PreInv<$t> {
+        impl PreModInv<$t> {
             /// Construct the preinv instance with raw values.
             ///
             /// This function can be used to initialize preinv in a constant context, the divisor d
@@ -32,7 +31,7 @@ macro_rules! impl_preinv_for_prim_int {
             }
         }
 
-        impl From<$t> for PreInv<$t> {
+        impl From<$t> for PreModInv<$t> {
             #[inline]
             fn from(v: $t) -> Self {
                 debug_assert!(v % 2 != 0, "only odd divisors are supported");
@@ -44,10 +43,10 @@ macro_rules! impl_preinv_for_prim_int {
             }
         }
 
-        impl DivExact<$t, PreInv<$t>> for $t {
+        impl DivExact<$t, PreModInv<$t>> for $t {
             type Output = $t;
             #[inline]
-            fn div_exact(self, d: $t, pre: &PreInv<$t>) -> Option<Self> {
+            fn div_exact(self, d: $t, pre: &PreModInv<$t>) -> Option<Self> {
                 pre.debug_check(d);
                 let q = self.wrapping_mul(pre.d_inv);
                 if q <= pre.q_lim {
@@ -58,10 +57,10 @@ macro_rules! impl_preinv_for_prim_int {
             }
         }
 
-        impl DivExact<$t, PreInv<$t>> for $tdouble {
+        impl DivExact<$t, PreModInv<$t>> for $tdouble {
             type Output = $tdouble;
             #[inline]
-            fn div_exact(self, d: $t, pre: &PreInv<$t>) -> Option<$tdouble> {
+            fn div_exact(self, d: $t, pre: &PreModInv<$t>) -> Option<$tdouble> {
                 pre.debug_check(d);
 
                 // this implementation comes from GNU factor,
@@ -108,7 +107,7 @@ mod tests {
         for _ in 0..N {
             // u8 test
             let d = random::<u8>() | 1;
-            let pre: PreInv<_> = d.into();
+            let pre: PreModInv<_> = d.into();
 
             let n: u8 = random();
             let expect = if n % d == 0 { Some(n / d) } else { None };
@@ -123,7 +122,7 @@ mod tests {
 
             // u16 test
             let d = random::<u16>() | 1;
-            let pre: PreInv<_> = d.into();
+            let pre: PreModInv<_> = d.into();
 
             let n: u16 = random();
             let expect = if n % d == 0 { Some(n / d) } else { None };
@@ -138,7 +137,7 @@ mod tests {
 
             // u32 test
             let d = random::<u32>() | 1;
-            let pre: PreInv<_> = d.into();
+            let pre: PreModInv<_> = d.into();
 
             let n: u32 = random();
             let expect = if n % d == 0 { Some(n / d) } else { None };
@@ -153,7 +152,7 @@ mod tests {
 
             // u64 test
             let d = random::<u64>() | 1;
-            let pre: PreInv<_> = d.into();
+            let pre: PreModInv<_> = d.into();
 
             let n: u64 = random();
             let expect = if n % d == 0 { Some(n / d) } else { None };

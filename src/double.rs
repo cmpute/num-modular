@@ -318,7 +318,10 @@ impl BitAnd for udouble {
     type Output = Self;
     #[inline]
     fn bitand(self, rhs: Self) -> Self::Output {
-        Self { lo: self.lo & rhs.lo, hi: self.hi & rhs.hi }
+        Self {
+            lo: self.lo & rhs.lo,
+            hi: self.hi & rhs.hi,
+        }
     }
 }
 //> (not used yet)
@@ -334,7 +337,10 @@ impl BitOr for udouble {
     type Output = Self;
     #[inline]
     fn bitor(self, rhs: Self) -> Self::Output {
-        Self { lo: self.lo | rhs.lo, hi: self.hi | rhs.hi }
+        Self {
+            lo: self.lo | rhs.lo,
+            hi: self.hi | rhs.hi,
+        }
     }
 }
 //> (not used yet)
@@ -350,7 +356,10 @@ impl BitXor for udouble {
     type Output = Self;
     #[inline]
     fn bitxor(self, rhs: Self) -> Self::Output {
-        Self { lo: self.lo ^ rhs.lo, hi: self.hi ^ rhs.hi }
+        Self {
+            lo: self.lo ^ rhs.lo,
+            hi: self.hi ^ rhs.hi,
+        }
     }
 }
 //> (not used yet)
@@ -366,7 +375,10 @@ impl Not for udouble {
     type Output = Self;
     #[inline]
     fn not(self) -> Self::Output {
-        Self { lo: !self.lo, hi: !self.hi }
+        Self {
+            lo: !self.lo,
+            hi: !self.hi,
+        }
     }
 }
 
@@ -384,7 +396,7 @@ impl udouble {
     // double by double division (long division), it's not the most efficient algorithm.
     // listed here in case of future use
     #[allow(dead_code)]
-    fn div_rem(self, other: Self) -> (Self, Self) {
+    fn div_rem_2by2(self, other: Self) -> (Self, Self) {
         let mut n = self; // numerator
         let mut d = other; // denominator
         let mut q = Self { lo: 0, hi: 0 }; // quotient
@@ -420,7 +432,7 @@ impl udouble {
     // double by single to single division.
     // equivalent to `udiv_qrnnd` in C or `divq` in assembly.
     //> (used in Self::{div, rem}::<umax>)
-    fn div_rem1(self, other: umax) -> (umax, umax) {
+    fn div_rem_2by1(self, other: umax) -> (umax, umax) {
         // the following algorithm comes from `ethnum` crate
         const B: umax = 1 << HALF_BITS; // number base (64 bits)
 
@@ -484,11 +496,14 @@ impl Div<umax> for udouble {
         // self.div_rem(rhs.into()).0
         if self.hi < rhs {
             // The result fits in 128 bits.
-            Self { lo: self.div_rem1(rhs).0, hi: 0 }
+            Self {
+                lo: self.div_rem_2by1(rhs).0,
+                hi: 0,
+            }
         } else {
             let (q, r) = div_rem(self.hi, rhs);
             Self {
-                lo: Self { lo: self.lo, hi: r }.div_rem1(rhs).0,
+                lo: Self { lo: self.lo, hi: r }.div_rem_2by1(rhs).0,
                 hi: q,
             }
         }
@@ -502,9 +517,14 @@ impl Rem<umax> for udouble {
     fn rem(self, rhs: umax) -> Self::Output {
         if self.hi < rhs {
             // The result fits in 128 bits.
-            self.div_rem1(rhs).1
+            self.div_rem_2by1(rhs).1
         } else {
-            Self { lo: self.lo, hi: self.hi % rhs }.div_rem1(rhs).1
+            Self {
+                lo: self.lo,
+                hi: self.hi % rhs,
+            }
+            .div_rem_2by1(rhs)
+            .1
         }
     }
 }
@@ -518,25 +538,67 @@ mod tests {
     fn test_construction() {
         // from widening operators
         assert_eq!(udouble { hi: 0, lo: 2 }, udouble::widening_add(1, 1));
-        assert_eq!(udouble { hi: 1, lo: umax::MAX - 1 }, udouble::widening_add(umax::MAX, umax::MAX));
+        assert_eq!(
+            udouble {
+                hi: 1,
+                lo: umax::MAX - 1
+            },
+            udouble::widening_add(umax::MAX, umax::MAX)
+        );
 
         assert_eq!(udouble { hi: 0, lo: 1 }, udouble::widening_mul(1, 1));
         assert_eq!(udouble { hi: 0, lo: 1 }, udouble::widening_square(1));
-        assert_eq!(udouble { hi: 1 << 32, lo: 0 }, udouble::widening_mul(1 << 80, 1 << 80));
-        assert_eq!(udouble { hi: 1 << 32, lo: 0 }, udouble::widening_square(1 << 80));
-        assert_eq!(udouble { hi: 1 << 32, lo: 2 << 120 | 1 << 80 }, udouble::widening_mul(1 << 80 | 1 << 40, 1 << 80 | 1 << 40));
-        assert_eq!(udouble { hi: 1 << 32, lo: 2 << 120 | 1 << 80 }, udouble::widening_square(1 << 80 | 1 << 40));
-        assert_eq!(udouble { hi: umax::MAX - 1, lo: 1 }, udouble::widening_mul(umax::MAX, umax::MAX));
-        assert_eq!(udouble { hi: umax::MAX - 1, lo: 1 }, udouble::widening_square(umax::MAX));
+        assert_eq!(
+            udouble { hi: 1 << 32, lo: 0 },
+            udouble::widening_mul(1 << 80, 1 << 80)
+        );
+        assert_eq!(
+            udouble { hi: 1 << 32, lo: 0 },
+            udouble::widening_square(1 << 80)
+        );
+        assert_eq!(
+            udouble {
+                hi: 1 << 32,
+                lo: 2 << 120 | 1 << 80
+            },
+            udouble::widening_mul(1 << 80 | 1 << 40, 1 << 80 | 1 << 40)
+        );
+        assert_eq!(
+            udouble {
+                hi: 1 << 32,
+                lo: 2 << 120 | 1 << 80
+            },
+            udouble::widening_square(1 << 80 | 1 << 40)
+        );
+        assert_eq!(
+            udouble {
+                hi: umax::MAX - 1,
+                lo: 1
+            },
+            udouble::widening_mul(umax::MAX, umax::MAX)
+        );
+        assert_eq!(
+            udouble {
+                hi: umax::MAX - 1,
+                lo: 1
+            },
+            udouble::widening_square(umax::MAX)
+        );
     }
 
     #[test]
     fn test_ops() {
         const ONE: udouble = udouble { hi: 0, lo: 1 };
         const TWO: udouble = udouble { hi: 0, lo: 2 };
-        const MAX: udouble = udouble { hi: 0, lo: umax::MAX };
+        const MAX: udouble = udouble {
+            hi: 0,
+            lo: umax::MAX,
+        };
         const ONEZERO: udouble = udouble { hi: 1, lo: 0 };
-        const ONEMAX: udouble = udouble { hi: 1, lo: umax::MAX };
+        const ONEMAX: udouble = udouble {
+            hi: 1,
+            lo: umax::MAX,
+        };
         const TWOZERO: udouble = udouble { hi: 2, lo: 0 };
 
         assert_eq!(ONE + MAX, ONEZERO);
@@ -548,7 +610,13 @@ mod tests {
 
         assert_eq!(ONE << umax::BITS, ONEZERO);
         assert_eq!((MAX << 1u8) + 1, ONEMAX);
-        assert_eq!(ONE << 200u8, udouble { lo: 0, hi: 1 << (200 - umax::BITS) });
+        assert_eq!(
+            ONE << 200u8,
+            udouble {
+                lo: 0,
+                hi: 1 << (200 - umax::BITS)
+            }
+        );
         assert_eq!(ONEZERO >> umax::BITS, ONE);
         assert_eq!(ONEMAX >> 1u8, MAX);
 
@@ -573,12 +641,20 @@ mod tests {
     #[test]
     fn test_assign_ops() {
         for _ in 0..10 {
-            let x = udouble { hi: random::<u32>() as umax, lo: random() };
-            let y = udouble { hi: random::<u32>() as umax, lo: random() };
+            let x = udouble {
+                hi: random::<u32>() as umax,
+                lo: random(),
+            };
+            let y = udouble {
+                hi: random::<u32>() as umax,
+                lo: random(),
+            };
             let mut z = x;
 
-            z += y; assert_eq!(z, x + y);
-            z -= y; assert_eq!(z, x);
+            z += y;
+            assert_eq!(z, x + y);
+            z -= y;
+            assert_eq!(z, x);
         }
     }
 }

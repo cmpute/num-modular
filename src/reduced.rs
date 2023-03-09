@@ -313,6 +313,7 @@ macro_rules! impl_uprim_vanilla_core {
     ($single:ty) => {
         #[inline(always)]
         fn new(m: &$single) -> Self {
+            assert!(m > &0);
             Self(*m)
         }
         #[inline(always)]
@@ -433,7 +434,7 @@ mod tests {
     fn test_against_prim() {
         macro_rules! tests_for {
             ($($T:ty)*) => ($(
-                let m = random::<$T>();
+                let m = random::<$T>().saturating_add(1);
                 let (a, b) = (random::<$T>(), random::<$T>());
                 let am = VanillaInt::new(a, &m);
                 let bm = VanillaInt::new(b, &m);
