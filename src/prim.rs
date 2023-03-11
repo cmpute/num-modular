@@ -30,6 +30,8 @@ macro_rules! impl_core_ops_uu {
 }
 impl_core_ops_uu! { u8 => u16; u16 => u32; u32 => u64; u64 => u128; }
 
+#[cfg(target_pointer_width = "16")]
+impl_core_ops_uu! { usize => u32; }
 #[cfg(target_pointer_width = "32")]
 impl_core_ops_uu! { usize => u64; }
 #[cfg(target_pointer_width = "64")]

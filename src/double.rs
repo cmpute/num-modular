@@ -35,6 +35,8 @@ pub struct udouble {
 }
 
 impl udouble {
+    pub const MAX: Self = Self { lo: umax::MAX, hi: umax::MAX };
+
     //> (used in u128::addm)
     #[inline]
     pub const fn widening_add(lhs: umax, rhs: umax) -> Self {

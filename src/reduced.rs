@@ -40,7 +40,7 @@ impl<T, R: Reducer<T>> ReducedInt<T, R> {
 
     #[inline(always)]
     pub fn inv(self) -> Option<Self> {
-        Some(ReducedInt {
+        Some(Self {
             a: self.r.inv(self.a)?,
             r: self.r,
         })
@@ -48,7 +48,7 @@ impl<T, R: Reducer<T>> ReducedInt<T, R> {
 
     #[inline(always)]
     pub fn pow(self, exp: T) -> Self {
-        ReducedInt {
+        Self {
             a: self.r.pow(self.a, exp),
             r: self.r,
         }
@@ -218,9 +218,7 @@ impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
     fn pow(self, rhs: T) -> Self::Output {
-        let Self { a, r } = self;
-        let a = r.pow(a, rhs);
-        Self { a, r }
+        ReducedInt::pow(self, rhs)
     }
 }
 #[cfg(feature = "num_traits")]
@@ -400,6 +398,8 @@ impl_uprim_vanilla!(u8, u16);
 impl_uprim_vanilla!(u16, u32);
 impl_uprim_vanilla!(u32, u64);
 impl_uprim_vanilla!(u64, u128);
+#[cfg(target_pointer_width = "16")]
+impl_uprim_vanilla!(usize, u32);
 #[cfg(target_pointer_width = "32")]
 impl_uprim_vanilla!(usize, u64);
 #[cfg(target_pointer_width = "64")]
@@ -423,41 +423,49 @@ impl Reducer<u128> for Vanilla<u128> {
 pub type VanillaInt<T> = ReducedInt<T, Vanilla<T>>;
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    use crate::{ModularCoreOps, ModularUnaryOps};
+    use crate::{ModularCoreOps, ModularUnaryOps, ModularPow};
+    use core::marker::PhantomData;
     use rand::random;
 
-    const NRANDOM: u32 = 10;
+    pub(crate) struct ReducedTester<T>(PhantomData<T>);
 
-    #[test]
-    fn test_against_prim() {
-        macro_rules! tests_for {
-            ($($T:ty)*) => ($(
-                let m = random::<$T>().saturating_add(1);
-                let (a, b) = (random::<$T>(), random::<$T>());
-                let am = VanillaInt::new(a, &m);
-                let bm = VanillaInt::new(b, &m);
-                assert_eq!((am + bm).residue(), a.addm(b, &m));
-                assert_eq!((am - bm).residue(), a.subm(b, &m));
-                assert_eq!((am * bm).residue(), a.mulm(b, &m));
-                assert_eq!(am.neg().residue(), a.negm(&m));
-                assert_eq!(am.double().residue(), a.dblm(&m));
-                assert_eq!(am.square().residue(), a.sqm(&m));
-                #[cfg(feature = "num_traits")]
-                {
-                    use crate::ModularPow;
+    macro_rules! impl_reduced_test_for {
+        ($($T:ty)*) => {$(
+            impl ReducedTester<$T> {
+                pub fn test_against_modops<R: Reducer<$T> + Copy>() {
+                    let m = random::<$T>().saturating_add(1);
+                    let (a, b) = (random::<$T>(), random::<$T>());
+                    let am = ReducedInt::<$T, R>::new(a, &m);
+                    let bm = ReducedInt::<$T, R>::new(b, &m);
+                    assert_eq!((am + bm).residue(), a.addm(b, &m), "incorrect add");
+                    assert_eq!((am - bm).residue(), a.subm(b, &m), "incorrect sub");
+                    assert_eq!((am * bm).residue(), a.mulm(b, &m), "incorrect mul");
+                    assert_eq!(am.neg().residue(), a.negm(&m), "incorrect neg");
+                    assert_eq!(am.double().residue(), a.dblm(&m), "incorrect dbl");
+                    assert_eq!(am.square().residue(), a.sqm(&m), "incorrect sqr");
+            
                     let e = random::<u8>() as $T;
-                    assert_eq!(am.pow(e).residue(), a.powm(e, &m));
+                    assert_eq!(am.pow(e).residue(), a.powm(e, &m), "incorrect pow");
                     if let Some(v) = a.invm(&m) {
-                        assert_eq!(am.inv().residue(), v);
+                        assert_eq!(am.inv().unwrap().residue(), v, "incorrect inv");
                     }
                 }
-            )*);
-        }
+            }
+        )*};
+    }
+    impl_reduced_test_for!(u8 u16 u32 u64 u128 usize);
 
-        for _ in 0..NRANDOM {
-            tests_for!(u8 u16 u32 u64 u128 usize);
+    #[test]
+    fn test_against_modops() {
+        for _ in 0..10 {
+            ReducedTester::<u8>::test_against_modops::<Vanilla<u8>>();
+            ReducedTester::<u16>::test_against_modops::<Vanilla<u16>>();
+            ReducedTester::<u32>::test_against_modops::<Vanilla<u32>>();
+            ReducedTester::<u64>::test_against_modops::<Vanilla<u64>>();
+            ReducedTester::<u128>::test_against_modops::<Vanilla<u128>>();
+            ReducedTester::<usize>::test_against_modops::<Vanilla<usize>>();
         }
     }
 }

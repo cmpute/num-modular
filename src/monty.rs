@@ -117,6 +117,7 @@ macro_rules! impl_uprim_montgomery_core {
 
         #[inline(always)]
         fn add(&self, lhs: $single, rhs: $single) -> $single {
+            // TODO: move this to standalone methods, which could improve performance
             Vanilla::<$single>::new(&self.1).add(lhs, rhs)
         }
 
