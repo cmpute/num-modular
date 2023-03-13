@@ -404,34 +404,33 @@ macro_rules! impl_uprim_vanilla_core {
 }
 
 macro_rules! impl_uprim_vanilla {
-    ($single:ty, $double:ty) => {
-        impl Reducer<$single> for Vanilla<$single> {
-            impl_uprim_vanilla_core!($single);
+    ($t:ident, $ns:ident) => {
+        mod $ns {
+            use super::*;
+            use crate::word::$t::*;
 
-            #[inline]
-            fn mul(&self, lhs: $single, rhs: $single) -> $single {
-                ((lhs as $double) * (rhs as $double) % (self.0 as $double)) as $single
-            }
+            impl Reducer<$t> for Vanilla<$t> {
+                impl_uprim_vanilla_core!($t);
 
-            #[inline]
-            fn square(&self, target: $single) -> $single {
-                let target = target as $double;
-                (target * target % (self.0 as $double)) as $single
+                #[inline]
+                fn mul(&self, lhs: $t, rhs: $t) -> $t {
+                    (wmul(lhs, rhs) % extend(self.0)) as $t
+                }
+
+                #[inline]
+                fn square(&self, target: $t) -> $t {
+                    (wsqr(target) % extend(self.0)) as $t
+                }
             }
         }
     };
 }
 
-impl_uprim_vanilla!(u8, u16);
-impl_uprim_vanilla!(u16, u32);
-impl_uprim_vanilla!(u32, u64);
-impl_uprim_vanilla!(u64, u128);
-#[cfg(target_pointer_width = "16")]
-impl_uprim_vanilla!(usize, u32);
-#[cfg(target_pointer_width = "32")]
-impl_uprim_vanilla!(usize, u64);
-#[cfg(target_pointer_width = "64")]
-impl_uprim_vanilla!(usize, u128);
+impl_uprim_vanilla!(u8, u8_impl);
+impl_uprim_vanilla!(u16, u16_impl);
+impl_uprim_vanilla!(u32, u32_impl);
+impl_uprim_vanilla!(u64, u64_impl);
+impl_uprim_vanilla!(usize, usize_impl);
 
 impl Reducer<u128> for Vanilla<u128> {
     impl_uprim_vanilla_core!(u128);
@@ -453,7 +452,7 @@ pub type VanillaInt<T> = ReducedInt<T, Vanilla<T>>;
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::{ModularCoreOps, ModularUnaryOps, ModularPow};
+    use crate::{ModularCoreOps, ModularPow, ModularUnaryOps};
     use core::marker::PhantomData;
     use rand::random;
 
@@ -473,7 +472,7 @@ pub(crate) mod tests {
                     assert_eq!(am.neg().residue(), a.negm(&m), "incorrect neg");
                     assert_eq!(am.double().residue(), a.dblm(&m), "incorrect dbl");
                     assert_eq!(am.square().residue(), a.sqm(&m), "incorrect sqr");
-            
+
                     let e = random::<u8>() as $T;
                     assert_eq!(am.pow(e).residue(), a.powm(e, &m), "incorrect pow");
                     if let Some(v) = a.invm(&m) {

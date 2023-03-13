@@ -11,82 +11,89 @@ pub struct PreModInv<T> {
 }
 
 macro_rules! impl_preinv_for_prim_int {
-    ($t:ty, $tdouble:ty) => {
-        impl PreModInv<$t> {
-            /// Construct the preinv instance with raw values.
-            ///
-            /// This function can be used to initialize preinv in a constant context, the divisor d
-            /// is required only for verification of d_inv and q_lim.
-            #[inline]
-            pub const fn new(d_inv: $t, q_lim: $t) -> Self {
-                Self { d_inv, q_lim }
-            }
+    ($t:ident, $ns:ident) => {
+        mod $ns {
+            use super::*;
+            use crate::word::$t::*;
 
-            // check if the divisor is consistent in debug mode
-            #[inline]
-            fn debug_check(&self, d: $t) {
-                debug_assert!(d % 2 != 0, "only odd divisors are supported");
-                debug_assert!(d.wrapping_mul(self.d_inv) == 1);
-                debug_assert!(self.q_lim * d > (<$t>::MAX - d));
-            }
-        }
+            impl PreModInv<$t> {
+                /// Construct the preinv instance with raw values.
+                ///
+                /// This function can be used to initialize preinv in a constant context, the divisor d
+                /// is required only for verification of d_inv and q_lim.
+                #[inline]
+                pub const fn new(d_inv: $t, q_lim: $t) -> Self {
+                    Self { d_inv, q_lim }
+                }
 
-        impl From<$t> for PreModInv<$t> {
-            #[inline]
-            fn from(v: $t) -> Self {
-                debug_assert!(v % 2 != 0, "only odd divisors are supported");
-                let d_inv = (v as $tdouble)
-                    .invm(&((1 as $tdouble) << <$t>::BITS))
-                    .unwrap() as $t;
-                let q_lim = <$t>::MAX / v;
-                Self { d_inv, q_lim }
-            }
-        }
-
-        impl DivExact<$t, PreModInv<$t>> for $t {
-            type Output = $t;
-            #[inline]
-            fn div_exact(self, d: $t, pre: &PreModInv<$t>) -> Option<Self> {
-                pre.debug_check(d);
-                let q = self.wrapping_mul(pre.d_inv);
-                if q <= pre.q_lim {
-                    Some(q)
-                } else {
-                    None
+                // check if the divisor is consistent in debug mode
+                #[inline]
+                fn debug_check(&self, d: $t) {
+                    debug_assert!(d % 2 != 0, "only odd divisors are supported");
+                    debug_assert!(d.wrapping_mul(self.d_inv) == 1);
+                    debug_assert!(self.q_lim * d > (<$t>::MAX - d));
                 }
             }
-        }
 
-        impl DivExact<$t, PreModInv<$t>> for $tdouble {
-            type Output = $tdouble;
-            #[inline]
-            fn div_exact(self, d: $t, pre: &PreModInv<$t>) -> Option<$tdouble> {
-                pre.debug_check(d);
+            impl From<$t> for PreModInv<$t> {
+                #[inline]
+                fn from(v: $t) -> Self {
+                    use crate::word::$t::*;
 
-                // this implementation comes from GNU factor,
-                // see https://math.stackexchange.com/q/4436380/815652 for explanation
-
-                let (n1, n0) = ((self >> <$t>::BITS) as $t, self as $t);
-                let q0 = n0.wrapping_mul(pre.d_inv);
-                let nr0 = (q0 as $tdouble) * (d as $tdouble);
-                let nr0 = (nr0 >> <$t>::BITS) as $t;
-                if nr0 > n1 {
-                    return None;
+                    debug_assert!(v % 2 != 0, "only odd divisors are supported");
+                    let d_inv = extend(v).invm(&merge(0, 1)).unwrap() as $t;
+                    let q_lim = <$t>::MAX / v;
+                    Self { d_inv, q_lim }
                 }
-                let nr1 = n1 - nr0;
-                let q1 = nr1.wrapping_mul(pre.d_inv);
-                if q1 > pre.q_lim {
-                    return None;
+            }
+
+            impl DivExact<$t, PreModInv<$t>> for $t {
+                type Output = $t;
+                #[inline]
+                fn div_exact(self, d: $t, pre: &PreModInv<$t>) -> Option<Self> {
+                    pre.debug_check(d);
+                    let q = self.wrapping_mul(pre.d_inv);
+                    if q <= pre.q_lim {
+                        Some(q)
+                    } else {
+                        None
+                    }
                 }
-                Some(((q1 as $tdouble) << <$t>::BITS) + q0 as $tdouble)
+            }
+
+            impl DivExact<$t, PreModInv<$t>> for DoubleWord {
+                type Output = DoubleWord;
+
+                #[inline]
+                fn div_exact(self, d: $t, pre: &PreModInv<$t>) -> Option<Self::Output> {
+                    pre.debug_check(d);
+
+                    // this implementation comes from GNU factor,
+                    // see https://math.stackexchange.com/q/4436380/815652 for explanation
+
+                    let (n0, n1) = split(self);
+                    let q0 = n0.wrapping_mul(pre.d_inv);
+                    let nr0 = wmul(q0, d);
+                    let nr0 = split(nr0).1;
+                    if nr0 > n1 {
+                        return None;
+                    }
+                    let nr1 = n1 - nr0;
+                    let q1 = nr1.wrapping_mul(pre.d_inv);
+                    if q1 > pre.q_lim {
+                        return None;
+                    }
+                    Some(merge(q0, q1))
+                }
             }
         }
     };
 }
-impl_preinv_for_prim_int!(u8, u16);
-impl_preinv_for_prim_int!(u16, u32);
-impl_preinv_for_prim_int!(u32, u64);
-impl_preinv_for_prim_int!(u64, u128);
+impl_preinv_for_prim_int!(u8, u8_impl);
+impl_preinv_for_prim_int!(u16, u16_impl);
+impl_preinv_for_prim_int!(u32, u32_impl);
+impl_preinv_for_prim_int!(u64, u64_impl);
+impl_preinv_for_prim_int!(usize, usize_impl);
 
 // XXX: we could implement the div_exact for big integers, in a similar way to support double width
 // REF: https://gmplib.org/manual/Exact-Division

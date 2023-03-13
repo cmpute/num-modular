@@ -27,8 +27,8 @@
 //
 // The latter two versions are efficient and practical for use.
 
-use crate::{Reducer, ModularUnaryOps, DivExact};
-use crate::reduced::{Vanilla, impl_reduced_binary_pow};
+use crate::reduced::{impl_reduced_binary_pow, Vanilla};
+use crate::{DivExact, ModularUnaryOps, Reducer};
 
 /// Divide a Word by a prearranged divisor.
 ///
@@ -50,10 +50,10 @@ macro_rules! impl_premulinv_1by1_for {
         impl PreMulInv1by1<$T> {
             pub const fn new(divisor: $T) -> Self {
                 debug_assert!(divisor > 1);
-        
+
                 // n = ceil(log2(divisor))
                 let n = <$T>::BITS - (divisor - 1).leading_zeros();
-        
+
                 /* Calculate:
                  * m = floor(B * 2^n / divisor) + 1 - B
                  * m >= B + 1 - B >= 1
@@ -68,7 +68,7 @@ macro_rules! impl_premulinv_1by1_for {
                  * divisor * (B + m) = divisor * floor(B * 2^n / divisor + 1)
                  * = B * 2^n + k, 1 <= k <= divisor
                  */
-        
+
                 // m = floor(B * (2^n-1 - (divisor-1)) / divisor) + 1
                 let (lo, _hi) = split(merge(0, ones(n) - (divisor - 1)) / extend(divisor));
                 debug_assert!(_hi == 0);
@@ -77,7 +77,7 @@ macro_rules! impl_premulinv_1by1_for {
                     m: lo + 1,
                 }
             }
-        
+
             /// (a / divisor, a % divisor)
             #[inline]
             pub const fn div_rem(&self, a: $T, d: $T) -> ($T, $T) {
@@ -95,7 +95,7 @@ macro_rules! impl_premulinv_1by1_for {
                  *
                  * Therefore the floor is always the exact quotient.
                  */
-        
+
                 // t = m * n / B
                 let (_, t) = split(wmul(self.m, a));
                 // q = (t + a) / 2^n = (t + (a - t)/2) / 2^(n-1)
@@ -189,26 +189,26 @@ macro_rules! impl_normdiv_2by1_for {
                 let r = a_lo.wrapping_sub(q.wrapping_mul(self.divisor));
 
                 /* Theorem: max(-d, q0+1-B) <= r < max(B-d, q0)
-                * Proof:
-                * r = a - q * d = a - q1 * d - d
-                * = a - (q1 * B + q0 - q0) * d/B - d
-                * = a - (m * a_hi + a - q0) * d/B - d
-                * = a - ((m+B) * a_hi + a_lo - q0) * d/B - d
-                * = a - ((B^2-k)/d * a_hi + a_lo - q0) * d/B - d
-                * = a - B * a_hi + (a_hi * k - a_lo * d + q0 * d) / B - d
-                * = (a_hi * k + a_lo * (B - d) + q0 * d) / B - d
-                *
-                * r >= q0 * d / B - d
-                * r >= -d
-                * r >= d/B (q0 - B) > q0-B
-                * r >= max(-d, q0+1-B)
-                *
-                * r < (d * d + B * (B-d) + q0 * d) / B - d
-                * = (B-d)^2 / B + q0 * d / B
-                * = (1 - d/B) * (B-d) + (d/B) * q0
-                * <= max(B-d, q0)
-                * QED
-                */
+                 * Proof:
+                 * r = a - q * d = a - q1 * d - d
+                 * = a - (q1 * B + q0 - q0) * d/B - d
+                 * = a - (m * a_hi + a - q0) * d/B - d
+                 * = a - ((m+B) * a_hi + a_lo - q0) * d/B - d
+                 * = a - ((B^2-k)/d * a_hi + a_lo - q0) * d/B - d
+                 * = a - B * a_hi + (a_hi * k - a_lo * d + q0 * d) / B - d
+                 * = (a_hi * k + a_lo * (B - d) + q0 * d) / B - d
+                 *
+                 * r >= q0 * d / B - d
+                 * r >= -d
+                 * r >= d/B (q0 - B) > q0-B
+                 * r >= max(-d, q0+1-B)
+                 *
+                 * r < (d * d + B * (B-d) + q0 * d) / B - d
+                 * = (B-d)^2 / B + q0 * d / B
+                 * = (1 - d/B) * (B-d) + (d/B) * q0
+                 * <= max(B-d, q0)
+                 * QED
+                 */
 
                 // if r mod B > q0 { q -= 1; r += d; }
                 //
@@ -273,7 +273,7 @@ macro_rules! impl_premulinv_2by1_reducer_for {
             fn is_zero(&self, target: &$T) -> bool {
                 *target == 0
             }
-        
+
             #[inline(always)]
             fn add(&self, lhs: $T, rhs: $T) -> $T {
                 Vanilla::<$T>::add(&self.div.divisor, lhs, rhs)
@@ -290,10 +290,12 @@ macro_rules! impl_premulinv_2by1_reducer_for {
             fn neg(&self, target: $T) -> $T {
                 Vanilla::<$T>::neg(&self.div.divisor, target)
             }
-    
+
             #[inline(always)]
             fn inv(&self, target: $T) -> Option<$T> {
-                self.residue(target).invm(&self.modulus()).map(|v| v << self.shift)
+                self.residue(target)
+                    .invm(&self.modulus())
+                    .map(|v| v << self.shift)
             }
             #[inline]
             fn mul(&self, lhs: $T, rhs: $T) -> $T {
@@ -303,7 +305,7 @@ macro_rules! impl_premulinv_2by1_reducer_for {
             fn square(&self, target: $T) -> $T {
                 self.div.div_rem_2by1(wsqr(target) >> self.shift).1
             }
-        
+
             impl_reduced_binary_pow!($T, $T);
         }
     };
@@ -423,7 +425,7 @@ macro_rules! impl_normdiv_3by2_for {
                 (merge(q0, q1), r0)
             }
         }
-    }
+    };
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -464,7 +466,7 @@ macro_rules! impl_premulinv_3by2_reducer_for {
             fn is_zero(&self, target: &$D) -> bool {
                 *target == 0
             }
-        
+
             #[inline(always)]
             fn add(&self, lhs: $D, rhs: $D) -> $D {
                 Vanilla::<$D>::add(&self.div.divisor, lhs, rhs)
@@ -481,10 +483,12 @@ macro_rules! impl_premulinv_3by2_reducer_for {
             fn neg(&self, target: $D) -> $D {
                 Vanilla::<$D>::neg(&self.div.divisor, target)
             }
-    
+
             #[inline(always)]
             fn inv(&self, target: $D) -> Option<$D> {
-                self.residue(target).invm(&self.modulus()).map(|v| v << self.shift)
+                self.residue(target)
+                    .invm(&self.modulus())
+                    .map(|v| v << self.shift)
             }
             #[inline]
             fn mul(&self, lhs: $D, rhs: $D) -> $D {
@@ -498,7 +502,7 @@ macro_rules! impl_premulinv_3by2_reducer_for {
                 let (lo, hi) = DoubleWordModule::split(prod);
                 self.div.div_rem_4by2(lo, hi).1
             }
-        
+
             impl_reduced_binary_pow!($D, $D);
         }
     };
@@ -618,12 +622,12 @@ mod tests {
             let d = rng.gen_range(DoubleWord::MAX / 2 + 1..=DoubleWord::MAX);
             let q = rng.gen();
             let r = rng.gen_range(0..d);
-            let (a_lo, a_hi) = split(wmul(q, d) + extend(r));
+            let (a_lo, a_hi) = split(wmul(q, d) + r as DoubleWord);
             let fast_div = Divider::new(d);
             assert_eq!(fast_div.div_rem_4by2(a_lo, a_hi), (q, r));
         }
     }
-    
+
     #[test]
     fn test_2by1_against_modops() {
         for _ in 0..10 {
@@ -635,7 +639,7 @@ mod tests {
             ReducedTester::<usize>::test_against_modops::<PreMulInv2by1<usize>>();
         }
     }
-    
+
     #[test]
     fn test_3by2_against_modops() {
         for _ in 0..10 {

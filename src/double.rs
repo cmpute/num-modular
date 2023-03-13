@@ -35,7 +35,10 @@ pub struct udouble {
 }
 
 impl udouble {
-    pub const MAX: Self = Self { lo: umax::MAX, hi: umax::MAX };
+    pub const MAX: Self = Self {
+        lo: umax::MAX,
+        hi: umax::MAX,
+    };
 
     //> (used in u128::addm)
     #[inline]
