@@ -281,6 +281,49 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<
 #[derive(Debug, Clone, Copy)]
 pub struct Vanilla<T>(T);
 
+macro_rules! impl_uprim_vanilla_core_const {
+    ($($T:ty)*) => {$(
+        // These methods are for internal use only, wait for the introduction of const Trait in Rust
+        impl Vanilla<$T> {
+            #[inline]
+            pub(crate) const fn add(m: &$T, lhs: $T, rhs: $T) -> $T {
+                let (sum, overflow) = lhs.overflowing_add(rhs);
+                if overflow {
+                    sum + m.wrapping_neg()
+                } else if sum >= *m {
+                    sum - *m
+                } else {
+                    sum
+                }
+            }
+
+            #[inline]
+            pub(crate) const fn double(m: &$T, target: $T) -> $T {
+                Self::add(m, target, target)
+            }
+
+            #[inline]
+            pub(crate) const fn sub(m: &$T, lhs: $T, rhs: $T) -> $T {
+                if lhs >= rhs {
+                    lhs - rhs
+                } else {
+                    *m - (rhs - lhs)
+                }
+            }
+
+            #[inline]
+            pub(crate) const fn neg(m: &$T, target: $T) -> $T {
+                if target == 0 {
+                    0
+                } else {
+                    *m - target
+                }
+            }
+        }
+    )*};
+}
+impl_uprim_vanilla_core_const!(u8 u16 u32 u64 u128 usize);
+
 macro_rules! impl_reduced_binary_pow {
     ($T:ty, $M:ty) => {
         fn pow(&self, base: $T, exp: $T) -> $T {
@@ -331,39 +374,24 @@ macro_rules! impl_uprim_vanilla_core {
             *target == 0
         }
 
-        #[inline]
+        #[inline(always)]
         fn add(&self, lhs: $single, rhs: $single) -> $single {
-            let (sum, overflow) = lhs.overflowing_add(rhs);
-            if overflow {
-                sum + self.0.wrapping_neg()
-            } else if sum >= self.0 {
-                sum - self.0
-            } else {
-                sum
-            }
+            Vanilla::<$single>::add(&self.0, lhs, rhs)
         }
 
-        #[inline]
+        #[inline(always)]
         fn double(&self, target: $single) -> $single {
-            self.add(target, target)
+            Vanilla::<$single>::double(&self.0, target)
         }
 
-        #[inline]
+        #[inline(always)]
         fn sub(&self, lhs: $single, rhs: $single) -> $single {
-            if lhs >= rhs {
-                lhs - rhs
-            } else {
-                self.0 - (rhs - lhs)
-            }
+            Vanilla::<$single>::sub(&self.0, lhs, rhs)
         }
 
-        #[inline]
+        #[inline(always)]
         fn neg(&self, target: $single) -> $single {
-            if target == 0 {
-                0
-            } else {
-                self.0 - target
-            }
+            Vanilla::<$single>::neg(&self.0, target)
         }
 
         #[inline(always)]

@@ -1,6 +1,6 @@
 use crate::{DivExact, ModularUnaryOps};
 
-/// Pre-computation for fast divisibility check.
+/// Pre-computing the modular inverse for fast divisibility check.
 ///
 /// This struct stores the modular inverse of a divisor, and a limit for divisibility check.
 /// See <https://math.stackexchange.com/a/1251328> for the explanation of the trick
@@ -90,11 +90,11 @@ impl_preinv_for_prim_int!(u64, u128);
 
 // XXX: we could implement the div_exact for big integers, in a similar way to support double width
 // REF: https://gmplib.org/manual/Exact-Division
+//      GMP `mpz_divexact`, `mpn_divexact`
 
 // XXX: unchecked div_exact can be introduced by not checking the q_lim,
 //      investigate this after `exact_div` is introduced or removed from core lib
 //      https://github.com/rust-lang/rust/issues/85122
-// REF: GMP `mpz_divexact`, `mpn_divexact`
 
 #[cfg(test)]
 mod tests {

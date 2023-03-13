@@ -27,7 +27,7 @@
 //
 // The latter two versions are efficient and practical for use.
 
-use crate::{Reducer, ModularUnaryOps};
+use crate::{Reducer, ModularUnaryOps, DivExact};
 use crate::reduced::{Vanilla, impl_reduced_binary_pow};
 
 /// Divide a Word by a prearranged divisor.
@@ -36,9 +36,6 @@ use crate::reduced::{Vanilla, impl_reduced_binary_pow};
 /// Algorithm 4.1.
 #[derive(Debug, Clone, Copy)]
 pub struct PreMulInv1by1<T> {
-    // 2 <= divisor < 2^N, N = T::BITS
-    divisor: T,
-
     // Let n = ceil(log_2(divisor))
     // 2^(n-1) < divisor <= 2^n
     // m = floor(B * 2^n / divisor) + 1 - B, where B = 2^N
@@ -76,7 +73,6 @@ macro_rules! impl_premulinv_1by1_for {
                 let (lo, _hi) = split(merge(0, ones(n) - (divisor - 1)) / extend(divisor));
                 debug_assert!(_hi == 0);
                 Self {
-                    divisor,
                     shift: n - 1,
                     m: lo + 1,
                 }
@@ -84,7 +80,7 @@ macro_rules! impl_premulinv_1by1_for {
         
             /// (a / divisor, a % divisor)
             #[inline]
-            pub const fn div_rem(&self, a: $T) -> ($T, $T) {
+            pub const fn div_rem(&self, a: $T, d: $T) -> ($T, $T) {
                 // q = floor( (B + m) * a / (B * 2^n) )
                 /*
                  * Remember that divisor * (B + m) = B * 2^n + k, 1 <= k <= 2^n
@@ -104,8 +100,22 @@ macro_rules! impl_premulinv_1by1_for {
                 let (_, t) = split(wmul(self.m, a));
                 // q = (t + a) / 2^n = (t + (a - t)/2) / 2^(n-1)
                 let q = (t + ((a - t) >> 1)) >> self.shift;
-                let r = a - q * self.divisor;
+                let r = a - q * d;
                 (q, r)
+            }
+        }
+
+        impl DivExact<$T, PreMulInv1by1<$T>> for $T {
+            type Output = $T;
+
+            #[inline]
+            fn div_exact(self, d: $T, pre: &PreMulInv1by1<$T>) -> Option<Self::Output> {
+                let (q, r) = pre.div_rem(self, d);
+                if r == 0 {
+                    Some(q)
+                } else {
+                    None
+                }
             }
         }
     };
@@ -266,19 +276,19 @@ macro_rules! impl_premulinv_2by1_reducer_for {
         
             #[inline(always)]
             fn add(&self, lhs: $T, rhs: $T) -> $T {
-                Vanilla::<$T>::new(&self.div.divisor).add(lhs, rhs)
+                Vanilla::<$T>::add(&self.div.divisor, lhs, rhs)
             }
             #[inline(always)]
             fn double(&self, target: $T) -> $T {
-                Vanilla::<$T>::new(&self.div.divisor).double(target)
+                Vanilla::<$T>::double(&self.div.divisor, target)
             }
             #[inline(always)]
             fn sub(&self, lhs: $T, rhs: $T) -> $T {
-                Vanilla::<$T>::new(&self.div.divisor).sub(lhs, rhs)
+                Vanilla::<$T>::sub(&self.div.divisor, lhs, rhs)
             }
             #[inline(always)]
             fn neg(&self, target: $T) -> $T {
-                Vanilla::<$T>::new(&self.div.divisor).neg(target)
+                Vanilla::<$T>::neg(&self.div.divisor, target)
             }
     
             #[inline(always)]
@@ -457,19 +467,19 @@ macro_rules! impl_premulinv_3by2_reducer_for {
         
             #[inline(always)]
             fn add(&self, lhs: $D, rhs: $D) -> $D {
-                Vanilla::<$D>::new(&self.div.divisor).add(lhs, rhs)
+                Vanilla::<$D>::add(&self.div.divisor, lhs, rhs)
             }
             #[inline(always)]
             fn double(&self, target: $D) -> $D {
-                Vanilla::<$D>::new(&self.div.divisor).double(target)
+                Vanilla::<$D>::double(&self.div.divisor, target)
             }
             #[inline(always)]
             fn sub(&self, lhs: $D, rhs: $D) -> $D {
-                Vanilla::<$D>::new(&self.div.divisor).sub(lhs, rhs)
+                Vanilla::<$D>::sub(&self.div.divisor, lhs, rhs)
             }
             #[inline(always)]
             fn neg(&self, target: $D) -> $D {
-                Vanilla::<$D>::new(&self.div.divisor).neg(target)
+                Vanilla::<$D>::neg(&self.div.divisor, target)
             }
     
             #[inline(always)]
@@ -493,8 +503,6 @@ macro_rules! impl_premulinv_3by2_reducer_for {
         }
     };
 }
-
-// TODO: impl DivExact<u64> for PreMulInv1by1<u64> (remove divider from PreMulInv1by1?)
 
 macro_rules! collect_impls {
     ($T:ident, $ns:ident) => {
@@ -532,9 +540,15 @@ mod tests {
             let d = rng.gen_range(max_d / 2 + 1..=max_d);
             let fast_div = PreMulInv1by1::<Word>::new(d);
             let n = rng.gen();
-            let (q, r) = fast_div.div_rem(n);
+            let (q, r) = fast_div.div_rem(n, d);
             assert_eq!(q, n / d);
             assert_eq!(r, n % d);
+
+            if r == 0 {
+                assert_eq!(n.div_exact(d, &fast_div), Some(q));
+            } else {
+                assert_eq!(n.div_exact(d, &fast_div), None);
+            }
         }
     }
 

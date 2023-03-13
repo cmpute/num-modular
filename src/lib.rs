@@ -35,8 +35,6 @@
 // REF: https://github.com/ridiculousfish/libdivide/
 // REF: Faster Interleaved Modular Multiplication Based on Barrett and Montgomery Reduction Methods (work for modulus in certain form)
 
-// TODO(0.5.x): Make the dependency on num-integer and num-traits optional (they are only required for num-bigint implementations)
-
 #![no_std]
 #[cfg(any(feature = "std", test))]
 extern crate std;
@@ -200,10 +198,10 @@ pub trait ModularInteger:
     /// Calculate the value of self * self
     fn square(self) -> Self;
 }
-// XXX: implement this trait for ff::PrimeField?
+
+// XXX: implement ModularInteger for ff::PrimeField?
 // TODO: implement invm_range (Modular inverse in certain range) and crt (Chinese Remainder Theorem), REF: bubblemath crate
 
-// TODO(v0.6): Refactor DivExact to don't take additional Precompute args. Store the divisor directly in PreModInv (lib ubig)
 /// Utility function for exact division, with precomputed helper values
 ///
 /// # Available Pre-computation types:

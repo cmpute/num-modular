@@ -117,23 +117,22 @@ macro_rules! impl_uprim_montgomery_core {
 
         #[inline(always)]
         fn add(&self, lhs: $single, rhs: $single) -> $single {
-            // TODO: move this to standalone methods, which could improve performance
-            Vanilla::<$single>::new(&self.1).add(lhs, rhs)
+            Vanilla::<$single>::add(&self.1, lhs, rhs)
         }
 
         #[inline(always)]
         fn double(&self, target: $single) -> $single {
-            Vanilla::<$single>::new(&self.1).double(target)
+            Vanilla::<$single>::double(&self.1, target)
         }
 
         #[inline(always)]
         fn sub(&self, lhs: $single, rhs: $single) -> $single {
-            Vanilla::<$single>::new(&self.1).sub(lhs, rhs)
+            Vanilla::<$single>::sub(&self.1, lhs, rhs)
         }
 
         #[inline(always)]
         fn neg(&self, target: $single) -> $single {
-            Vanilla::<$single>::new(&self.1).neg(target)
+            Vanilla::<$single>::neg(&self.1, target)
         }
 
         #[inline(always)]
