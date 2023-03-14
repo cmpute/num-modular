@@ -105,7 +105,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
     }
 
     #[inline]
-    fn add(&self, lhs: umax, rhs: umax) -> umax {
+    fn add(&self, lhs: &umax, rhs: &umax) -> umax {
         let mut sum = lhs + rhs;
         if sum >= Self::MODULUS {
             sum -= Self::MODULUS
@@ -113,7 +113,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         sum
     }
     #[inline]
-    fn sub(&self, lhs: umax, rhs: umax) -> umax {
+    fn sub(&self, lhs: &umax, rhs: &umax) -> umax {
         if lhs >= rhs {
             lhs - rhs
         } else {
@@ -122,7 +122,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
     }
     #[inline]
     fn double(&self, target: umax) -> umax {
-        self.add(target, target)
+        self.add(&target, &target)
     }
     #[inline]
     fn neg(&self, target: umax) -> umax {
@@ -133,11 +133,11 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         }
     }
     #[inline]
-    fn mul(&self, lhs: umax, rhs: umax) -> umax {
+    fn mul(&self, lhs: &umax, rhs: &umax) -> umax {
         if (P as u32) < (umax::BITS / 2) {
             Self::reduce_single(lhs * rhs)
         } else {
-            Self::reduce_double(udouble::widening_mul(lhs, rhs))
+            Self::reduce_double(udouble::widening_mul(*lhs, *rhs))
         }
     }
     #[inline]
@@ -212,9 +212,9 @@ mod tests {
                 let r = <$M>::new(&P);
                 let am = r.transform($a);
                 let bm = r.transform($b);
-                assert_eq!(r.add(am, bm), $a.addm($b, &P));
-                assert_eq!(r.sub(am, bm), $a.subm($b, &P));
-                assert_eq!(r.mul(am, bm), $a.mulm($b, &P));
+                assert_eq!(r.add(&am, &bm), $a.addm($b, &P));
+                assert_eq!(r.sub(&am, &bm), $a.subm($b, &P));
+                assert_eq!(r.mul(&am, &bm), $a.mulm($b, &P));
                 assert_eq!(r.neg(am), $a.negm(&P));
                 assert_eq!(r.inv(am), $a.invm(&P));
                 assert_eq!(r.double(am), $a.dblm(&P));

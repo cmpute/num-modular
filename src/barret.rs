@@ -238,20 +238,43 @@ macro_rules! impl_normdiv_2by1_for {
     };
 }
 
+/// A wrapper of [Normalized2by1Divider] that can be used as a [Reducer]
 #[derive(Debug, Clone, Copy)]
 pub struct PreMulInv2by1<T> {
     div: Normalized2by1Divider<T>,
     shift: u32,
 }
 
+impl<T> PreMulInv2by1<T> {
+    #[inline]
+    pub fn divider(&self) -> &Normalized2by1Divider<T> {
+        &self.div
+    }
+    #[inline]
+    pub fn shift(&self) -> u32 {
+        self.shift
+    }
+}
+
 macro_rules! impl_premulinv_2by1_reducer_for {
     ($T:ty) => {
+        impl PreMulInv2by1<$T> {
+            #[inline]
+            pub const fn new(divisor: $T) -> Self {
+                let shift = divisor.leading_zeros();
+                let div = Normalized2by1Divider::<$T>::new(divisor << shift);
+                Self { div, shift }
+            }
+            #[inline]
+            pub const fn divisor(&self) -> $T {
+                self.div.divisor >> self.shift
+            }
+        }
+
         impl Reducer<$T> for PreMulInv2by1<$T> {
             #[inline]
             fn new(m: &$T) -> Self {
-                let shift = m.leading_zeros();
-                let div = Normalized2by1Divider::<$T>::new(m << shift);
-                Self { div, shift }
+                PreMulInv2by1::<$T>::new(*m)
             }
             #[inline]
             fn transform(&self, target: $T) -> $T {
@@ -275,16 +298,16 @@ macro_rules! impl_premulinv_2by1_reducer_for {
             }
 
             #[inline(always)]
-            fn add(&self, lhs: $T, rhs: $T) -> $T {
-                Vanilla::<$T>::add(&self.div.divisor, lhs, rhs)
+            fn add(&self, lhs: &$T, rhs: &$T) -> $T {
+                Vanilla::<$T>::add(&self.div.divisor, *lhs, *rhs)
             }
             #[inline(always)]
             fn double(&self, target: $T) -> $T {
                 Vanilla::<$T>::double(&self.div.divisor, target)
             }
             #[inline(always)]
-            fn sub(&self, lhs: $T, rhs: $T) -> $T {
-                Vanilla::<$T>::sub(&self.div.divisor, lhs, rhs)
+            fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
+                Vanilla::<$T>::sub(&self.div.divisor, *lhs, *rhs)
             }
             #[inline(always)]
             fn neg(&self, target: $T) -> $T {
@@ -298,8 +321,8 @@ macro_rules! impl_premulinv_2by1_reducer_for {
                     .map(|v| v << self.shift)
             }
             #[inline]
-            fn mul(&self, lhs: $T, rhs: $T) -> $T {
-                self.div.div_rem_2by1(wmul(lhs >> self.shift, rhs)).1
+            fn mul(&self, lhs: &$T, rhs: &$T) -> $T {
+                self.div.div_rem_2by1(wmul(lhs >> self.shift, *rhs)).1
             }
             #[inline]
             fn square(&self, target: $T) -> $T {
@@ -428,14 +451,40 @@ macro_rules! impl_normdiv_3by2_for {
     };
 }
 
+/// A wrapper of [Normalized3by2Divider] that can be used as a [Reducer]
 #[derive(Debug, Clone, Copy)]
 pub struct PreMulInv3by2<T, D> {
     div: Normalized3by2Divider<T, D>,
     shift: u32,
 }
 
+impl<T, D> PreMulInv3by2<T, D> {
+    #[inline]
+    pub fn divider(&self) -> &Normalized3by2Divider<T, D> {
+        &self.div
+    }
+    #[inline]
+    pub fn shift(&self) -> u32 {
+        self.shift
+    }
+}
+
 macro_rules! impl_premulinv_3by2_reducer_for {
-    ($T:ty, $D:ty) => {
+    ($T:ty, $D:ty) => {        
+        impl PreMulInv3by2<$T, $D> {
+            #[inline]
+            pub const fn new(divisor: $D) -> Self {
+                let shift = divisor.leading_zeros();
+                let div = Normalized3by2Divider::<$T, $D>::new(divisor << shift);
+                Self { div, shift }
+            }
+
+            #[inline]
+            pub const fn divisor(&self) -> $D {
+                self.div.divisor >> self.shift
+            }
+        }
+
         impl Reducer<$D> for PreMulInv3by2<$T, $D> {
             #[inline]
             fn new(m: &$D) -> Self {
@@ -468,16 +517,16 @@ macro_rules! impl_premulinv_3by2_reducer_for {
             }
 
             #[inline(always)]
-            fn add(&self, lhs: $D, rhs: $D) -> $D {
-                Vanilla::<$D>::add(&self.div.divisor, lhs, rhs)
+            fn add(&self, lhs: &$D, rhs: &$D) -> $D {
+                Vanilla::<$D>::add(&self.div.divisor, *lhs, *rhs)
             }
             #[inline(always)]
             fn double(&self, target: $D) -> $D {
                 Vanilla::<$D>::double(&self.div.divisor, target)
             }
             #[inline(always)]
-            fn sub(&self, lhs: $D, rhs: $D) -> $D {
-                Vanilla::<$D>::sub(&self.div.divisor, lhs, rhs)
+            fn sub(&self, lhs: &$D, rhs: &$D) -> $D {
+                Vanilla::<$D>::sub(&self.div.divisor, *lhs, *rhs)
             }
             #[inline(always)]
             fn neg(&self, target: $D) -> $D {
@@ -491,8 +540,8 @@ macro_rules! impl_premulinv_3by2_reducer_for {
                     .map(|v| v << self.shift)
             }
             #[inline]
-            fn mul(&self, lhs: $D, rhs: $D) -> $D {
-                let prod = DoubleWordModule::wmul(lhs >> self.shift, rhs);
+            fn mul(&self, lhs: &$D, rhs: &$D) -> $D {
+                let prod = DoubleWordModule::wmul(lhs >> self.shift, *rhs);
                 let (lo, hi) = DoubleWordModule::split(prod);
                 self.div.div_rem_4by2(lo, hi).1
             }

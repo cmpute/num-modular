@@ -70,7 +70,7 @@ macro_rules! impl_binops {
             fn $method(self, rhs: Self) -> Self::Output {
                 self.check_modulus_eq(&rhs);
                 let Self { a, r } = self;
-                let a = r.$method(a, rhs.a);
+                let a = r.$method(&a, &rhs.a);
                 Self { a, r }
             }
         }
@@ -81,7 +81,7 @@ macro_rules! impl_binops {
             fn $method(self, rhs: &Self) -> Self::Output {
                 self.check_modulus_eq(&rhs);
                 let Self { a, r } = self;
-                let a = r.$method(a, rhs.a.clone());
+                let a = r.$method(&a, &rhs.a);
                 Self { a, r }
             }
         }
@@ -92,7 +92,7 @@ macro_rules! impl_binops {
             fn $method(self, rhs: ReducedInt<T, R>) -> Self::Output {
                 self.check_modulus_eq(&rhs);
                 let ReducedInt { a, r } = rhs;
-                let a = r.$method(self.a.clone(), a);
+                let a = r.$method(&self.a, &a);
                 ReducedInt { a, r }
             }
         }
@@ -104,7 +104,7 @@ macro_rules! impl_binops {
             #[inline]
             fn $method(self, rhs: &ReducedInt<T, R>) -> Self::Output {
                 self.check_modulus_eq(&rhs);
-                let a = self.r.$method(self.a.clone(), rhs.a.clone());
+                let a = self.r.$method(&self.a, &rhs.a);
                 ReducedInt {
                     a,
                     r: self.r.clone(),
@@ -117,7 +117,7 @@ macro_rules! impl_binops {
             fn $method(self, rhs: T) -> Self::Output {
                 let Self { a, r } = self;
                 let rhs = r.transform(rhs);
-                let a = r.$method(a, rhs);
+                let a = r.$method(&a, &rhs);
                 Self { a, r }
             }
         }
@@ -173,7 +173,7 @@ impl<T: PartialEq, R: Reducer<T>> Div for ReducedInt<T, R> {
     fn div(self, rhs: Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let ReducedInt { a, r } = rhs;
-        let a = r.mul(self.a, r.inv(a).expect(INV_ERR_MSG));
+        let a = r.mul(&self.a, &r.inv(a).expect(INV_ERR_MSG));
         ReducedInt { a, r }
     }
 }
@@ -183,7 +183,7 @@ impl<T: PartialEq + Clone, R: Reducer<T>> Div<&ReducedInt<T, R>> for ReducedInt<
     fn div(self, rhs: &Self) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let Self { a, r } = self;
-        let a = r.mul(a, r.inv(rhs.a.clone()).expect(INV_ERR_MSG));
+        let a = r.mul(&a, &r.inv(rhs.a.clone()).expect(INV_ERR_MSG));
         ReducedInt { a, r }
     }
 }
@@ -193,7 +193,7 @@ impl<T: PartialEq + Clone, R: Reducer<T>> Div<ReducedInt<T, R>> for &ReducedInt<
     fn div(self, rhs: ReducedInt<T, R>) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let ReducedInt { a, r } = rhs;
-        let a = r.mul(self.a.clone(), r.inv(a).expect(INV_ERR_MSG));
+        let a = r.mul(&self.a, &r.inv(a).expect(INV_ERR_MSG));
         ReducedInt { a, r }
     }
 }
@@ -203,8 +203,8 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Div<&ReducedInt<T, R>> for &Re
     fn div(self, rhs: &ReducedInt<T, R>) -> Self::Output {
         self.check_modulus_eq(&rhs);
         let a = self.r.mul(
-            self.a.clone(),
-            self.r.inv(rhs.a.clone()).expect(INV_ERR_MSG),
+            &self.a,
+            &self.r.inv(rhs.a.clone()).expect(INV_ERR_MSG),
         );
         ReducedInt {
             a,
@@ -288,10 +288,10 @@ macro_rules! impl_uprim_vanilla_core_const {
             #[inline]
             pub(crate) const fn add(m: &$T, lhs: $T, rhs: $T) -> $T {
                 let (sum, overflow) = lhs.overflowing_add(rhs);
-                if overflow {
-                    sum + m.wrapping_neg()
-                } else if sum >= *m {
-                    sum - *m
+                if overflow || sum >= *m {
+                    let (sum2, overflow2) = sum.overflowing_sub(*m);
+                    debug_assert!(overflow == overflow2);
+                    sum2
                 } else {
                     sum
                 }
@@ -336,7 +336,7 @@ macro_rules! impl_reduced_binary_pow {
                     let mut result = self.transform(1);
                     while exp > 0 {
                         if exp & 1 != 0 {
-                            result = self.mul(result, multi);
+                            result = self.mul(&result, &multi);
                         }
                         multi = self.square(multi);
                         exp >>= 1;
@@ -375,8 +375,8 @@ macro_rules! impl_uprim_vanilla_core {
         }
 
         #[inline(always)]
-        fn add(&self, lhs: $single, rhs: $single) -> $single {
-            Vanilla::<$single>::add(&self.0, lhs, rhs)
+        fn add(&self, lhs: &$single, rhs: &$single) -> $single {
+            Vanilla::<$single>::add(&self.0, *lhs, *rhs)
         }
 
         #[inline(always)]
@@ -385,8 +385,8 @@ macro_rules! impl_uprim_vanilla_core {
         }
 
         #[inline(always)]
-        fn sub(&self, lhs: $single, rhs: $single) -> $single {
-            Vanilla::<$single>::sub(&self.0, lhs, rhs)
+        fn sub(&self, lhs: &$single, rhs: &$single) -> $single {
+            Vanilla::<$single>::sub(&self.0, *lhs, *rhs)
         }
 
         #[inline(always)]
@@ -413,8 +413,8 @@ macro_rules! impl_uprim_vanilla {
                 impl_uprim_vanilla_core!($t);
 
                 #[inline]
-                fn mul(&self, lhs: $t, rhs: $t) -> $t {
-                    (wmul(lhs, rhs) % extend(self.0)) as $t
+                fn mul(&self, lhs: &$t, rhs: &$t) -> $t {
+                    (wmul(*lhs, *rhs) % extend(self.0)) as $t
                 }
 
                 #[inline]
@@ -436,8 +436,8 @@ impl Reducer<u128> for Vanilla<u128> {
     impl_uprim_vanilla_core!(u128);
 
     #[inline]
-    fn mul(&self, lhs: u128, rhs: u128) -> u128 {
-        udouble::widening_mul(lhs, rhs) % self.0
+    fn mul(&self, lhs: &u128, rhs: &u128) -> u128 {
+        udouble::widening_mul(*lhs, *rhs) % self.0
     }
 
     #[inline]

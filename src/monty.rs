@@ -116,8 +116,8 @@ macro_rules! impl_uprim_montgomery_core {
         }
 
         #[inline(always)]
-        fn add(&self, lhs: $single, rhs: $single) -> $single {
-            Vanilla::<$single>::add(&self.1, lhs, rhs)
+        fn add(&self, lhs: &$single, rhs: &$single) -> $single {
+            Vanilla::<$single>::add(&self.1, *lhs, *rhs)
         }
 
         #[inline(always)]
@@ -126,8 +126,8 @@ macro_rules! impl_uprim_montgomery_core {
         }
 
         #[inline(always)]
-        fn sub(&self, lhs: $single, rhs: $single) -> $single {
-            Vanilla::<$single>::sub(&self.1, lhs, rhs)
+        fn sub(&self, lhs: &$single, rhs: &$single) -> $single {
+            Vanilla::<$single>::sub(&self.1, *lhs, *rhs)
         }
 
         #[inline(always)]
@@ -166,8 +166,8 @@ macro_rules! impl_uprim_montgomery {
             }
 
             #[inline]
-            fn mul(&self, lhs: $single, rhs: $single) -> $single {
-                self.reduce((lhs as $double) * (rhs as $double))
+            fn mul(&self, lhs: &$single, rhs: &$single) -> $single {
+                self.reduce((*lhs as $double) * (*rhs as $double))
             }
 
             #[inline]
@@ -218,8 +218,8 @@ impl Reducer<u128> for Montgomery<u128, u128> {
     }
 
     #[inline]
-    fn mul(&self, lhs: u128, rhs: u128) -> u128 {
-        self.reduce(udouble::widening_mul(lhs, rhs))
+    fn mul(&self, lhs: &u128, rhs: &u128) -> u128 {
+        self.reduce(udouble::widening_mul(*lhs, *rhs))
     }
 
     #[inline]
@@ -266,7 +266,7 @@ mod tests {
         assert!(r.is_zero(&r.transform(0)));
         let five = r.transform(5u8);
         let six = r.transform(6u8);
-        assert!(r.is_zero(&r.add(five, six)));
+        assert!(r.is_zero(&r.add(&five, &six)));
 
         // random creation test
         for _ in 0..NRANDOM {
@@ -307,9 +307,9 @@ mod tests {
                 let (a, b) = (random::<$T>(), random::<$T>());
                 let am = r.transform(a);
                 let bm = r.transform(b);
-                assert_eq!(r.residue(r.add(am, bm)), a.addm(b, &m));
-                assert_eq!(r.residue(r.sub(am, bm)), a.subm(b, &m));
-                assert_eq!(r.residue(r.mul(am, bm)), a.mulm(b, &m));
+                assert_eq!(r.residue(r.add(&am, &bm)), a.addm(b, &m));
+                assert_eq!(r.residue(r.sub(&am, &bm)), a.subm(b, &m));
+                assert_eq!(r.residue(r.mul(&am, &bm)), a.mulm(b, &m));
                 assert_eq!(r.residue(r.neg(am)), a.negm(&m));
                 assert_eq!(r.inv(am).map(|v| r.residue(v)), a.invm(&m));
                 assert_eq!(r.residue(r.double(am)), a.dblm(&m));
