@@ -13,6 +13,15 @@ pub struct ReducedInt<T, R: Reducer<T>> {
     r: R,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ReducedIntRef<'a, T, R: Reducer<T>> {
+    /// The reduced representation of the integer in a modulo ring.
+    a: T,
+
+    /// Reference to the reducer for the integer
+    r: &'a R,
+}
+
 impl<T, R: Reducer<T>> ReducedInt<T, R> {
     /// Convert n into the modulo ring ℤ/mℤ (i.e. `n % m`)
     #[inline]
@@ -202,10 +211,9 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Div<&ReducedInt<T, R>> for &Re
     #[inline]
     fn div(self, rhs: &ReducedInt<T, R>) -> Self::Output {
         self.check_modulus_eq(&rhs);
-        let a = self.r.mul(
-            &self.a,
-            &self.r.inv(rhs.a.clone()).expect(INV_ERR_MSG),
-        );
+        let a = self
+            .r
+            .mul(&self.a, &self.r.inv(rhs.a.clone()).expect(INV_ERR_MSG));
         ReducedInt {
             a,
             r: self.r.clone(),
@@ -244,6 +252,7 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<
 
     #[inline(always)]
     fn residue(&self) -> T {
+        debug_assert!(self.r.check(&self.a));
         self.r.residue(self.a.clone())
     }
 
@@ -325,7 +334,7 @@ macro_rules! impl_uprim_vanilla_core_const {
 impl_uprim_vanilla_core_const!(u8 u16 u32 u64 u128 usize);
 
 macro_rules! impl_reduced_binary_pow {
-    ($T:ty, $M:ty) => {
+    ($T:ty) => {
         fn pow(&self, base: $T, exp: $T) -> $T {
             match exp {
                 1 => base,
@@ -360,6 +369,10 @@ macro_rules! impl_uprim_vanilla_core {
         #[inline(always)]
         fn transform(&self, target: $single) -> $single {
             target % self.0
+        }
+        #[inline(always)]
+        fn check(&self, target: &$single) -> bool {
+            *target < self.0
         }
         #[inline(always)]
         fn residue(&self, target: $single) -> $single {
@@ -399,7 +412,7 @@ macro_rules! impl_uprim_vanilla_core {
             target.invm(&self.0)
         }
 
-        impl_reduced_binary_pow!($single, $single);
+        impl_reduced_binary_pow!($single);
     };
 }
 
@@ -461,8 +474,12 @@ pub(crate) mod tests {
     macro_rules! impl_reduced_test_for {
         ($($T:ty)*) => {$(
             impl ReducedTester<$T> {
-                pub fn test_against_modops<R: Reducer<$T> + Copy>() {
-                    let m = random::<$T>().saturating_add(1);
+                pub fn test_against_modops<R: Reducer<$T> + Copy>(odd_only: bool) {
+                    let mut m = random::<$T>().saturating_add(1);
+                    if odd_only {
+                        m |= 1;
+                    }
+
                     let (a, b) = (random::<$T>(), random::<$T>());
                     let am = ReducedInt::<$T, R>::new(a, &m);
                     let bm = ReducedInt::<$T, R>::new(b, &m);
@@ -487,12 +504,12 @@ pub(crate) mod tests {
     #[test]
     fn test_against_modops() {
         for _ in 0..10 {
-            ReducedTester::<u8>::test_against_modops::<Vanilla<u8>>();
-            ReducedTester::<u16>::test_against_modops::<Vanilla<u16>>();
-            ReducedTester::<u32>::test_against_modops::<Vanilla<u32>>();
-            ReducedTester::<u64>::test_against_modops::<Vanilla<u64>>();
-            ReducedTester::<u128>::test_against_modops::<Vanilla<u128>>();
-            ReducedTester::<usize>::test_against_modops::<Vanilla<usize>>();
+            ReducedTester::<u8>::test_against_modops::<Vanilla<u8>>(false);
+            ReducedTester::<u16>::test_against_modops::<Vanilla<u16>>(false);
+            ReducedTester::<u32>::test_against_modops::<Vanilla<u32>>(false);
+            ReducedTester::<u64>::test_against_modops::<Vanilla<u64>>(false);
+            ReducedTester::<u128>::test_against_modops::<Vanilla<u128>>(false);
+            ReducedTester::<usize>::test_against_modops::<Vanilla<usize>>(false);
         }
     }
 }

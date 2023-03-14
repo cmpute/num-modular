@@ -91,6 +91,9 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
     fn transform(&self, target: umax) -> umax {
         Self::reduce_single(target)
     }
+    fn check(&self, target: &umax) -> bool {
+        *target < Self::MODULUS
+    }
     #[inline]
     fn residue(&self, target: umax) -> umax {
         target
@@ -159,7 +162,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         }
     }
 
-    impl_reduced_binary_pow!(umax, ());
+    impl_reduced_binary_pow!(umax);
 }
 
 #[cfg(test)]

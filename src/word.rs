@@ -19,8 +19,18 @@ macro_rules! simple_word_impl {
         }
 
         #[inline(always)]
+        pub const fn low(dw: DoubleWord) -> Word {
+            dw as Word
+        }
+
+        #[inline(always)]
+        pub const fn high(dw: DoubleWord) -> Word {
+            (dw >> Word::BITS) as Word
+        }
+
+        #[inline(always)]
         pub const fn split(dw: DoubleWord) -> (Word, Word) {
-            (dw as Word, (dw >> Word::BITS) as Word)
+            (low(dw), high(dw))
         }
 
         #[inline(always)]
@@ -28,14 +38,21 @@ macro_rules! simple_word_impl {
             extend(low) | extend(high) << Word::BITS
         }
 
+        /// Widening multiplication
         #[inline(always)]
         pub const fn wmul(a: Word, b: Word) -> DoubleWord {
             extend(a) * extend(b)
         }
 
+        /// Widening squaring
         #[inline(always)]
         pub const fn wsqr(a: Word) -> DoubleWord {
             extend(a) * extend(a)
+        }
+
+        /// Narrowing remainder
+        pub const fn nrem(n: DoubleWord, d: Word) -> Word {
+            (n % d as DoubleWord) as _
         }
     };
 }
@@ -71,20 +88,30 @@ pub mod u128 {
     pub type Word = u128;
     pub type DoubleWord = udouble;
 
-    // #[inline]
-    // pub const fn extend(word: Word) -> DoubleWord {
-    //     udouble { lo: word, hi: 0 }
-    // }
+    #[inline]
+    pub const fn extend(word: Word) -> DoubleWord {
+        udouble { lo: word, hi: 0 }
+    }
+
+    #[inline(always)]
+    pub const fn low(dw: DoubleWord) -> Word {
+        dw.lo
+    }
+
+    #[inline(always)]
+    pub const fn high(dw: DoubleWord) -> Word {
+        dw.hi
+    }
 
     #[inline]
     pub const fn split(dw: DoubleWord) -> (Word, Word) {
         (dw.lo, dw.hi)
     }
 
-    // #[inline]
-    // pub const fn merge(low: Word, high: Word) -> DoubleWord {
-    //     udouble { lo: low, hi: high }
-    // }
+    #[inline]
+    pub const fn merge(low: Word, high: Word) -> DoubleWord {
+        udouble { lo: low, hi: high }
+    }
 
     #[inline]
     pub const fn wmul(a: Word, b: Word) -> DoubleWord {
@@ -94,5 +121,10 @@ pub mod u128 {
     #[inline]
     pub const fn wsqr(a: Word) -> DoubleWord {
         udouble::widening_square(a)
+    }
+
+    #[inline]
+    pub fn nrem(n: DoubleWord, d: Word) -> Word {
+        n % d
     }
 }

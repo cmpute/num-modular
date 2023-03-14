@@ -226,6 +226,9 @@ pub trait Reducer<T> {
     /// Transform a normal integer into reduced form
     fn transform(&self, target: T) -> T;
 
+    /// Check whether target is a valid reduced form
+    fn check(&self, target: &T) -> bool;
+
     /// Get the modulus in original integer type
     fn modulus(&self) -> T;
 
@@ -236,19 +239,35 @@ pub trait Reducer<T> {
     fn is_zero(&self, target: &T) -> bool;
 
     /// Calculate (lhs + rhs) mod m in reduced form
-    fn add(&self, lhs: T, rhs: T) -> T;
+    fn add(&self, lhs: &T, rhs: &T) -> T;
+
+    fn add_assign(&self, lhs: &mut T, rhs: &T) {
+        *lhs = self.add(lhs, rhs)
+    }
 
     /// Calculate 2*target mod m
     fn double(&self, target: T) -> T;
 
     /// Calculate (lhs - rhs) mod m in reduced form
-    fn sub(&self, lhs: T, rhs: T) -> T;
+    fn sub(&self, lhs: &T, rhs: &T) -> T;
+
+    fn sub_assign(&self, lhs: &mut T, rhs: &T) {
+        *lhs = self.sub(lhs, rhs);
+    }
+
+    fn sub_assign_swap(&self, lhs: &T, rhs: &mut T) {
+        *rhs = self.sub(lhs, rhs);
+    }
 
     /// Calculate -monty mod m in reduced form
     fn neg(&self, target: T) -> T;
 
     /// Calculate (lhs * rhs) mod m in reduced form
-    fn mul(&self, lhs: T, rhs: T) -> T;
+    fn mul(&self, lhs: &T, rhs: &T) -> T;
+
+    fn mul_assign(&self, lhs: &mut T, rhs: &T) {
+        *lhs = self.mul(lhs, rhs);
+    }
 
     /// Calculate target^-1 mod m in reduced form,
     /// it may return None when there is no modular inverse.
@@ -271,7 +290,7 @@ mod reduced;
 mod word;
 
 pub use barret::{
-    Normalized2by1Divider, Normalized3by2Divider, PreMulInv1by1, PreMulInv2by1, PreMulInv3by2,
+    Normalized2by1Divisor, Normalized3by2Divisor, PreMulInv1by1, PreMulInv2by1, PreMulInv3by2,
 };
 pub use double::{udouble, umax};
 pub use mersenne::FixedMersenne;
@@ -280,7 +299,7 @@ pub use preinv::PreModInv;
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 
 /// An integer in modulo ring based on [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form)
-pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T, T>>;
+pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>;
 
 /// An integer in modulo ring with a fixed (pseudo) Mersenne number as modulus
 pub type FixedMersenneInt<const P: u8, const K: umax> = ReducedInt<umax, FixedMersenne<P, K>>;

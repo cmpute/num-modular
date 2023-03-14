@@ -34,7 +34,7 @@ use crate::{DivExact, ModularUnaryOps, Reducer};
 ///
 /// Granlund, Montgomerry "Division by Invariant Integers using Multiplication"
 /// Algorithm 4.1.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PreMulInv1by1<T> {
     // Let n = ceil(log_2(divisor))
     // 2^(n-1) < divisor <= 2^n
@@ -126,8 +126,8 @@ macro_rules! impl_premulinv_1by1_for {
 /// Assumes quotient fits in a Word.
 ///
 /// Möller, Granlund, "Improved division by invariant integers", Algorithm 4.
-#[derive(Debug, Clone, Copy)]
-pub struct Normalized2by1Divider<T> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Normalized2by1Divisor<T> {
     // Normalized (top bit must be set).
     divisor: T,
 
@@ -137,7 +137,7 @@ pub struct Normalized2by1Divider<T> {
 
 macro_rules! impl_normdiv_2by1_for {
     ($T:ty, $D:ty) => {
-        impl Normalized2by1Divider<$T> {
+        impl Normalized2by1Divisor<$T> {
             /// Calculate the inverse m > 0 of a normalized divisor (fit in a word), such that
             ///
             /// (m + B) * divisor = B^2 - k for some 1 <= k <= divisor
@@ -238,16 +238,16 @@ macro_rules! impl_normdiv_2by1_for {
     };
 }
 
-/// A wrapper of [Normalized2by1Divider] that can be used as a [Reducer]
-#[derive(Debug, Clone, Copy)]
+/// A wrapper of [Normalized2by1Divisor] that can be used as a [Reducer]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PreMulInv2by1<T> {
-    div: Normalized2by1Divider<T>,
+    div: Normalized2by1Divisor<T>,
     shift: u32,
 }
 
 impl<T> PreMulInv2by1<T> {
     #[inline]
-    pub fn divider(&self) -> &Normalized2by1Divider<T> {
+    pub fn divider(&self) -> &Normalized2by1Divisor<T> {
         &self.div
     }
     #[inline]
@@ -262,7 +262,7 @@ macro_rules! impl_premulinv_2by1_reducer_for {
             #[inline]
             pub const fn new(divisor: $T) -> Self {
                 let shift = divisor.leading_zeros();
-                let div = Normalized2by1Divider::<$T>::new(divisor << shift);
+                let div = Normalized2by1Divisor::<$T>::new(divisor << shift);
                 Self { div, shift }
             }
             #[inline]
@@ -283,6 +283,10 @@ macro_rules! impl_premulinv_2by1_reducer_for {
                 } else {
                     self.div.div_rem_2by1(extend(target) << self.shift).1
                 }
+            }
+            #[inline]
+            fn check(&self, target: &$T) -> bool {
+                *target < self.div.divisor && target & ones(self.shift) == 0
             }
             #[inline]
             fn residue(&self, target: $T) -> $T {
@@ -329,7 +333,7 @@ macro_rules! impl_premulinv_2by1_reducer_for {
                 self.div.div_rem_2by1(wsqr(target) >> self.shift).1
             }
 
-            impl_reduced_binary_pow!($T, $T);
+            impl_reduced_binary_pow!($T);
         }
     };
 }
@@ -340,8 +344,8 @@ macro_rules! impl_premulinv_2by1_reducer_for {
 ///
 /// Möller, Granlund, "Improved division by invariant integers"
 /// Algorithm 5.
-#[derive(Debug, Clone, Copy)]
-pub struct Normalized3by2Divider<T, D> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Normalized3by2Divisor<T, D> {
     // Top bit must be 1.
     divisor: D,
 
@@ -351,7 +355,7 @@ pub struct Normalized3by2Divider<T, D> {
 
 macro_rules! impl_normdiv_3by2_for {
     ($T:ty, $D:ty) => {
-        impl Normalized3by2Divider<$T, $D> {
+        impl Normalized3by2Divisor<$T, $D> {
             /// Calculate the inverse m > 0 of a normalized divisor (fit in a DoubleWord), such that
             ///
             /// (m + B) * divisor = B^3 - k for some 1 <= k <= divisor
@@ -360,7 +364,7 @@ macro_rules! impl_normdiv_3by2_for {
             #[inline]
             pub const fn invert_double_word(divisor: $D) -> $T {
                 let (d0, d1) = split(divisor);
-                let mut v = Normalized2by1Divider::<$T>::invert_word(d1);
+                let mut v = Normalized2by1Divisor::<$T>::invert_word(d1);
                 // then B^2 - d1 <= (B + v)d1 < B^2
 
                 let (mut p, c) = d1.wrapping_mul(v).overflowing_add(d0);
@@ -451,16 +455,16 @@ macro_rules! impl_normdiv_3by2_for {
     };
 }
 
-/// A wrapper of [Normalized3by2Divider] that can be used as a [Reducer]
-#[derive(Debug, Clone, Copy)]
+/// A wrapper of [Normalized3by2Divisor] that can be used as a [Reducer]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PreMulInv3by2<T, D> {
-    div: Normalized3by2Divider<T, D>,
+    div: Normalized3by2Divisor<T, D>,
     shift: u32,
 }
 
 impl<T, D> PreMulInv3by2<T, D> {
     #[inline]
-    pub fn divider(&self) -> &Normalized3by2Divider<T, D> {
+    pub fn divider(&self) -> &Normalized3by2Divisor<T, D> {
         &self.div
     }
     #[inline]
@@ -470,12 +474,12 @@ impl<T, D> PreMulInv3by2<T, D> {
 }
 
 macro_rules! impl_premulinv_3by2_reducer_for {
-    ($T:ty, $D:ty) => {        
+    ($T:ty, $D:ty) => {
         impl PreMulInv3by2<$T, $D> {
             #[inline]
             pub const fn new(divisor: $D) -> Self {
                 let shift = divisor.leading_zeros();
-                let div = Normalized3by2Divider::<$T, $D>::new(divisor << shift);
+                let div = Normalized3by2Divisor::<$T, $D>::new(divisor << shift);
                 Self { div, shift }
             }
 
@@ -488,8 +492,9 @@ macro_rules! impl_premulinv_3by2_reducer_for {
         impl Reducer<$D> for PreMulInv3by2<$T, $D> {
             #[inline]
             fn new(m: &$D) -> Self {
+                assert!(*m > <$T>::MAX as $D);
                 let shift = m.leading_zeros();
-                let div = Normalized3by2Divider::<$T, $D>::new(m << shift);
+                let div = Normalized3by2Divisor::<$T, $D>::new(m << shift);
                 Self { div, shift }
             }
             #[inline]
@@ -502,6 +507,10 @@ macro_rules! impl_premulinv_3by2_reducer_for {
                     let n12 = (extend(hi) << self.shift) | extend(carry);
                     self.div.div_rem_3by2(n0, n12).1
                 }
+            }
+            #[inline]
+            fn check(&self, target: &$D) -> bool {
+                *target < self.div.divisor && split(*target).0 & ones(self.shift) == 0
             }
             #[inline]
             fn residue(&self, target: $D) -> $D {
@@ -552,7 +561,7 @@ macro_rules! impl_premulinv_3by2_reducer_for {
                 self.div.div_rem_4by2(lo, hi).1
             }
 
-            impl_reduced_binary_pow!($D, $D);
+            impl_reduced_binary_pow!($D);
         }
     };
 }
@@ -608,7 +617,7 @@ mod tests {
     #[test]
     fn test_mul_inv_2by1() {
         type Word = u64;
-        type Divider = Normalized2by1Divider<Word>;
+        type Divider = Normalized2by1Divisor<Word>;
         use crate::word::u64::*;
 
         let fast_div = Divider::new(Word::MAX);
@@ -629,7 +638,7 @@ mod tests {
     fn test_mul_inv_3by2() {
         type Word = u64;
         type DoubleWord = u128;
-        type Divider = Normalized3by2Divider<Word, DoubleWord>;
+        type Divider = Normalized3by2Divisor<Word, DoubleWord>;
         use crate::word::u64::*;
 
         let d = DoubleWord::MAX;
@@ -663,7 +672,7 @@ mod tests {
     fn test_mul_inv_4by2() {
         type Word = u64;
         type DoubleWord = u128;
-        type Divider = Normalized3by2Divider<Word, DoubleWord>;
+        type Divider = Normalized3by2Divisor<Word, DoubleWord>;
         use crate::word::u128::*;
 
         let mut rng = StdRng::seed_from_u64(1);
@@ -680,22 +689,22 @@ mod tests {
     #[test]
     fn test_2by1_against_modops() {
         for _ in 0..10 {
-            ReducedTester::<u8>::test_against_modops::<PreMulInv2by1<u8>>();
-            ReducedTester::<u16>::test_against_modops::<PreMulInv2by1<u16>>();
-            ReducedTester::<u32>::test_against_modops::<PreMulInv2by1<u32>>();
-            ReducedTester::<u64>::test_against_modops::<PreMulInv2by1<u64>>();
+            ReducedTester::<u8>::test_against_modops::<PreMulInv2by1<u8>>(false);
+            ReducedTester::<u16>::test_against_modops::<PreMulInv2by1<u16>>(false);
+            ReducedTester::<u32>::test_against_modops::<PreMulInv2by1<u32>>(false);
+            ReducedTester::<u64>::test_against_modops::<PreMulInv2by1<u64>>(false);
             // ReducedTester::<u128>::test_against_modops::<PreMulInv2by1<u128>>();
-            ReducedTester::<usize>::test_against_modops::<PreMulInv2by1<usize>>();
+            ReducedTester::<usize>::test_against_modops::<PreMulInv2by1<usize>>(false);
         }
     }
 
     #[test]
     fn test_3by2_against_modops() {
         for _ in 0..10 {
-            ReducedTester::<u16>::test_against_modops::<PreMulInv3by2<u8, u16>>();
-            ReducedTester::<u32>::test_against_modops::<PreMulInv3by2<u16, u32>>();
-            ReducedTester::<u64>::test_against_modops::<PreMulInv3by2<u32, u64>>();
-            ReducedTester::<u128>::test_against_modops::<PreMulInv3by2<u64, u128>>();
+            ReducedTester::<u16>::test_against_modops::<PreMulInv3by2<u8, u16>>(false);
+            ReducedTester::<u32>::test_against_modops::<PreMulInv3by2<u16, u32>>(false);
+            ReducedTester::<u64>::test_against_modops::<PreMulInv3by2<u32, u64>>(false);
+            ReducedTester::<u128>::test_against_modops::<PreMulInv3by2<u64, u128>>(false);
         }
     }
 }
