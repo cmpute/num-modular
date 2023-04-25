@@ -1,6 +1,6 @@
 [package]
 name = "num-modular"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2018"
 
 repository = "https://github.com/cmpute/num-modular"
@@ -16,24 +16,21 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-num-integer = { version = "0.1.44", optional = true }
-num-traits = { version = "0.2.14", optional = true }
+num-integer = { version = "0.1.44", default_features = false, optional = true }
+num-traits = { version = "0.2.14", default_features = false, optional = true }
+num-bigint = { version = "0.4.3", default_features = false, optional = true }
 
-[dependencies.num-bigint]
-optional = true
-version = "0.4.3"
-default-features = false
 
 [dev-dependencies]
 rand = "0.8.4"
 
 [workspace]
-members = [
-  "bench",
-]
+members = ["bench"]
 
 [package.metadata.docs.rs]
 all-features = true
 
 [features]
-std = []
+default = ["std"]
+std = ["num-integer?/std", "num-traits?/std", "num-bigint?/std"]
+num-bigint = ["dep:num-bigint", "num-traits", "num-integer"]
