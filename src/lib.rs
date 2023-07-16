@@ -241,7 +241,7 @@ pub trait Reducer<T> {
     /// Calculate (lhs + rhs) mod m in reduced form
     fn add(&self, lhs: &T, rhs: &T) -> T;
 
-    fn add_assign(&self, lhs: &mut T, rhs: &T) {
+    fn add_in_place(&self, lhs: &mut T, rhs: &T) {
         *lhs = self.add(lhs, rhs)
     }
 
@@ -251,12 +251,8 @@ pub trait Reducer<T> {
     /// Calculate (lhs - rhs) mod m in reduced form
     fn sub(&self, lhs: &T, rhs: &T) -> T;
 
-    fn sub_assign(&self, lhs: &mut T, rhs: &T) {
+    fn sub_in_place(&self, lhs: &mut T, rhs: &T) {
         *lhs = self.sub(lhs, rhs);
-    }
-
-    fn sub_assign_swap(&self, lhs: &T, rhs: &mut T) {
-        *rhs = self.sub(lhs, rhs);
     }
 
     /// Calculate -monty mod m in reduced form
@@ -277,7 +273,7 @@ pub trait Reducer<T> {
     fn square(&self, target: T) -> T;
 
     /// Calculate base ^ exp mod m in reduced form
-    fn pow(&self, base: T, exp: T) -> T;
+    fn pow(&self, base: T, exp: &T) -> T;
 }
 
 mod barret;

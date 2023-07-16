@@ -74,7 +74,7 @@ macro_rules! impl_powm_uprim {
             type Output = $T;
             #[inline(always)]
             fn powm(self, exp: $T, m: &$T) -> $T {
-                Vanilla::<$T>::new(&m).pow(self % m, exp)
+                Vanilla::<$T>::new(&m).pow(self % m, &exp)
             }
         }
     )*);

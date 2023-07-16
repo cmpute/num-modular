@@ -208,7 +208,7 @@ mod tests {
     }
 
     #[test]
-    fn test_against_prim() {
+    fn test_against_modops() {
         macro_rules! tests_for {
             ($a:tt, $b:tt, $e:tt; $($M:ty)*) => ($({
                 const P: umax = <$M>::MODULUS;
@@ -222,7 +222,7 @@ mod tests {
                 assert_eq!(r.inv(am), $a.invm(&P));
                 assert_eq!(r.double(am), $a.dblm(&P));
                 assert_eq!(r.square(am), $a.sqm(&P));
-                assert_eq!(r.pow(am, $e), $a.powm($e, &P));
+                assert_eq!(r.pow(am, &$e), $a.powm($e, &P));
             })*);
         }
 

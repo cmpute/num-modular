@@ -247,11 +247,11 @@ pub struct PreMulInv2by1<T> {
 
 impl<T> PreMulInv2by1<T> {
     #[inline]
-    pub fn divider(&self) -> &Normalized2by1Divisor<T> {
+    pub const fn divider(&self) -> &Normalized2by1Divisor<T> {
         &self.div
     }
     #[inline]
-    pub fn shift(&self) -> u32 {
+    pub const fn shift(&self) -> u32 {
         self.shift
     }
 }
@@ -464,11 +464,11 @@ pub struct PreMulInv3by2<T, D> {
 
 impl<T, D> PreMulInv3by2<T, D> {
     #[inline]
-    pub fn divider(&self) -> &Normalized3by2Divisor<T, D> {
+    pub const fn divider(&self) -> &Normalized3by2Divisor<T, D> {
         &self.div
     }
     #[inline]
-    pub fn shift(&self) -> u32 {
+    pub const fn shift(&self) -> u32 {
         self.shift
     }
 }

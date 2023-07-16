@@ -13,15 +13,6 @@ pub struct ReducedInt<T, R: Reducer<T>> {
     r: R,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct ReducedIntRef<'a, T, R: Reducer<T>> {
-    /// The reduced representation of the integer in a modulo ring.
-    a: T,
-
-    /// Reference to the reducer for the integer
-    r: &'a R,
-}
-
 impl<T, R: Reducer<T>> ReducedInt<T, R> {
     /// Convert n into the modulo ring ℤ/mℤ (i.e. `n % m`)
     #[inline]
@@ -56,7 +47,7 @@ impl<T, R: Reducer<T>> ReducedInt<T, R> {
     }
 
     #[inline(always)]
-    pub fn pow(self, exp: T) -> Self {
+    pub fn pow(self, exp: &T) -> Self {
         Self {
             a: self.r.pow(self.a, exp),
             r: self.r,
@@ -335,8 +326,8 @@ impl_uprim_vanilla_core_const!(u8 u16 u32 u64 u128 usize);
 
 macro_rules! impl_reduced_binary_pow {
     ($T:ty) => {
-        fn pow(&self, base: $T, exp: $T) -> $T {
-            match exp {
+        fn pow(&self, base: $T, exp: &$T) -> $T {
+            match *exp {
                 1 => base,
                 2 => self.square(base),
                 e => {
@@ -491,7 +482,7 @@ pub(crate) mod tests {
                     assert_eq!(am.square().residue(), a.sqm(&m), "incorrect sqr");
 
                     let e = random::<u8>() as $T;
-                    assert_eq!(am.pow(e).residue(), a.powm(e, &m), "incorrect pow");
+                    assert_eq!(am.pow(&e).residue(), a.powm(e, &m), "incorrect pow");
                     if let Some(v) = a.invm(&m) {
                         assert_eq!(am.inv().unwrap().residue(), v, "incorrect inv");
                     }
