@@ -265,9 +265,11 @@ macro_rules! impl_premulinv_2by1_reducer_for {
                 let div = Normalized2by1Divisor::<$T>::new(divisor << shift);
                 Self { div, shift }
             }
+
+            /// Get the **normalized** divisor.
             #[inline]
             pub const fn divisor(&self) -> $T {
-                self.div.divisor >> self.shift
+                self.div.divisor
             }
         }
 
@@ -483,9 +485,10 @@ macro_rules! impl_premulinv_3by2_reducer_for {
                 Self { div, shift }
             }
 
+            /// Get the **normalized** divisor.
             #[inline]
             pub const fn divisor(&self) -> $D {
-                self.div.divisor >> self.shift
+                self.div.divisor
             }
         }
 

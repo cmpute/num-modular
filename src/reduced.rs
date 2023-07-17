@@ -304,6 +304,7 @@ macro_rules! impl_uprim_vanilla_core_const {
 
             #[inline]
             pub(crate) const fn sub(m: &$T, lhs: $T, rhs: $T) -> $T {
+                // this implementation should be equivalent to using overflowing_add and _sub after optimization.
                 if lhs >= rhs {
                     lhs - rhs
                 } else {
@@ -313,10 +314,9 @@ macro_rules! impl_uprim_vanilla_core_const {
 
             #[inline]
             pub(crate) const fn neg(m: &$T, target: $T) -> $T {
-                if target == 0 {
-                    0
-                } else {
-                    *m - target
+                match target {
+                    0 => 0,
+                    x => *m - x
                 }
             }
         }

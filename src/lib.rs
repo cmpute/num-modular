@@ -241,6 +241,7 @@ pub trait Reducer<T> {
     /// Calculate (lhs + rhs) mod m in reduced form
     fn add(&self, lhs: &T, rhs: &T) -> T;
 
+    #[inline]
     fn add_in_place(&self, lhs: &mut T, rhs: &T) {
         *lhs = self.add(lhs, rhs)
     }
@@ -251,6 +252,7 @@ pub trait Reducer<T> {
     /// Calculate (lhs - rhs) mod m in reduced form
     fn sub(&self, lhs: &T, rhs: &T) -> T;
 
+    #[inline]
     fn sub_in_place(&self, lhs: &mut T, rhs: &T) {
         *lhs = self.sub(lhs, rhs);
     }
@@ -261,7 +263,8 @@ pub trait Reducer<T> {
     /// Calculate (lhs * rhs) mod m in reduced form
     fn mul(&self, lhs: &T, rhs: &T) -> T;
 
-    fn mul_assign(&self, lhs: &mut T, rhs: &T) {
+    #[inline]
+    fn mul_in_place(&self, lhs: &mut T, rhs: &T) {
         *lhs = self.mul(lhs, rhs);
     }
 
