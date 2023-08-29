@@ -308,8 +308,8 @@ macro_rules! impl_premulinv_2by1_reducer_for {
                 Vanilla::<$T>::add(&self.div.divisor, *lhs, *rhs)
             }
             #[inline(always)]
-            fn double(&self, target: $T) -> $T {
-                Vanilla::<$T>::double(&self.div.divisor, target)
+            fn dbl(&self, target: $T) -> $T {
+                Vanilla::<$T>::dbl(&self.div.divisor, target)
             }
             #[inline(always)]
             fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
@@ -331,7 +331,7 @@ macro_rules! impl_premulinv_2by1_reducer_for {
                 self.div.div_rem_2by1(wmul(lhs >> self.shift, *rhs)).1
             }
             #[inline]
-            fn square(&self, target: $T) -> $T {
+            fn sqr(&self, target: $T) -> $T {
                 self.div.div_rem_2by1(wsqr(target) >> self.shift).1
             }
 
@@ -533,8 +533,8 @@ macro_rules! impl_premulinv_3by2_reducer_for {
                 Vanilla::<$D>::add(&self.div.divisor, *lhs, *rhs)
             }
             #[inline(always)]
-            fn double(&self, target: $D) -> $D {
-                Vanilla::<$D>::double(&self.div.divisor, target)
+            fn dbl(&self, target: $D) -> $D {
+                Vanilla::<$D>::dbl(&self.div.divisor, target)
             }
             #[inline(always)]
             fn sub(&self, lhs: &$D, rhs: &$D) -> $D {
@@ -558,7 +558,7 @@ macro_rules! impl_premulinv_3by2_reducer_for {
                 self.div.div_rem_4by2(lo, hi).1
             }
             #[inline]
-            fn square(&self, target: $D) -> $D {
+            fn sqr(&self, target: $D) -> $D {
                 let prod = DoubleWordModule::wsqr(target) >> self.shift;
                 let (lo, hi) = DoubleWordModule::split(prod);
                 self.div.div_rem_4by2(lo, hi).1

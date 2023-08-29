@@ -161,8 +161,8 @@ macro_rules! impl_montgomery_for {
                 }
 
                 #[inline(always)]
-                fn double(&self, target: $t) -> $t {
-                    Vanilla::<$t>::double(&self.m, target)
+                fn dbl(&self, target: $t) -> $t {
+                    Vanilla::<$t>::dbl(&self.m, target)
                 }
 
                 #[inline(always)]
@@ -181,7 +181,7 @@ macro_rules! impl_montgomery_for {
                 }
 
                 #[inline]
-                fn square(&self, target: $t) -> $t {
+                fn sqr(&self, target: $t) -> $t {
                     self.reduce(wsqr(target))
                 }
 

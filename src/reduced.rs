@@ -263,14 +263,14 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<
     #[inline]
     fn double(self) -> Self {
         let Self { a, r } = self;
-        let a = r.double(a);
+        let a = r.dbl(a);
         Self { a, r }
     }
 
     #[inline]
     fn square(self) -> Self {
         let Self { a, r } = self;
-        let a = r.square(a);
+        let a = r.sqr(a);
         Self { a, r }
     }
 }
@@ -298,7 +298,7 @@ macro_rules! impl_uprim_vanilla_core_const {
             }
 
             #[inline]
-            pub(crate) const fn double(m: &$T, target: $T) -> $T {
+            pub(crate) const fn dbl(m: &$T, target: $T) -> $T {
                 Self::add(m, target, target)
             }
 
@@ -329,7 +329,7 @@ macro_rules! impl_reduced_binary_pow {
         fn pow(&self, base: $T, exp: &$T) -> $T {
             match *exp {
                 1 => base,
-                2 => self.square(base),
+                2 => self.sqr(base),
                 e => {
                     let mut multi = base;
                     let mut exp = e;
@@ -338,7 +338,7 @@ macro_rules! impl_reduced_binary_pow {
                         if exp & 1 != 0 {
                             result = self.mul(&result, &multi);
                         }
-                        multi = self.square(multi);
+                        multi = self.sqr(multi);
                         exp >>= 1;
                     }
                     result
@@ -384,8 +384,8 @@ macro_rules! impl_uprim_vanilla_core {
         }
 
         #[inline(always)]
-        fn double(&self, target: $single) -> $single {
-            Vanilla::<$single>::double(&self.0, target)
+        fn dbl(&self, target: $single) -> $single {
+            Vanilla::<$single>::dbl(&self.0, target)
         }
 
         #[inline(always)]
@@ -422,7 +422,7 @@ macro_rules! impl_uprim_vanilla {
                 }
 
                 #[inline]
-                fn square(&self, target: $t) -> $t {
+                fn sqr(&self, target: $t) -> $t {
                     (wsqr(target) % extend(self.0)) as $t
                 }
             }
@@ -445,7 +445,7 @@ impl Reducer<u128> for Vanilla<u128> {
     }
 
     #[inline]
-    fn square(&self, target: u128) -> u128 {
+    fn sqr(&self, target: u128) -> u128 {
         udouble::widening_square(target) % self.0
     }
 }

@@ -120,7 +120,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         }
     }
     #[inline]
-    fn double(&self, target: umax) -> umax {
+    fn dbl(&self, target: umax) -> umax {
         self.add(&target, &target)
     }
     #[inline]
@@ -150,7 +150,7 @@ impl<const P: u8, const K: umax> Reducer<umax> for FixedMersenne<P, K> {
         }
     }
     #[inline]
-    fn square(&self, target: umax) -> umax {
+    fn sqr(&self, target: umax) -> umax {
         if (P as u32) < (umax::BITS / 2) {
             Self::reduce_single(target * target)
         } else {
@@ -216,8 +216,8 @@ mod tests {
                 assert_eq!(r.mul(&am, &bm), $a.mulm($b, &P));
                 assert_eq!(r.neg(am), $a.negm(&P));
                 assert_eq!(r.inv(am), $a.invm(&P));
-                assert_eq!(r.double(am), $a.dblm(&P));
-                assert_eq!(r.square(am), $a.sqm(&P));
+                assert_eq!(r.dbl(am), $a.dblm(&P));
+                assert_eq!(r.sqr(am), $a.sqm(&P));
                 assert_eq!(r.pow(am, &$e), $a.powm($e, &P));
             })*);
         }

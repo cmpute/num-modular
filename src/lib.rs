@@ -247,7 +247,7 @@ pub trait Reducer<T> {
     }
 
     /// Calculate 2*target mod m
-    fn double(&self, target: T) -> T;
+    fn dbl(&self, target: T) -> T;
 
     /// Calculate (lhs - rhs) mod m in reduced form
     fn sub(&self, lhs: &T, rhs: &T) -> T;
@@ -273,7 +273,7 @@ pub trait Reducer<T> {
     fn inv(&self, target: T) -> Option<T>;
 
     /// Calculate target^2 mod m in reduced form
-    fn square(&self, target: T) -> T;
+    fn sqr(&self, target: T) -> T;
 
     /// Calculate base ^ exp mod m in reduced form
     fn pow(&self, base: T, exp: &T) -> T;
