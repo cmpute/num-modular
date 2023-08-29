@@ -11,8 +11,6 @@ A generic implementation of integer division and modular arithmetics in Rust. It
 It also support various integer type backends, including primitive integers and `num-bigint`. Note that this crate also supports `[no_std]`. To enable `std` related functionalities, enable the `std` feature of the crate.
 
 <!-- TODO: Roadmap for v1:
-- support ibig-rs, rug
-- support barret reduction form
 - maybe support invariant integer form?
 - const functions (if const traits are stablized then)
 -->

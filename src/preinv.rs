@@ -95,10 +95,6 @@ impl_preinv_for_prim_int!(u32, u32_impl);
 impl_preinv_for_prim_int!(u64, u64_impl);
 impl_preinv_for_prim_int!(usize, usize_impl);
 
-// XXX: we could implement the div_exact for big integers, in a similar way to support double width
-// REF: https://gmplib.org/manual/Exact-Division
-//      GMP `mpz_divexact`, `mpn_divexact`
-
 // XXX: unchecked div_exact can be introduced by not checking the q_lim,
 //      investigate this after `exact_div` is introduced or removed from core lib
 //      https://github.com/rust-lang/rust/issues/85122

@@ -206,16 +206,7 @@ impl_montgomery_for!(u64, u64_impl);
 impl_montgomery_for!(u128, u128_impl);
 impl_montgomery_for!(usize, usize_impl);
 
-// TODO: support bigints, use relaxed form described in https://cetinkayakoc.net/docs/j56.pdf and https://eprint.iacr.org/2011/239.pdf
-// impl Reducer<BigUInt> for Montgomery<usize>
-// or impl Reducer<&[usize]> for Montgomery<usize> ??
-//
-// We could directly base the operations on a specific bigint library (ibig is a good candidate), and convert all other bigint types to this type for arithmetics (rug::Integer::as_limbs, num_bigint::BigUint::to_u32_digits/to_u64_digits)
-//     but there're two problems for ibig-rs now: it's unable to construct and deconstruct big integer by moving, and it has not implemented the Integer trait yet.
-// So the better option is to create a standalone "reduce" function that takes &[usize] as input, and then call this reduce function for each big integer backend.
-// And consider create separate ReducedInt type for small and bigints, as we can provide convenient interface for multi-by-single operators
-
-// TODO(v0.5.x): accept even numbers by removing 2 factors from m and store the exponent
+// TODO(v0.6.x): accept even numbers by removing 2 factors from m and store the exponent
 // Requirement: 1. A separate class to perform modular arithmetics with 2^n as modulus
 //              2. Algorithm for construct residue from two components (see http://koclab.cs.ucsb.edu/teaching/cs154/docx/Notes7-Montgomery.pdf)
 // Or we can just provide crt function, and let the implementation of monty int with full modulus support as an example code.
