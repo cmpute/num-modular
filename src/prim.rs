@@ -43,7 +43,7 @@ impl ModularCoreOps<u128, &u128> for u128 {
     #[inline]
     fn addm(self, rhs: u128, m: &u128) -> u128 {
         if let Some(ab) = self.checked_add(rhs) {
-            return ab % m;
+            ab % m
         } else {
             udouble::widening_add(self, rhs) % *m
         }
@@ -114,7 +114,7 @@ macro_rules! impl_symbols_uprim {
                 let mut t = 1;
                 while a > 0 {
                     while a % 2 == 0 {
-                        a = a / 2;
+                        a /= 2;
                         if n % 8 == 3 || n % 8 == 5 {
                             t *= -1;
                         }
@@ -123,7 +123,7 @@ macro_rules! impl_symbols_uprim {
                     if a % 4 == 3 && n % 4 == 3 {
                         t *= -1;
                     }
-                    a = a % n;
+                    a %= n;
                 }
                 Some(if n == 1 {
                     t

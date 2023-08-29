@@ -195,14 +195,14 @@ mod _num_bigint {
         type Output = BigUint;
         #[inline]
         fn powm(self, exp: &BigUint, m: &BigUint) -> BigUint {
-            self.modpow(&exp, m)
+            self.modpow(exp, m)
         }
     }
 
     impl ModularSymbols<&BigUint> for BigUint {
         #[inline]
         fn checked_legendre(&self, n: &BigUint) -> Option<i8> {
-            let r = self.powm((n - 1u8) >> 1u8, &n);
+            let r = self.powm((n - 1u8) >> 1u8, n);
             if r.is_zero() {
                 Some(0)
             } else if r.is_one() {
@@ -285,14 +285,14 @@ mod _num_bigint {
             }
             self.mod_floor(n)
                 .magnitude()
-                .checked_legendre(&n.magnitude())
+                .checked_legendre(n.magnitude())
         }
 
         fn checked_jacobi(&self, n: &BigInt) -> Option<i8> {
             if n < &BigInt::one() {
                 return None;
             }
-            self.mod_floor(n).magnitude().checked_jacobi(&n.magnitude())
+            self.mod_floor(n).magnitude().checked_jacobi(n.magnitude())
         }
 
         #[inline]
