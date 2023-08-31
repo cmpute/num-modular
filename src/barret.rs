@@ -692,22 +692,22 @@ mod tests {
     #[test]
     fn test_2by1_against_modops() {
         for _ in 0..10 {
-            ReducedTester::<u8>::test_against_modops::<PreMulInv2by1<u8>>(false);
-            ReducedTester::<u16>::test_against_modops::<PreMulInv2by1<u16>>(false);
-            ReducedTester::<u32>::test_against_modops::<PreMulInv2by1<u32>>(false);
-            ReducedTester::<u64>::test_against_modops::<PreMulInv2by1<u64>>(false);
+            ReducedTester::<u8>::test_against_modops::<PreMulInv2by1<u8>>(0);
+            ReducedTester::<u16>::test_against_modops::<PreMulInv2by1<u16>>(0);
+            ReducedTester::<u32>::test_against_modops::<PreMulInv2by1<u32>>(0);
+            ReducedTester::<u64>::test_against_modops::<PreMulInv2by1<u64>>(0);
             // ReducedTester::<u128>::test_against_modops::<PreMulInv2by1<u128>>();
-            ReducedTester::<usize>::test_against_modops::<PreMulInv2by1<usize>>(false);
+            ReducedTester::<usize>::test_against_modops::<PreMulInv2by1<usize>>(0);
         }
     }
 
     #[test]
     fn test_3by2_against_modops() {
         for _ in 0..10 {
-            ReducedTester::<u16>::test_against_modops::<PreMulInv3by2<u8, u16>>(false);
-            ReducedTester::<u32>::test_against_modops::<PreMulInv3by2<u16, u32>>(false);
-            ReducedTester::<u64>::test_against_modops::<PreMulInv3by2<u32, u64>>(false);
-            ReducedTester::<u128>::test_against_modops::<PreMulInv3by2<u64, u128>>(false);
+            ReducedTester::<u16>::test_against_modops::<PreMulInv3by2<u8, u16>>(2);
+            ReducedTester::<u32>::test_against_modops::<PreMulInv3by2<u16, u32>>(2);
+            ReducedTester::<u64>::test_against_modops::<PreMulInv3by2<u32, u64>>(2);
+            ReducedTester::<u128>::test_against_modops::<PreMulInv3by2<u64, u128>>(2);
         }
     }
 }

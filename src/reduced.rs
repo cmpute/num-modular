@@ -465,11 +465,17 @@ pub(crate) mod tests {
     macro_rules! impl_reduced_test_for {
         ($($T:ty)*) => {$(
             impl ReducedTester<$T> {
-                pub fn test_against_modops<R: Reducer<$T> + Copy>(odd_only: bool) {
-                    let mut m = random::<$T>().saturating_add(1);
-                    if odd_only {
-                        m |= 1;
-                    }
+                /// Range of modulus:
+                /// - random_mode = 0: [1, $T::MAX]
+                /// - random_mode = 1: [1, $T::MAX] and odd
+                /// - random_mode = 2: [$T::MAX >> $T::BITS/2, $T::MAX]
+                pub fn test_against_modops<R: Reducer<$T> + Copy>(random_mode: i32) {
+                    let m = match random_mode {
+                        0 => random::<$T>().saturating_add(1),
+                        1 => random::<$T>().saturating_add(1) | 1,
+                        2 => random::<$T>().saturating_add(1 << (<$T>::BITS / 2)),
+                        _ => unreachable!()
+                    };
 
                     let (a, b) = (random::<$T>(), random::<$T>());
                     let am = ReducedInt::<$T, R>::new(a, &m);
@@ -495,12 +501,12 @@ pub(crate) mod tests {
     #[test]
     fn test_against_modops() {
         for _ in 0..10 {
-            ReducedTester::<u8>::test_against_modops::<Vanilla<u8>>(false);
-            ReducedTester::<u16>::test_against_modops::<Vanilla<u16>>(false);
-            ReducedTester::<u32>::test_against_modops::<Vanilla<u32>>(false);
-            ReducedTester::<u64>::test_against_modops::<Vanilla<u64>>(false);
-            ReducedTester::<u128>::test_against_modops::<Vanilla<u128>>(false);
-            ReducedTester::<usize>::test_against_modops::<Vanilla<usize>>(false);
+            ReducedTester::<u8>::test_against_modops::<Vanilla<u8>>(0);
+            ReducedTester::<u16>::test_against_modops::<Vanilla<u16>>(0);
+            ReducedTester::<u32>::test_against_modops::<Vanilla<u32>>(0);
+            ReducedTester::<u64>::test_against_modops::<Vanilla<u64>>(0);
+            ReducedTester::<u128>::test_against_modops::<Vanilla<u128>>(0);
+            ReducedTester::<usize>::test_against_modops::<Vanilla<usize>>(0);
         }
     }
 }

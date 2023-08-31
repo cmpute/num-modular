@@ -267,12 +267,12 @@ mod tests {
     fn test_against_modops() {
         use crate::reduced::tests::ReducedTester;
         for _ in 0..NRANDOM {
-            ReducedTester::<u8>::test_against_modops::<Montgomery<u8>>(true);
-            ReducedTester::<u16>::test_against_modops::<Montgomery<u16>>(true);
-            ReducedTester::<u32>::test_against_modops::<Montgomery<u32>>(true);
-            ReducedTester::<u64>::test_against_modops::<Montgomery<u64>>(true);
-            ReducedTester::<u128>::test_against_modops::<Montgomery<u128>>(true);
-            ReducedTester::<usize>::test_against_modops::<Montgomery<usize>>(true);
+            ReducedTester::<u8>::test_against_modops::<Montgomery<u8>>(1);
+            ReducedTester::<u16>::test_against_modops::<Montgomery<u16>>(1);
+            ReducedTester::<u32>::test_against_modops::<Montgomery<u32>>(1);
+            ReducedTester::<u64>::test_against_modops::<Montgomery<u64>>(1);
+            ReducedTester::<u128>::test_against_modops::<Montgomery<u128>>(1);
+            ReducedTester::<usize>::test_against_modops::<Montgomery<usize>>(1);
         }
     }
 }
