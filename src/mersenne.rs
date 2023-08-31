@@ -26,9 +26,7 @@ impl<const P: u8, const K: umax> FixedMersenne<P, K> {
             hi = sum >> P;
         }
 
-        if K == 1 {
-            lo
-        } else if lo >= Self::MODULUS {
+        if lo >= Self::MODULUS {
             lo - Self::MODULUS
         } else {
             lo
@@ -55,9 +53,7 @@ impl<const P: u8, const K: umax> FixedMersenne<P, K> {
             hi = sum >> P;
         }
 
-        if K == 1 {
-            lo
-        } else if lo >= Self::MODULUS {
+        if lo >= Self::MODULUS {
             lo - Self::MODULUS
         } else {
             lo

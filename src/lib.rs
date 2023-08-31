@@ -158,7 +158,7 @@ impl<T> ModularRefOps for T where T: for<'r> ModularOps<&'r T, &'r T> {}
 
 /// Provides a utility function to convert signed integers into unsigned modular form
 pub trait ModularAbs<Modulus> {
-    /// Return |self| % m
+    /// Return self % m, but accepting signed integers
     fn absm(self, m: &Modulus) -> Modulus;
 }
 
