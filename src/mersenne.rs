@@ -163,6 +163,7 @@ mod tests {
     use crate::{ModularCoreOps, ModularPow};
     use rand::random;
 
+    type M = FixedMersenne<31, 1>;
     type M1 = FixedMersenne<31, 1>;
     type M2 = FixedMersenne<61, 1>;
     type M3 = FixedMersenne<127, 1>;
@@ -174,6 +175,14 @@ mod tests {
 
     #[test]
     fn creation_test() {
+        const P: umax = (1 << 31) - 1;
+        let m = M::new(&P);
+        assert_eq!(m.residue(m.transform(0)), 0);
+        assert_eq!(m.residue(m.transform(1)), 1);
+        assert_eq!(m.residue(m.transform(P)), 0);
+        assert_eq!(m.residue(m.transform(P-1)), P-1);
+        assert_eq!(m.residue(m.transform(P+1)), 1);
+
         // random creation test
         for _ in 0..NRANDOM {
             let a = random::<umax>();
