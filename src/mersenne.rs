@@ -180,8 +180,8 @@ mod tests {
         assert_eq!(m.residue(m.transform(0)), 0);
         assert_eq!(m.residue(m.transform(1)), 1);
         assert_eq!(m.residue(m.transform(P)), 0);
-        assert_eq!(m.residue(m.transform(P-1)), P-1);
-        assert_eq!(m.residue(m.transform(P+1)), 1);
+        assert_eq!(m.residue(m.transform(P - 1)), P - 1);
+        assert_eq!(m.residue(m.transform(P + 1)), 1);
 
         // random creation test
         for _ in 0..NRANDOM {
