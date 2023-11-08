@@ -217,7 +217,7 @@ impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
     fn pow(self, rhs: T) -> Self::Output {
-        ReducedInt::pow(self, rhs)
+        ReducedInt::pow(self, &rhs)
     }
 }
 #[cfg(feature = "num-traits")]
@@ -225,7 +225,7 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Pow<T> for &ReducedInt<T, R> {
     type Output = ReducedInt<T, R>;
     #[inline]
     fn pow(self, rhs: T) -> Self::Output {
-        let a = self.r.pow(self.a.clone(), rhs);
+        let a = self.r.pow(self.a.clone(), &rhs);
         ReducedInt {
             a,
             r: self.r.clone(),
