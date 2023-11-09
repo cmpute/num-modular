@@ -121,11 +121,84 @@ macro_rules! impl_binops {
                 Self { a, r }
             }
         }
+
+        impl<T: PartialEq + Clone, R: Reducer<T>> $op<&T> for ReducedInt<T, R> {
+            type Output = Self;
+            fn $method(self, rhs: &T) -> Self::Output {
+                let Self { a, r } = self;
+                let rhs = r.transform(rhs.clone());
+                let a = r.$method(&a, &rhs);
+                Self { a, r }
+            }
+        }
+
+        impl<T: PartialEq, R: Reducer<T> + Clone> $op<T> for &ReducedInt<T, R> {
+            type Output = ReducedInt<T, R>;
+            fn $method(self, rhs: T) -> Self::Output {
+                let rhs = self.r.transform(rhs);
+                let a = self.r.$method(&self.a, &rhs);
+                ReducedInt {
+                    a,
+                    r: self.r.clone(),
+                }
+            }
+        }
+
+        impl<T: PartialEq + Clone, R: Reducer<T> + Clone> $op<&T> for &ReducedInt<T, R> {
+            type Output = ReducedInt<T, R>;
+            fn $method(self, rhs: &T) -> Self::Output {
+                let rhs = self.r.transform(rhs.clone());
+                let a = self.r.$method(&self.a, &rhs);
+                ReducedInt {
+                    a,
+                    r: self.r.clone(),
+                }
+            }
+        }
     };
 }
 impl_binops!(add, impl Add);
 impl_binops!(sub, impl Sub);
 impl_binops!(mul, impl Mul);
+
+macro_rules! impl_assign_ops {
+    ($method:ident, impl $op:ident, with $reducer_method:ident) => {
+        impl<T: PartialEq, R: Reducer<T>> $op for ReducedInt<T, R> {
+            fn $method(&mut self, rhs: Self) {
+                self.check_modulus_eq(&rhs);
+                let Self { a, r } = self;
+                r.$reducer_method(a, &rhs.a);
+            }
+        }
+
+        impl<T: PartialEq, R: Reducer<T>> $op<&Self> for ReducedInt<T, R> {
+            fn $method(&mut self, rhs: &Self) {
+                self.check_modulus_eq(rhs);
+                let Self { a, r } = self;
+                r.$reducer_method(a, &rhs.a);
+            }
+        }
+
+        impl<T: PartialEq, R: Reducer<T>> $op<T> for ReducedInt<T, R> {
+            fn $method(&mut self, rhs: T) {
+                let Self { a, r } = self;
+                let rhs = r.transform(rhs);
+                r.$reducer_method(a, &rhs);
+            }
+        }
+
+        impl<T: PartialEq + Clone, R: Reducer<T>> $op<&T> for ReducedInt<T, R> {
+            fn $method(&mut self, rhs: &T) {
+                let Self { a, r } = self;
+                let rhs = r.transform(rhs.clone());
+                r.$reducer_method(a, &rhs);
+            }
+        }
+    }
+}
+impl_assign_ops!(add_assign, impl AddAssign, with add_in_place);
+impl_assign_ops!(sub_assign, impl SubAssign, with sub_in_place);
+impl_assign_ops!(mul_assign, impl MulAssign, with mul_in_place);
 
 impl<T: PartialEq, R: Reducer<T>> Neg for ReducedInt<T, R> {
     type Output = Self;
