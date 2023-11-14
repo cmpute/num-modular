@@ -1,6 +1,6 @@
 use crate::{udouble, ModularInteger, ModularUnaryOps, Reducer};
 use core::ops::*;
-#[cfg(feature = "num_traits")]
+#[cfg(feature = "num-traits")]
 use num_traits::{Inv, Pow};
 
 /// An integer in a modulo ring
@@ -150,7 +150,7 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Neg for &ReducedInt<T, R> {
 
 const INV_ERR_MSG: &str = "the modular inverse doesn't exist!";
 
-#[cfg(feature = "num_traits")]
+#[cfg(feature = "num-traits")]
 impl<T: PartialEq, R: Reducer<T>> Inv for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
@@ -158,7 +158,7 @@ impl<T: PartialEq, R: Reducer<T>> Inv for ReducedInt<T, R> {
         self.inv().expect(INV_ERR_MSG)
     }
 }
-#[cfg(feature = "num_traits")]
+#[cfg(feature = "num-traits")]
 impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Inv for &ReducedInt<T, R> {
     type Output = ReducedInt<T, R>;
     #[inline]
@@ -212,20 +212,20 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Div<&ReducedInt<T, R>> for &Re
     }
 }
 
-#[cfg(feature = "num_traits")]
+#[cfg(feature = "num-traits")]
 impl<T: PartialEq, R: Reducer<T>> Pow<T> for ReducedInt<T, R> {
     type Output = Self;
     #[inline]
     fn pow(self, rhs: T) -> Self::Output {
-        ReducedInt::pow(self, rhs)
+        ReducedInt::pow(self, &rhs)
     }
 }
-#[cfg(feature = "num_traits")]
+#[cfg(feature = "num-traits")]
 impl<T: PartialEq + Clone, R: Reducer<T> + Clone> Pow<T> for &ReducedInt<T, R> {
     type Output = ReducedInt<T, R>;
     #[inline]
     fn pow(self, rhs: T) -> Self::Output {
-        let a = self.r.pow(self.a.clone(), rhs);
+        let a = self.r.pow(self.a.clone(), &rhs);
         ReducedInt {
             a,
             r: self.r.clone(),
