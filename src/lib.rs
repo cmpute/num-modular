@@ -33,7 +33,7 @@
 // REF: https://github.com/lemire/fastmod & https://arxiv.org/pdf/1902.01961.pdf
 // REF: https://eprint.iacr.org/2014/040.pdf
 // REF: https://github.com/ridiculousfish/libdivide/
-// REF: Faster Interleaved Modular Multiplication Based on Barrettt and Montgomery Reduction Methods (work for modulus in certain form)
+// REF: Faster Interleaved Modular Multiplication Based on Barrett and Montgomery Reduction Methods (work for modulus in certain form)
 
 #![no_std]
 #[cfg(any(feature = "std", test))]
