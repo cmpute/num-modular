@@ -22,10 +22,10 @@
 //! # Comparison of fast division / modular arithmetics
 //! Several fast division / modulo tricks are provided in these crate, the difference of them are listed below:
 //! - [PreModInv]: pre-compute modular inverse of the divisor, only applicable to exact division
-//! - Barret (to be implemented): pre-compute (rational approximation of) the reciprocal of the divisor,
+//! - Barrett (to be implemented): pre-compute (rational approximation of) the reciprocal of the divisor,
 //!     applicable to fast division and modulo
 //! - [Montgomery]: Convert the dividend into a special form by shifting and pre-compute a modular inverse,
-//!     only applicable to fast modulo, but faster than Barret reduction
+//!     only applicable to fast modulo, but faster than Barrett reduction
 //! - [FixedMersenne]: Specialization of modulo in form `2^P-K` under 2^127.
 //!
 
@@ -279,7 +279,7 @@ pub trait Reducer<T> {
     fn pow(&self, base: T, exp: &T) -> T;
 }
 
-mod barret;
+mod barrett;
 mod double;
 mod mersenne;
 mod monty;
@@ -288,7 +288,7 @@ mod prim;
 mod reduced;
 mod word;
 
-pub use barret::{
+pub use barrett::{
     Normalized2by1Divisor, Normalized3by2Divisor, PreMulInv1by1, PreMulInv2by1, PreMulInv3by2,
 };
 pub use double::{udouble, umax};
@@ -303,7 +303,7 @@ pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>;
 /// An integer in modulo ring with a fixed (pseudo) Mersenne number as modulus
 pub type FixedMersenneInt<const P: u8, const K: umax> = ReducedInt<umax, FixedMersenne<P, K>>;
 
-// pub type BarretInt<T> = ReducedInt<T, BarretInt<T>>;
+// pub type BarrettInt<T> = ReducedInt<T, BarrettInt<T>>;
 
 #[cfg(feature = "num-bigint")]
 mod bigint;
