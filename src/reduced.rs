@@ -121,11 +121,84 @@ macro_rules! impl_binops {
                 Self { a, r }
             }
         }
+
+        impl<T: PartialEq + Clone, R: Reducer<T>> $op<&T> for ReducedInt<T, R> {
+            type Output = Self;
+            fn $method(self, rhs: &T) -> Self::Output {
+                let Self { a, r } = self;
+                let rhs = r.transform(rhs.clone());
+                let a = r.$method(&a, &rhs);
+                Self { a, r }
+            }
+        }
+
+        impl<T: PartialEq, R: Reducer<T> + Clone> $op<T> for &ReducedInt<T, R> {
+            type Output = ReducedInt<T, R>;
+            fn $method(self, rhs: T) -> Self::Output {
+                let rhs = self.r.transform(rhs);
+                let a = self.r.$method(&self.a, &rhs);
+                ReducedInt {
+                    a,
+                    r: self.r.clone(),
+                }
+            }
+        }
+
+        impl<T: PartialEq + Clone, R: Reducer<T> + Clone> $op<&T> for &ReducedInt<T, R> {
+            type Output = ReducedInt<T, R>;
+            fn $method(self, rhs: &T) -> Self::Output {
+                let rhs = self.r.transform(rhs.clone());
+                let a = self.r.$method(&self.a, &rhs);
+                ReducedInt {
+                    a,
+                    r: self.r.clone(),
+                }
+            }
+        }
     };
 }
 impl_binops!(add, impl Add);
 impl_binops!(sub, impl Sub);
 impl_binops!(mul, impl Mul);
+
+macro_rules! impl_assign_ops {
+    ($method:ident, impl $op:ident, with $reducer_method:ident) => {
+        impl<T: PartialEq, R: Reducer<T>> $op for ReducedInt<T, R> {
+            fn $method(&mut self, rhs: Self) {
+                self.check_modulus_eq(&rhs);
+                let Self { a, r } = self;
+                r.$reducer_method(a, &rhs.a);
+            }
+        }
+
+        impl<T: PartialEq, R: Reducer<T>> $op<&Self> for ReducedInt<T, R> {
+            fn $method(&mut self, rhs: &Self) {
+                self.check_modulus_eq(rhs);
+                let Self { a, r } = self;
+                r.$reducer_method(a, &rhs.a);
+            }
+        }
+
+        impl<T: PartialEq, R: Reducer<T>> $op<T> for ReducedInt<T, R> {
+            fn $method(&mut self, rhs: T) {
+                let Self { a, r } = self;
+                let rhs = r.transform(rhs);
+                r.$reducer_method(a, &rhs);
+            }
+        }
+
+        impl<T: PartialEq + Clone, R: Reducer<T>> $op<&T> for ReducedInt<T, R> {
+            fn $method(&mut self, rhs: &T) {
+                let Self { a, r } = self;
+                let rhs = r.transform(rhs.clone());
+                r.$reducer_method(a, &rhs);
+            }
+        }
+    }
+}
+impl_assign_ops!(add_assign, impl AddAssign, with add_in_place);
+impl_assign_ops!(sub_assign, impl SubAssign, with sub_in_place);
+impl_assign_ops!(mul_assign, impl MulAssign, with mul_in_place);
 
 impl<T: PartialEq, R: Reducer<T>> Neg for ReducedInt<T, R> {
     type Output = Self;
@@ -450,6 +523,74 @@ impl Reducer<u128> for Vanilla<u128> {
     }
 }
 
+#[cfg(all(feature = "num-bigint", feature = "num-traits"))]
+mod bigint_impl {
+    use super::*;
+    use crate::ModularCoreOps;
+    use crate::ModularPow;
+    use num_bigint::BigUint;
+    use num_traits::Zero;
+
+    impl Reducer<BigUint> for Vanilla<BigUint> {
+        fn new(m: &BigUint) -> Self {
+            assert!(!m.is_zero());
+            Self(m.clone())
+        }
+
+        fn transform(&self, target: BigUint) -> BigUint {
+            target % &self.0
+        }
+
+        fn check(&self, target: &BigUint) -> bool {
+            target < &self.0
+        }
+
+        fn modulus(&self) -> BigUint {
+            self.0.clone()
+        }
+
+        fn residue(&self, target: BigUint) -> BigUint {
+            target
+        }
+
+        fn is_zero(&self, target: &BigUint) -> bool {
+            target.is_zero()
+        }
+
+        fn add(&self, lhs: &BigUint, rhs: &BigUint) -> num_bigint::BigUint {
+            lhs.addm(rhs, &self.0)
+        }
+
+        fn dbl(&self, target: num_bigint::BigUint) -> num_bigint::BigUint {
+            target.dblm(&self.0)
+        }
+
+        fn sub(&self, lhs: &num_bigint::BigUint, rhs: &num_bigint::BigUint) -> num_bigint::BigUint {
+            lhs.subm(rhs, &self.0)
+        }
+
+        fn neg(&self, target: num_bigint::BigUint) -> num_bigint::BigUint {
+            target.negm(&self.0)
+        }
+
+        fn mul(&self, lhs: &num_bigint::BigUint, rhs: &num_bigint::BigUint) -> num_bigint::BigUint {
+            lhs.mulm(rhs, &self.0)
+        }
+
+        fn inv(&self, target: num_bigint::BigUint) -> Option<num_bigint::BigUint> {
+            target.invm(&self.0)
+        }
+
+        fn sqr(&self, target: num_bigint::BigUint) -> num_bigint::BigUint {
+            target.sqm(&self.0)
+        }
+
+        fn pow(&self, base: num_bigint::BigUint, exp: &num_bigint::BigUint) -> num_bigint::BigUint {
+            base.powm(exp, &self.0)
+        }
+    }
+}
+
 /// An integer in modulo ring based on conventional [Rem] operations
 pub type VanillaInt<T> = ReducedInt<T, Vanilla<T>>;
 
@@ -508,5 +649,39 @@ pub(crate) mod tests {
             ReducedTester::<u128>::test_against_modops::<Vanilla<u128>>(0);
             ReducedTester::<usize>::test_against_modops::<Vanilla<usize>>(0);
         }
+    }
+
+    #[cfg(all(feature = "num-bigint", feature = "num-bigint"))]
+    #[test]
+    fn test_binops_no_copy_compiles() {
+        use num_bigint::BigUint;
+
+        let mut m = VanillaInt::<BigUint>::new(0u8.into(), &10u8.into());
+        let v: BigUint = 0u8.into();
+
+        _ = m.clone() + m.clone();
+        _ = m.clone() + &m;
+        _ = &m + m.clone();
+        _ = &m + &m;
+
+        _ = m.clone() + v.clone();
+        _ = m.clone() + &v;
+        _ = &m + v.clone();
+        _ = &m + &v;
+
+        m += m.clone();
+        m += &m.clone();
+        m += v.clone();
+        m += &v;
+
+        m -= m.clone();
+        m -= &m.clone();
+        m -= v.clone();
+        m -= &v;
+
+        m *= m.clone();
+        m *= &m.clone();
+        m *= v.clone();
+        m *= &v;
     }
 }
