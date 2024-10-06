@@ -168,3 +168,20 @@ jobs:
         with:
           command: clippy
           args: --all-features --all-targets -- -D warnings
+
+  build-num-bigint:
+    name: Build with num-bigint
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --features num-bigint
