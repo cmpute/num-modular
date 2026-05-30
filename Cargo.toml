@@ -37,3 +37,5 @@ all-features = true
 
 [features]
 std = []
+num-bigint = ["dep:num-bigint", "dep:num-integer", "dep:num-traits"]
+num-traits = ["dep:num-traits"]
