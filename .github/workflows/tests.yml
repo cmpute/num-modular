@@ -14,18 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [stable, 1.57]
+        rust: [stable, "1.57"]
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-features
+      - run: cargo check --all-features --tests
 
   test:
     name: Test
@@ -37,16 +32,11 @@ jobs:
       RUST_BACKTRACE: 1
       RUSTFLAGS: -D warnings --cfg force_bits="${{ matrix.bits }}$"
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features
+      - run: cargo test --all-features --workspace --exclude num-modular-bench --no-fail-fast
 
   test-x86:
     name: Test x86
@@ -55,18 +45,15 @@ jobs:
       RUST_BACKTRACE: 1
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: stable-i686-unknown-linux-gnu
-          override: true
+          toolchain: stable
+          targets: i686-unknown-linux-gnu
       - run: |
           sudo apt update
           sudo apt install gcc-multilib
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
+      - run: cargo test --target i686-unknown-linux-gnu --workspace --exclude num-modular-bench
 
   test-x86_64:
     name: Test x86_64
@@ -75,15 +62,12 @@ jobs:
       RUST_BACKTRACE: 1
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: stable-x86_64-unknown-linux-gnu
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
+          toolchain: stable
+          targets: x86_64-unknown-linux-gnu
+      - run: cargo test --target x86_64-unknown-linux-gnu --workspace --exclude num-modular-bench
 
   test-no-std:
     name: Test no-std
@@ -91,16 +75,11 @@ jobs:
     env:
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --no-default-features
+      - run: cargo test --no-default-features --workspace --exclude num-modular-bench
 
   build-aarch64:
     name: Build aarch64
@@ -108,17 +87,12 @@ jobs:
     env:
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          target: aarch64-unknown-linux-gnu
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --target aarch64-unknown-linux-gnu --all-features --workspace --exclude benchmark
+          targets: aarch64-unknown-linux-gnu
+      - run: cargo build --target aarch64-unknown-linux-gnu --all-features --workspace --exclude num-modular-bench
 
   build-benchmark:
     name: Build benchmark
@@ -126,45 +100,30 @@ jobs:
     env:
       RUSTFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: -p num-modular-bench
+      - run: cargo build -p num-modular-bench
 
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
           components: rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - run: cargo fmt --all -- --check
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
           toolchain: stable
-          override: true
           components: clippy
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-features --all-targets -- -D warnings
+      - run: cargo clippy --all-features --all-targets --workspace --exclude num-modular-bench -- -D warnings
