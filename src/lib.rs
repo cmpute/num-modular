@@ -23,9 +23,9 @@
 //! Several fast division / modulo tricks are provided in these crate, the difference of them are listed below:
 //! - [PreModInv]: pre-compute modular inverse of the divisor, only applicable to exact division
 //! - Barrett (to be implemented): pre-compute (rational approximation of) the reciprocal of the divisor,
-//!     applicable to fast division and modulo
+//!   applicable to fast division and modulo
 //! - [Montgomery]: Convert the dividend into a special form by shifting and pre-compute a modular inverse,
-//!     only applicable to fast modulo, but faster than Barrett reduction
+//!   only applicable to fast modulo, but faster than Barrett reduction
 //! - [FixedMersenne]: Specialization of modulo in form `2^P-K` under 2^127.
 //!
 

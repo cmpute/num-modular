@@ -13,6 +13,7 @@ Implementation of efficient integer division and modular arithmetic operations w
 Supports various backends including num-bigint, etc..
 """
 readme = "README.md"
+rust-version = "1.64"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
