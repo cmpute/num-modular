@@ -596,6 +596,7 @@ mod tests {
     use rand::prelude::*;
 
     #[test]
+    #[allow(unstable_name_collisions)]
     fn test_mul_inv_1by1() {
         type Word = u64;
         let mut rng = StdRng::seed_from_u64(1);

@@ -105,6 +105,7 @@ mod tests {
     use rand::random;
 
     #[test]
+    #[allow(unstable_name_collisions)]
     fn div_exact_test() {
         const N: u8 = 100;
         for _ in 0..N {
