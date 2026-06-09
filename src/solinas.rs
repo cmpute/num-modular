@@ -140,6 +140,8 @@ macro_rules! impl_fixed_trinomial_solinas {
             }
             #[inline]
             fn inv(&self, target: $T) -> Option<$T> {
+                // TODO: inv can be specialized
+                // REF: https://xn--2-umb.com/22/goldilocks/
                 if (P1 as u32) < usize::BITS {
                     (target as usize)
                         .invm(&(Self::MODULUS as usize))

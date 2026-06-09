@@ -11,8 +11,17 @@ macro_rules! impl_fixed_mersenne {
         $kind:ident
     ) => {
         impl<const P: u8, const K: $T> $TypeName<P, K> {
-            const BITMASK: $T = ((1 as $T) << P) - 1;
-            pub const MODULUS: $T = ((1 as $T) << P) - K;
+            const BITMASK: $T = match (1 as $T).checked_shl(P as u32) {
+                Some(v) => v.wrapping_sub(1),
+                None => <$T>::MAX,
+            };
+            pub const MODULUS: $T = {
+                let p1 = match (1 as $T).checked_shl(P as u32) {
+                    Some(v) => v,
+                    None => 0,
+                };
+                p1.wrapping_sub(K)
+            };
 
             /// Worst-case fold count for `reduce_double`.
             /// Each fold replaces V = hi·2^P + lo with hi·K + lo (since 2^P ≡ K).
@@ -29,11 +38,17 @@ macro_rules! impl_fixed_mersenne {
 
             const fn reduce_single(v: $T) -> $T {
                 let mut lo = v & Self::BITMASK;
-                let mut hi = v >> P;
+                let mut hi = match v.checked_shr(P as u32) {
+                    Some(s) => s,
+                    None => 0,
+                };
                 while hi > 0 {
                     let sum = if K == 1 { hi + lo } else { hi * K + lo };
                     lo = sum & Self::BITMASK;
-                    hi = sum >> P;
+                    hi = match sum.checked_shr(P as u32) {
+                        Some(s) => s,
+                        None => 0,
+                    };
                 }
                 if lo >= Self::MODULUS {
                     lo - Self::MODULUS
@@ -183,8 +198,8 @@ macro_rules! impl_fixed_mersenne {
 
     // Internal: reduce_double for udouble (u128→udouble)
     //
-    // Phase 1 (udouble while hi.hi > 0) is unreachable for valid P ≤ 127 since
-    // hi = v >> P < 2^P ≤ 2^127 always fits in one word. Phase 2 uses u128
+    // Phase 1 (udouble while hi.hi > 0) is unreachable for valid P ≤ 128 since
+    // hi = v >> P < 2^P ≤ 2^128 always fits in one word. Phase 2 uses u128
     // arithmetic and is unrolled when FOLDS ≤ 3 (all practical pseudo-Mersennes).
     (@reduce_double, udouble, $T:ty, $D:ty) => {
         fn reduce_double(v: $D) -> $T {
@@ -200,7 +215,10 @@ macro_rules! impl_fixed_mersenne {
                 () => {
                     let sum = if K == 1 { hi + lo } else { hi * K + lo };
                     lo = sum & Self::BITMASK;
-                    hi = sum >> P;
+                    hi = match sum.checked_shr(P as u32) {
+                        Some(s) => s,
+                        None => 0,
+                    };
                 };
             }
             if Self::FOLDS <= 2 {
@@ -244,7 +262,7 @@ macro_rules! impl_fixed_mersenne {
 
 /// A modular reducer for (pseudo) Mersenne numbers `2^P - K` as modulus with 32-bit operands.
 ///
-/// Supports `P` up to 31 and `K < 2^(P-1)`. All inputs and outputs are `u32`.
+/// Supports `P` up to 32 and `K < 2^(P-1)`. All inputs and outputs are `u32`.
 /// The modulus `2^P - K` must be prime for modular inverse and Fermat-based operations to be valid.
 ///
 /// # Example
@@ -263,11 +281,11 @@ macro_rules! impl_fixed_mersenne {
 #[derive(Debug, Clone, Copy)]
 pub struct FixedMersenne32<const P: u8, const K: u32>();
 
-impl_fixed_mersenne!(FixedMersenne32, u32, u64, 16, 31, primitive);
+impl_fixed_mersenne!(FixedMersenne32, u32, u64, 16, 32, primitive);
 
 /// A modular reducer for (pseudo) Mersenne numbers `2^P - K` as modulus with 64-bit operands.
 ///
-/// Supports `P` up to 63 and `K < 2^(P-1)`. All inputs and outputs are `u64`.
+/// Supports `P` up to 64 and `K < 2^(P-1)`. All inputs and outputs are `u64`.
 /// Uses `u128` as the double-width intermediate for multiplication and reduction.
 /// The modulus `2^P - K` must be prime for modular inverse and Fermat-based operations to be valid.
 ///
@@ -276,9 +294,9 @@ impl_fixed_mersenne!(FixedMersenne32, u32, u64, 16, 31, primitive);
 /// ```rust
 /// use num_modular::{FixedMersenne64, Reducer};
 ///
-/// const P: u8 = 31;
+/// const P: u8 = 61;
 /// const K: u64 = 1;
-/// let modulus = (1u64 << P) - K; // 2^31 - 1 (Mersenne prime)
+/// let modulus = (1u64 << P) - K; // 2^61 - 1 (Mersenne prime)
 /// let reducer = FixedMersenne64::<P, K>::new(&modulus);
 /// let a = reducer.transform(1000);
 /// let b = reducer.transform(2000);
@@ -287,32 +305,32 @@ impl_fixed_mersenne!(FixedMersenne32, u32, u64, 16, 31, primitive);
 #[derive(Debug, Clone, Copy)]
 pub struct FixedMersenne64<const P: u8, const K: u64>();
 
-impl_fixed_mersenne!(FixedMersenne64, u64, u128, 32, 63, primitive);
+impl_fixed_mersenne!(FixedMersenne64, u64, u128, 32, 64, primitive);
 
 /// A modular reducer for (pseudo) Mersenne numbers `2^P - K` as modulus.
 ///
-/// Supports `P` up to 127 and `K < 2^(P-1)`. All inputs and outputs are [umax] (currently `u128`).
+/// Supports `P` up to 128 and `K < 2^(P-1)`. All inputs and outputs are [umax] (currently `u128`).
 ///
-/// The `P` is limited to 127 so that overflow checks aren't necessary. This covers all Mersenne
+/// The `P` is limited to 128 so that overflow checks aren't necessary. This covers all Mersenne
 /// primes within the range of [umax] (i.e. `u128`).
 ///
 /// # Example
 ///
 /// ```rust
-/// use num_modular::{FixedMersenne, Reducer};
+/// use num_modular::{FixedMersenne, Reducer, umax};
 ///
 /// const P: u8 = 31;
-/// const K: u128 = 1;
-/// let modulus = (1u128 << P) - K; // 2^31 - 1 (Mersenne prime)
+/// const K: umax = 1;
+/// let modulus = (1 << P) - K; // 2^31 - 1 (Mersenne prime)
 /// let reducer = FixedMersenne::<P, K>::new(&modulus);
 /// let a = reducer.transform(1000);
 /// let b = reducer.transform(2000);
-/// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (1000u128 * 2000) % modulus);
+/// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (1000 * 2000) % modulus);
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct FixedMersenne<const P: u8, const K: umax>();
 
-impl_fixed_mersenne!(FixedMersenne, umax, udouble, 64, 127, udouble);
+impl_fixed_mersenne!(FixedMersenne, umax, udouble, 64, 128, udouble);
 
 #[cfg(test)]
 mod tests {
@@ -327,11 +345,13 @@ mod tests {
     type M4 = FixedMersenne<32, 5>;
     type M5 = FixedMersenne<56, 5>;
     type M6 = FixedMersenne<122, 3>;
+    type M7 = FixedMersenne<128, 159>;
 
     // u64 tests
     type M64_1 = FixedMersenne64<31, 1>;
     type M64_2 = FixedMersenne64<61, 1>;
     type M64_3 = FixedMersenne64<32, 5>;
+    type M64_4 = FixedMersenne64<64, 59>;
 
     // u32 tests
     type M32_1 = FixedMersenne32<13, 1>;
@@ -371,6 +391,9 @@ mod tests {
             const P6: umax = (1 << 122) - 3;
             let m6 = M6::new(&P6);
             assert_eq!(m6.residue(m6.transform(a)), a % P6);
+            const P7: umax = M7::MODULUS;
+            let m7 = M7::new(&P7);
+            assert_eq!(m7.residue(m7.transform(a)), a % P7);
         }
     }
 
@@ -388,6 +411,9 @@ mod tests {
             const P3: u64 = (1 << 32) - 5;
             let m3 = M64_3::new(&P3);
             assert_eq!(m3.residue(m3.transform(a)), a % P3);
+            const P4: u64 = M64_4::MODULUS;
+            let m4 = M64_4::new(&P4);
+            assert_eq!(m4.residue(m4.transform(a)), a % P4);
         }
     }
 

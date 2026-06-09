@@ -1,7 +1,10 @@
 #[macro_use]
 extern crate criterion;
 use criterion::Criterion;
-use num_modular::{FixedMersenneInt, ModularCoreOps, ModularPow, ModularUnaryOps};
+use num_modular::{
+    FixedMersenne64, FixedMersenneInt, FixedTrinomialSolinas64, ModularCoreOps,
+    ModularPow, ModularUnaryOps, Montgomery, PreMulInv2by1, Reducer,
+};
 use rand::random;
 
 pub fn bench_u128(c: &mut Criterion) {
@@ -116,5 +119,65 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_modinv, bench_u128);
+pub fn bench_mod_pow(c: &mut Criterion) {
+    const N: usize = 256;
+
+    // Goldilocks prime: 2^64 - 2^32 + 1
+    // As Mersenne: 2^64 - K where K = 2^32 - 1
+    type Sol = FixedTrinomialSolinas64<64, 32, 1>;
+    type Mer = FixedMersenne64<64, { (1u64 << 32) - 1 }>;
+    const MOD: u64 = <Sol>::MODULUS;
+
+    let mer = Mer::new(&MOD);
+    let sol = Sol::new(&MOD);
+    let monty = Montgomery::<u64>::new(MOD);
+    let premul = PreMulInv2by1::<u64>::new(MOD);
+
+    // Generate random bases, pre-transform into each reducer's form
+    let mut bases_mer = [0u64; N];
+    let mut bases_sol = [0u64; N];
+    for i in 0..N {
+        bases_mer[i] = mer.transform(random::<u64>() % MOD);
+        bases_sol[i] = sol.transform(random::<u64>() % MOD);
+    }
+
+    let exp = MOD - 2;
+
+    let mut group = c.benchmark_group("mod_pow");
+    group.bench_function("Mersenne (2^64 - 2^32 + 1)", |b| {
+        b.iter(|| {
+            bases_mer
+                .iter()
+                .map(|&v| mer.pow(v, &exp))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.bench_function("Solinas (2^64 - 2^32 + 1)", |b| {
+        b.iter(|| {
+            bases_sol
+                .iter()
+                .map(|&v| sol.pow(v, &exp))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.bench_function("Montgomery (2^64 - 2^32 + 1)", |b| {
+        b.iter(|| {
+            bases_sol
+                .iter()
+                .map(|&v| monty.pow(v, &exp))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.bench_function("PreMulInv2by1 (2^64 - 2^32 + 1)", |b| {
+        b.iter(|| {
+            bases_sol
+                .iter()
+                .map(|&v| premul.pow(v, &exp))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.finish();
+}
+
+criterion_group!(benches, bench_modinv, bench_u128, bench_mod_pow);
 criterion_main!(benches);
