@@ -292,7 +292,7 @@ pub use barrett::{
     Normalized2by1Divisor, Normalized3by2Divisor, PreMulInv1by1, PreMulInv2by1, PreMulInv3by2,
 };
 pub use double::{udouble, umax};
-pub use mersenne::FixedMersenne;
+pub use mersenne::{FixedMersenne, FixedMersenne32, FixedMersenne64};
 pub use monty::Montgomery;
 pub use preinv::PreModInv;
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
@@ -302,6 +302,12 @@ pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>;
 
 /// An integer in modulo ring with a fixed (pseudo) Mersenne number as modulus
 pub type FixedMersenneInt<const P: u8, const K: umax> = ReducedInt<umax, FixedMersenne<P, K>>;
+
+/// An integer in modulo ring with a fixed (pseudo) Mersenne number as modulus (32-bit)
+pub type FixedMersenneInt32<const P: u8, const K: u32> = ReducedInt<u32, FixedMersenne32<P, K>>;
+
+/// An integer in modulo ring with a fixed (pseudo) Mersenne number as modulus (64-bit)
+pub type FixedMersenneInt64<const P: u8, const K: u64> = ReducedInt<u64, FixedMersenne64<P, K>>;
 
 // pub type BarrettInt<T> = ReducedInt<T, BarrettInt<T>>;
 
