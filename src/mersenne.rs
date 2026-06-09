@@ -36,7 +36,11 @@ macro_rules! impl_fixed_mersenne {
                 folds_ceil + 1
             };
 
-            const fn reduce_single(v: $T) -> $T {
+            /// Reduces a single-width value `v` modulo `2^P - K`.
+            ///
+            /// For the result of a widening multiplication or square, use
+            /// [`reduce_double`](Self::reduce_double) instead.
+            pub const fn reduce_single(v: $T) -> $T {
                 let mut lo = v & Self::BITMASK;
                 let mut hi = match v.checked_shr(P as u32) {
                     Some(s) => s,
@@ -164,7 +168,11 @@ macro_rules! impl_fixed_mersenne {
     // Unrolling replaces the data-dependent while loop with straight-line folds.
     // Extra folds past the true count are no-ops (hi reaches 0).
     (@reduce_double, primitive, $T:ty, $D:ty) => {
-        fn reduce_double(v: $D) -> $T {
+        /// Reduces a double-width value `v` modulo `2^P - K`.
+        ///
+        /// This handles widening-multiplication or widening-square results.
+        /// For single-width values, use [`reduce_single`](Self::reduce_single).
+        pub fn reduce_double(v: $D) -> $T {
             let mut lo = (v as $T) & Self::BITMASK;
             let mut hi = v >> P;
             macro_rules! mersenne_fold {
@@ -202,7 +210,11 @@ macro_rules! impl_fixed_mersenne {
     // hi = v >> P < 2^P ≤ 2^128 always fits in one word. Phase 2 uses u128
     // arithmetic and is unrolled when FOLDS ≤ 3 (all practical pseudo-Mersennes).
     (@reduce_double, udouble, $T:ty, $D:ty) => {
-        fn reduce_double(v: $D) -> $T {
+        /// Reduces a double-width value `v` modulo `2^P - K`.
+        ///
+        /// This handles widening-multiplication or widening-square results.
+        /// For single-width values, use [`reduce_single`](Self::reduce_single).
+        pub fn reduce_double(v: $D) -> $T {
             let mut lo = v.lo & Self::BITMASK;
             let mut hi = v >> P;
             while hi.hi > 0 {

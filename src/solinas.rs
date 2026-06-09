@@ -166,7 +166,11 @@ macro_rules! impl_fixed_trinomial_solinas {
 
     // Internal: reduce_single for primitive double-width types (u32→u64, u64→u128)
     (@reduce_single, primitive, $T:ty, $D:ty) => {
-        const fn reduce_single(v: $T) -> $T {
+        /// Reduces a single-width value `v` modulo `2^P1 - 2^P2 + K`.
+        ///
+        /// For the result of a widening multiplication or square, use
+        /// [`reduce_double`](Self::reduce_double) instead.
+        pub const fn reduce_single(v: $T) -> $T {
             let mut v: $D = v as $D;
             while v >> P1 > 0 {
                 let lo = (v as $T) & Self::BITMASK;
@@ -191,7 +195,11 @@ macro_rules! impl_fixed_trinomial_solinas {
     // Internal: reduce_single for udouble (umax→udouble). Stays in udouble for the same reason
     // as reduce_double below: `hi << P2` can exceed `umax` during the tail.
     (@reduce_single, udouble, $T:ty, $D:ty) => {
-        fn reduce_single(v: $T) -> $T {
+        /// Reduces a single-width value `v` modulo `2^P1 - 2^P2 + K`.
+        ///
+        /// For the result of a widening multiplication or square, use
+        /// [`reduce_double`](Self::reduce_double) instead.
+        pub fn reduce_single(v: $T) -> $T {
             let mut v: $D = udouble { hi: 0, lo: v };
             while v.hi > 0 || v.lo >> P1 > 0 {
                 let lo = v.lo & Self::BITMASK;
@@ -220,7 +228,11 @@ macro_rules! impl_fixed_trinomial_solinas {
     // FOLDS from the expert formula: ⌈P1/(P1−P2)⌉ + 1 (K>0) or +2 (K<0).
     // Unrolling condition: P2 ≤ ⌊2·P1/3⌋  ⇔  FOLDS ≤ 4.
     (@reduce_double, primitive, $T:ty, $D:ty) => {
-        fn reduce_double(v: $D) -> $T {
+        /// Reduces a double-width value `v` modulo `2^P1 - 2^P2 + K`.
+        ///
+        /// This handles widening-multiplication or widening-square results.
+        /// For single-width values, use [`reduce_single`](Self::reduce_single).
+        pub fn reduce_double(v: $D) -> $T {
             let mut lo = (v as $T) & Self::BITMASK;
             let mut hi = v >> P1;
             macro_rules! solinas_fold {
@@ -260,7 +272,11 @@ macro_rules! impl_fixed_trinomial_solinas {
     // `hi << P2`, which can exceed `umax` even when `hi` fits in one word (e.g. `hi * 2^P2`), so
     // the tail must stay in double-width arithmetic.
     (@reduce_double, udouble, $T:ty, $D:ty) => {
-        fn reduce_double(v: $D) -> $T {
+        /// Reduces a double-width value `v` modulo `2^P1 - 2^P2 + K`.
+        ///
+        /// This handles widening-multiplication or widening-square results.
+        /// For single-width values, use [`reduce_single`](Self::reduce_single).
+        pub fn reduce_double(v: $D) -> $T {
             let mut lo = v.lo & Self::BITMASK;
             let mut hi = v >> P1;
             macro_rules! udouble_fold {
