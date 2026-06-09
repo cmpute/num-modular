@@ -33,6 +33,21 @@ macro_rules! impl_fixed_trinomial_solinas {
                 }
             };
 
+            /// Worst-case fold count for `reduce_double`.
+            /// Each fold removes roughly (P1−P2) bits; ⌈P1/(P1−P2)⌉ folds
+            /// shrink from 2·P1 bits to ≤ P1, plus 1 (K>0) or 2 (K<0) for the carry tail.
+            const FOLDS: u32 = {
+                let gap = (P1 - P2) as u32;
+                let folds_ceil = ((P1 as u32) + gap - 1) / gap;
+                if K > 0 {
+                    folds_ceil + 1
+                } else if K < 0 {
+                    folds_ceil + 2
+                } else {
+                    1 // K == 0: trivial reduction, single fold
+                }
+            };
+
             impl_fixed_trinomial_solinas!(@reduce_single, $kind, $T, $D);
             impl_fixed_trinomial_solinas!(@reduce_double, $kind, $T, $D);
         }
@@ -196,19 +211,35 @@ macro_rules! impl_fixed_trinomial_solinas {
     };
 
     // Internal: reduce_double for primitive double-width types (u32→u64, u64→u128)
+    //
+    // When the worst-case fold count is small, replace the while loop with
+    // straight-line unconditional folds. Each fold is a no-op once hi reaches 0.
+    // FOLDS from the expert formula: ⌈P1/(P1−P2)⌉ + 1 (K>0) or +2 (K<0).
+    // Unrolling condition: P2 ≤ ⌊2·P1/3⌋  ⇔  FOLDS ≤ 4.
     (@reduce_double, primitive, $T:ty, $D:ty) => {
         fn reduce_double(v: $D) -> $T {
             let mut lo = (v as $T) & Self::BITMASK;
             let mut hi = v >> P1;
-            while hi > 0 {
-                let mut sum: $D = (hi << (P2 as u32)) + (lo as $D);
-                if K > 0 {
-                    sum -= hi * (K as $D);
-                } else if K < 0 {
-                    sum += hi * ((-K) as $D);
-                }
-                lo = (sum as $T) & Self::BITMASK;
-                hi = sum >> P1;
+            macro_rules! solinas_fold {
+                () => {
+                    let mut sum: $D = (hi << (P2 as u32)) + (lo as $D);
+                    if K > 0 { sum -= hi * (K as $D); }
+                    else if K < 0 { sum += hi * ((-K) as $D); }
+                    lo = (sum as $T) & Self::BITMASK;
+                    hi = sum >> P1;
+                };
+            }
+            if Self::FOLDS <= 3 {
+                #[allow(unused_assignments)] { solinas_fold!(); }
+                #[allow(unused_assignments)] { solinas_fold!(); }
+                #[allow(unused_assignments)] { solinas_fold!(); }
+            } else if Self::FOLDS == 4 {
+                #[allow(unused_assignments)] { solinas_fold!(); }
+                #[allow(unused_assignments)] { solinas_fold!(); }
+                #[allow(unused_assignments)] { solinas_fold!(); }
+                #[allow(unused_assignments)] { solinas_fold!(); }
+            } else {
+                while hi > 0 { solinas_fold!(); }
             }
             if lo >= Self::MODULUS {
                 lo - Self::MODULUS
@@ -229,15 +260,26 @@ macro_rules! impl_fixed_trinomial_solinas {
         fn reduce_double(v: $D) -> $T {
             let mut lo = v.lo & Self::BITMASK;
             let mut hi = v >> P1;
-            while hi.hi > 0 || hi.lo > 0 {
-                let mut sum = (hi << (P2 as u32)) + lo;
-                if K > 0 {
-                    sum = sum - hi * (K as umax);
-                } else if K < 0 {
-                    sum = sum + hi * ((-K) as umax);
-                }
-                lo = sum.lo & Self::BITMASK;
-                hi = sum >> P1;
+            macro_rules! udouble_fold {
+                () => {
+                    let mut sum = (hi << (P2 as u32)) + lo;
+                    if K > 0 { sum = sum - hi * (K as umax); }
+                    else if K < 0 { sum = sum + hi * ((-K) as umax); }
+                    lo = sum.lo & Self::BITMASK;
+                    hi = sum >> P1;
+                };
+            }
+            if Self::FOLDS <= 3 {
+                #[allow(unused_assignments)] { udouble_fold!(); }
+                #[allow(unused_assignments)] { udouble_fold!(); }
+                #[allow(unused_assignments)] { udouble_fold!(); }
+            } else if Self::FOLDS == 4 {
+                #[allow(unused_assignments)] { udouble_fold!(); }
+                #[allow(unused_assignments)] { udouble_fold!(); }
+                #[allow(unused_assignments)] { udouble_fold!(); }
+                #[allow(unused_assignments)] { udouble_fold!(); }
+            } else {
+                while hi.hi > 0 || hi.lo > 0 { udouble_fold!(); }
             }
             if lo >= Self::MODULUS {
                 lo - Self::MODULUS

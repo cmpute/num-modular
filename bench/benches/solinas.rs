@@ -319,6 +319,58 @@ pub fn bench_inv(c: &mut Criterion) {
     group.finish();
 }
 
+// 2^64 - 2^32 + 1 — P1=64 triggers the unrolled reduce_double path (P1*2 >= D::BITS)
+const NTT_P1: u8 = 64;
+const NTT_P2: u8 = 32;
+const NTT_K64: i64 = 1;
+
+const NTT_MOD64: u64 = {
+    let p1 = match 1u64.checked_shl(NTT_P1 as u32) {
+        Some(v) => v,
+        None => 0,
+    };
+    let p2 = 1u64.checked_shl(NTT_P2 as u32).unwrap();
+    p1.wrapping_sub(p2).wrapping_add(NTT_K64 as u64)
+};
+
+pub fn bench_mul_near_width(c: &mut Criterion) {
+    let mut lhs: [u64; N] = [0; N];
+    let mut rhs: [u64; N] = [0; N];
+    for i in 0..N {
+        lhs[i] = (random::<u64>()) % NTT_MOD64;
+        rhs[i] = (random::<u64>()) % NTT_MOD64;
+    }
+    let reducer64 = FixedTrinomialSolinas64::<NTT_P1, NTT_P2, NTT_K64>::new(&NTT_MOD64);
+    let lhs64: Vec<u64> = lhs.iter().map(|&v| reducer64.transform(v)).collect();
+    let rhs64: Vec<u64> = rhs.iter().map(|&v| reducer64.transform(v)).collect();
+    let mut group = c.benchmark_group("solinas mul (2^64 - 2^32 + 1)");
+    group.bench_function("FixedTrinomialSolinas64", |b| {
+        b.iter(|| {
+            lhs64.iter().zip(rhs64.iter())
+                .map(|(a, b)| reducer64.mul(a, b))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.finish();
+}
+
+pub fn bench_sqr_near_width(c: &mut Criterion) {
+    let mut inputs: [u64; N] = [0; N];
+    for i in 0..N {
+        inputs[i] = (random::<u64>()) % NTT_MOD64;
+    }
+    let reducer64 = FixedTrinomialSolinas64::<NTT_P1, NTT_P2, NTT_K64>::new(&NTT_MOD64);
+    let sqr64: Vec<u64> = inputs.iter().map(|&v| reducer64.transform(v)).collect();
+    let mut group = c.benchmark_group("solinas sqr (2^64 - 2^32 + 1)");
+    group.bench_function("FixedTrinomialSolinas64", |b| {
+        b.iter(|| {
+            sqr64.iter().map(|&v| reducer64.sqr(v))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_transform,
@@ -327,6 +379,8 @@ criterion_group!(
     bench_sqr,
     bench_mul_xlarge,
     bench_sqr_xlarge,
+    bench_mul_near_width,
+    bench_sqr_near_width,
     bench_inv
 );
 criterion_main!(benches);

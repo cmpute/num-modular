@@ -14,6 +14,19 @@ macro_rules! impl_fixed_mersenne {
             const BITMASK: $T = ((1 as $T) << P) - 1;
             pub const MODULUS: $T = ((1 as $T) << P) - K;
 
+            /// Worst-case fold count for `reduce_double`.
+            /// Each fold replaces V = hi·2^P + lo with hi·K + lo (since 2^P ≡ K).
+            /// For K = 1: always 2 folds (the carry chain terminates in at most one
+            /// extra step). For K > 1: ⌈P/(P−⌈log₂K⌉)⌉ + 1 folds.
+            const FOLDS: u32 = if K == 1 {
+                2
+            } else {
+                let s = K.ilog2() + 1; // bit-width of K
+                let gap = P as u32 - s;
+                let folds_ceil = (P as u32 + gap - 1) / gap;
+                folds_ceil + 1
+            };
+
             const fn reduce_single(v: $T) -> $T {
                 let mut lo = v & Self::BITMASK;
                 let mut hi = v >> P;
@@ -131,18 +144,34 @@ macro_rules! impl_fixed_mersenne {
     };
 
     // Internal: reduce_double for primitive double-width types (u32→u64, u64→u128)
+    //
+    // For real pseudo-Mersennes, FOLDS is always ≤ 3 (K=1 → 2; small K → 3).
+    // Unrolling replaces the data-dependent while loop with straight-line folds.
+    // Extra folds past the true count are no-ops (hi reaches 0).
     (@reduce_double, primitive, $T:ty, $D:ty) => {
         fn reduce_double(v: $D) -> $T {
             let mut lo = (v as $T) & Self::BITMASK;
             let mut hi = v >> P;
-            while hi > 0 {
-                let sum = if K == 1 {
-                    hi + lo as $D
-                } else {
-                    hi * (K as $D) + lo as $D
+            macro_rules! mersenne_fold {
+                () => {
+                    let sum = if K == 1 {
+                        hi + lo as $D
+                    } else {
+                        hi * (K as $D) + lo as $D
+                    };
+                    lo = (sum as $T) & Self::BITMASK;
+                    hi = sum >> P;
                 };
-                lo = (sum as $T) & Self::BITMASK;
-                hi = sum >> P;
+            }
+            if Self::FOLDS <= 2 {
+                #[allow(unused_assignments)] { mersenne_fold!(); }
+                #[allow(unused_assignments)] { mersenne_fold!(); }
+            } else if Self::FOLDS == 3 {
+                #[allow(unused_assignments)] { mersenne_fold!(); }
+                #[allow(unused_assignments)] { mersenne_fold!(); }
+                #[allow(unused_assignments)] { mersenne_fold!(); }
+            } else {
+                while hi > 0 { mersenne_fold!(); }
             }
             if lo >= Self::MODULUS {
                 lo - Self::MODULUS
@@ -153,6 +182,10 @@ macro_rules! impl_fixed_mersenne {
     };
 
     // Internal: reduce_double for udouble (u128→udouble)
+    //
+    // Phase 1 (udouble while hi.hi > 0) is unreachable for valid P ≤ 127 since
+    // hi = v >> P < 2^P ≤ 2^127 always fits in one word. Phase 2 uses u128
+    // arithmetic and is unrolled when FOLDS ≤ 3 (all practical pseudo-Mersennes).
     (@reduce_double, udouble, $T:ty, $D:ty) => {
         fn reduce_double(v: $D) -> $T {
             let mut lo = v.lo & Self::BITMASK;
@@ -163,10 +196,22 @@ macro_rules! impl_fixed_mersenne {
                 hi = sum >> P;
             }
             let mut hi = hi.lo;
-            while hi > 0 {
-                let sum = if K == 1 { hi + lo } else { hi * K + lo };
-                lo = sum & Self::BITMASK;
-                hi = sum >> P;
+            macro_rules! mersenne_u128_fold {
+                () => {
+                    let sum = if K == 1 { hi + lo } else { hi * K + lo };
+                    lo = sum & Self::BITMASK;
+                    hi = sum >> P;
+                };
+            }
+            if Self::FOLDS <= 2 {
+                #[allow(unused_assignments)] { mersenne_u128_fold!(); }
+                #[allow(unused_assignments)] { mersenne_u128_fold!(); }
+            } else if Self::FOLDS == 3 {
+                #[allow(unused_assignments)] { mersenne_u128_fold!(); }
+                #[allow(unused_assignments)] { mersenne_u128_fold!(); }
+                #[allow(unused_assignments)] { mersenne_u128_fold!(); }
+            } else {
+                while hi > 0 { mersenne_u128_fold!(); }
             }
             if lo >= Self::MODULUS {
                 lo - Self::MODULUS
