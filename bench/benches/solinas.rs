@@ -1,7 +1,9 @@
 #[macro_use]
 extern crate criterion;
 use criterion::Criterion;
-use num_modular::{FixedTrinomialSolinas, FixedTrinomialSolinas32, FixedTrinomialSolinas64, Reducer};
+use num_modular::{
+    FixedTrinomialSolinas, FixedTrinomialSolinas32, FixedTrinomialSolinas64, Reducer,
+};
 use rand::random;
 
 const N: usize = 256;
@@ -78,8 +80,14 @@ pub fn bench_mul(c: &mut Criterion) {
     let rhs32: Vec<u32> = rhs.iter().map(|&v| reducer32.transform(v)).collect();
     let lhs64: Vec<u64> = lhs.iter().map(|&v| reducer64.transform(v as u64)).collect();
     let rhs64: Vec<u64> = rhs.iter().map(|&v| reducer64.transform(v as u64)).collect();
-    let lhs128: Vec<u128> = lhs.iter().map(|&v| reducer128.transform(v as u128)).collect();
-    let rhs128: Vec<u128> = rhs.iter().map(|&v| reducer128.transform(v as u128)).collect();
+    let lhs128: Vec<u128> = lhs
+        .iter()
+        .map(|&v| reducer128.transform(v as u128))
+        .collect();
+    let rhs128: Vec<u128> = rhs
+        .iter()
+        .map(|&v| reducer128.transform(v as u128))
+        .collect();
 
     let mut group = c.benchmark_group("solinas mul (2^31 - 2^13 + 1)");
     group.bench_function("FixedTrinomialSolinas32", |b| {
@@ -123,8 +131,14 @@ pub fn bench_sqr(c: &mut Criterion) {
     let reducer128 = FixedTrinomialSolinas::<P1, P2, K128>::new(&MOD128);
 
     let sqr32: Vec<u32> = inputs.iter().map(|&v| reducer32.transform(v)).collect();
-    let sqr64: Vec<u64> = inputs.iter().map(|&v| reducer64.transform(v as u64)).collect();
-    let sqr128: Vec<u128> = inputs.iter().map(|&v| reducer128.transform(v as u128)).collect();
+    let sqr64: Vec<u64> = inputs
+        .iter()
+        .map(|&v| reducer64.transform(v as u64))
+        .collect();
+    let sqr128: Vec<u128> = inputs
+        .iter()
+        .map(|&v| reducer128.transform(v as u128))
+        .collect();
 
     let mut group = c.benchmark_group("solinas sqr (2^31 - 2^13 + 1)");
     group.bench_function("FixedTrinomialSolinas32", |b| {
@@ -216,8 +230,14 @@ pub fn bench_add(c: &mut Criterion) {
     let rhs32: Vec<u32> = rhs.iter().map(|&v| reducer32.transform(v)).collect();
     let lhs64: Vec<u64> = lhs.iter().map(|&v| reducer64.transform(v as u64)).collect();
     let rhs64: Vec<u64> = rhs.iter().map(|&v| reducer64.transform(v as u64)).collect();
-    let lhs128: Vec<u128> = lhs.iter().map(|&v| reducer128.transform(v as u128)).collect();
-    let rhs128: Vec<u128> = rhs.iter().map(|&v| reducer128.transform(v as u128)).collect();
+    let lhs128: Vec<u128> = lhs
+        .iter()
+        .map(|&v| reducer128.transform(v as u128))
+        .collect();
+    let rhs128: Vec<u128> = rhs
+        .iter()
+        .map(|&v| reducer128.transform(v as u128))
+        .collect();
 
     let mut group = c.benchmark_group("solinas add (2^31 - 2^13 + 1)");
     group.bench_function("FixedTrinomialSolinas32", |b| {
@@ -262,8 +282,14 @@ pub fn bench_inv(c: &mut Criterion) {
     let reducer128 = FixedTrinomialSolinas::<P1, P2, K128>::new(&MOD128);
 
     let inv32: Vec<u32> = inputs.iter().map(|&v| reducer32.transform(v)).collect();
-    let inv64: Vec<u64> = inputs.iter().map(|&v| reducer64.transform(v as u64)).collect();
-    let inv128: Vec<u128> = inputs.iter().map(|&v| reducer128.transform(v as u128)).collect();
+    let inv64: Vec<u64> = inputs
+        .iter()
+        .map(|&v| reducer64.transform(v as u64))
+        .collect();
+    let inv128: Vec<u128> = inputs
+        .iter()
+        .map(|&v| reducer128.transform(v as u128))
+        .collect();
 
     let mut group = c.benchmark_group("solinas inv (2^31 - 2^13 + 1)");
     group.bench_function("FixedTrinomialSolinas32", |b| {

@@ -14,14 +14,22 @@ macro_rules! impl_fixed_trinomial_solinas {
         $kind:ident
     ) => {
         impl<const P1: u8, const P2: u8, const K: $K> $TypeName<P1, P2, K> {
-            const BITMASK: $T = ((1 as $T) << (P1 as u32)) - 1;
+            const BITMASK: $T = match (1 as $T).checked_shl(P1 as u32) {
+                Some(v) => v.wrapping_sub(1),
+                None => <$T>::MAX,
+            };
             pub const MODULUS: $T = {
-                let p1 = (1 as $T) << (P1 as u32);
-                let p2 = (1 as $T) << (P2 as u32);
+                let p1 = match (1 as $T).checked_shl(P1 as u32) {
+                    Some(v) => v,
+                    None => 0,
+                };
+                let p2 = (1 as $T)
+                    .checked_shl(P2 as u32)
+                    .expect("P2 exceeds type width");
                 if K >= 0 {
-                    p1 - p2 + (K as $T)
+                    p1.wrapping_sub(p2).wrapping_add(K as $T)
                 } else {
-                    p1 - p2 - ((-K) as $T)
+                    p1.wrapping_sub(p2).wrapping_sub((-K) as $T)
                 }
             };
 
@@ -73,11 +81,13 @@ macro_rules! impl_fixed_trinomial_solinas {
 
             #[inline]
             fn add(&self, lhs: &$T, rhs: &$T) -> $T {
-                let mut sum = lhs + rhs;
-                if sum >= Self::MODULUS {
-                    sum -= Self::MODULUS
+                let (sum, overflow) = lhs.overflowing_add(*rhs);
+                if overflow || sum >= Self::MODULUS {
+                    let (sum2, _) = sum.overflowing_sub(Self::MODULUS);
+                    sum2
+                } else {
+                    sum
                 }
-                sum
             }
             #[inline]
             fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
@@ -89,7 +99,13 @@ macro_rules! impl_fixed_trinomial_solinas {
             }
             #[inline]
             fn dbl(&self, target: $T) -> $T {
-                self.add(&target, &target)
+                let (sum, overflow) = target.overflowing_add(target);
+                if overflow || sum >= Self::MODULUS {
+                    let (sum2, _) = sum.overflowing_sub(Self::MODULUS);
+                    sum2
+                } else {
+                    sum
+                }
             }
             #[inline]
             fn neg(&self, target: $T) -> $T {
@@ -278,7 +294,7 @@ impl_fixed_trinomial_solinas!(FixedTrinomialSolinas32, u32, i32, u64, 16, 31, pr
 
 /// A modular reducer for trinomial Solinas numbers `2^P1 - 2^P2 + K` as modulus with 64-bit operands.
 ///
-/// Supports `P1` up to 63, `P2 < P1`, and odd signed `K` with `|K| < 2^P2`. All inputs and outputs are `u64`.
+/// Supports `P1` up to 64, `P2 < P1`, and odd signed `K` with `|K| < 2^P2`. All inputs and outputs are `u64`.
 /// Uses `u128` as the double-width intermediate for multiplication and reduction.
 /// The modulus `2^P1 - 2^P2 + K` must be prime for modular inverse and Fermat-based operations to be valid.
 ///
@@ -299,7 +315,7 @@ impl_fixed_trinomial_solinas!(FixedTrinomialSolinas32, u32, i32, u64, 16, 31, pr
 #[derive(Debug, Clone, Copy)]
 pub struct FixedTrinomialSolinas64<const P1: u8, const P2: u8, const K: i64>();
 
-impl_fixed_trinomial_solinas!(FixedTrinomialSolinas64, u64, i64, u128, 32, 63, primitive);
+impl_fixed_trinomial_solinas!(FixedTrinomialSolinas64, u64, i64, u128, 32, 64, primitive);
 
 /// A modular reducer for trinomial Solinas numbers `2^P1 - 2^P2 + K` as modulus.
 ///
@@ -345,6 +361,7 @@ mod tests {
     type S64_1 = FixedTrinomialSolinas64<31, 13, 1>;
     type S64_2 = FixedTrinomialSolinas64<61, 30, 1>;
     type S64_3 = FixedTrinomialSolinas64<32, 16, 1>;
+    type S64_4 = FixedTrinomialSolinas64<64, 32, 1>; // 2^64 - 2^32 + 1
 
     // u32 types
     type S32_1 = FixedTrinomialSolinas32<4, 2, 1>;
@@ -401,6 +418,9 @@ mod tests {
             const P3: u64 = <S64_3>::MODULUS;
             let m3 = S64_3::new(&P3);
             assert_eq!(m3.residue(m3.transform(a)), a % P3);
+            const P4: u64 = <S64_4>::MODULUS;
+            let m4 = S64_4::new(&P4);
+            assert_eq!(m4.residue(m4.transform(a)), a % P4);
         }
     }
 
@@ -470,7 +490,7 @@ mod tests {
             let a = random::<u64>();
             let b = random::<u64>();
             let e = random::<u8>() as u64;
-            tests_for!(a, b, e; S64_1 S64_2 S64_3);
+            tests_for!(a, b, e; S64_1 S64_2 S64_3 S64_4);
         }
     }
 
@@ -499,5 +519,22 @@ mod tests {
             let e = random::<u8>() as u32;
             tests_for!(a, b, e; S32_1 S32_2 S32_3);
         }
+    }
+
+    #[test]
+    fn test_add_near_overflow_u64() {
+        // 2^64 - 2^32 + 1 = 0xFFFFFFFF00000001, near u64::MAX
+        type S = FixedTrinomialSolinas64<64, 32, 1>;
+        const P: u64 = <S>::MODULUS;
+        assert_eq!(P, 0xFFFFFFFF00000001);
+        let r = S::new(&P);
+        // Values near P-1; their sum exceeds u64::MAX
+        // (P-1) + (P-2) = 2P-3 ≡ P-3 (mod P)
+        let a = r.transform(P - 1);
+        let b = r.transform(P - 2);
+        assert_eq!(r.residue(r.add(&a, &b)), P - 3);
+        // dbl near overflow: 2*(P-1) = 2P-2 ≡ P-2 (mod P)
+        let c = r.transform(P - 1);
+        assert_eq!(r.residue(r.dbl(c)), P - 2);
     }
 }
