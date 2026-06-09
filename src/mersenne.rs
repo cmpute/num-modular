@@ -1,8 +1,6 @@
 use crate::reduced::impl_reduced_binary_pow;
 use crate::{udouble, umax, ModularUnaryOps, Reducer};
 
-// FIXME: use unchecked operators to speed up calculation (after https://github.com/rust-lang/rust/issues/85122)
-
 macro_rules! impl_fixed_mersenne {
     (
         $TypeName:ident,

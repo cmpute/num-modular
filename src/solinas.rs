@@ -39,6 +39,8 @@ macro_rules! impl_fixed_trinomial_solinas {
                 debug_assert!(P1 <= $max_P1);
                 debug_assert!(P2 > 0 && P1 > P2);
                 debug_assert!(K % 2 != 0); // modulus must be odd
+                // |K| < 2^P2 keeps each reduction step non-negative in Z (required for unsigned arithmetic)
+                debug_assert!((K.unsigned_abs() as u128) < (1u128 << (P2 as u32)));
                 debug_assert!(
                     (Self::MODULUS == 3 || Self::MODULUS % 3 != 0)
                         && (Self::MODULUS == 5 || Self::MODULUS % 5 != 0)
@@ -130,7 +132,7 @@ macro_rules! impl_fixed_trinomial_solinas {
 
     // Internal: reduce_single for primitive double-width types (u32→u64, u64→u128)
     (@reduce_single, primitive, $T:ty, $D:ty) => {
-        fn reduce_single(v: $T) -> $T {
+        const fn reduce_single(v: $T) -> $T {
             let mut v: $D = v as $D;
             while v >> P1 > 0 {
                 let lo = (v as $T) & Self::BITMASK;
@@ -152,7 +154,8 @@ macro_rules! impl_fixed_trinomial_solinas {
         }
     };
 
-    // Internal: reduce_single for udouble (umax→udouble)
+    // Internal: reduce_single for udouble (umax→udouble). Stays in udouble for the same reason
+    // as reduce_double below: `hi << P2` can exceed `umax` during the tail.
     (@reduce_single, udouble, $T:ty, $D:ty) => {
         fn reduce_single(v: $T) -> $T {
             let mut v: $D = udouble { hi: 0, lo: v };
@@ -200,6 +203,12 @@ macro_rules! impl_fixed_trinomial_solinas {
     };
 
     // Internal: reduce_double for udouble (u128→udouble)
+    //
+    // Unlike [Mersenne](crate::FixedMersenne)'s two-phase loop (udouble while `hi.hi > 0`, then
+    // `umax` while `hi.lo > 0`), Solinas keeps `hi` as [udouble] until fully zero. Mersenne's
+    // tail step is `hi * K + lo`, which stays within `umax` when `K < 2^(P-1)`. Solinas uses
+    // `hi << P2`, which can exceed `umax` even when `hi` fits in one word (e.g. `hi * 2^P2`), so
+    // the tail must stay in double-width arithmetic.
     (@reduce_double, udouble, $T:ty, $D:ty) => {
         fn reduce_double(v: $D) -> $T {
             let mut lo = v.lo & Self::BITMASK;
@@ -245,7 +254,7 @@ macro_rules! impl_fixed_trinomial_solinas {
 
 /// A modular reducer for trinomial Solinas numbers `2^P1 - 2^P2 + K` as modulus with 32-bit operands.
 ///
-/// Supports `P1` up to 31, `P2 < P1`, `K` is a signed integer. All inputs and outputs are `u32`.
+/// Supports `P1` up to 31, `P2 < P1`, and odd signed `K` with `|K| < 2^P2`. All inputs and outputs are `u32`.
 /// The modulus `2^P1 - 2^P2 + K` must be prime for modular inverse and Fermat-based operations to be valid.
 ///
 /// # Example
@@ -269,7 +278,7 @@ impl_fixed_trinomial_solinas!(FixedTrinomialSolinas32, u32, i32, u64, 16, 31, pr
 
 /// A modular reducer for trinomial Solinas numbers `2^P1 - 2^P2 + K` as modulus with 64-bit operands.
 ///
-/// Supports `P1` up to 63, `P2 < P1`, `K` is a signed integer. All inputs and outputs are `u64`.
+/// Supports `P1` up to 63, `P2 < P1`, and odd signed `K` with `|K| < 2^P2`. All inputs and outputs are `u64`.
 /// Uses `u128` as the double-width intermediate for multiplication and reduction.
 /// The modulus `2^P1 - 2^P2 + K` must be prime for modular inverse and Fermat-based operations to be valid.
 ///
@@ -294,7 +303,7 @@ impl_fixed_trinomial_solinas!(FixedTrinomialSolinas64, u64, i64, u128, 32, 63, p
 
 /// A modular reducer for trinomial Solinas numbers `2^P1 - 2^P2 + K` as modulus.
 ///
-/// Supports `P1` up to 127, `P2 < P1`, `K` is a signed integer. All inputs and outputs are [umax] (currently `u128`).
+/// Supports `P1` up to 127, `P2 < P1`, and odd signed `K` with `|K| < 2^P2`. All inputs and outputs are [umax] (currently `u128`).
 ///
 /// The `P1` is limited to 127 so that overflow checks aren't necessary. This covers all trinomial
 /// Solinas primes within the range of [umax] (i.e. `u128`).

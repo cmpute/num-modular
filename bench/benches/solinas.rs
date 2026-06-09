@@ -4,9 +4,11 @@ use criterion::Criterion;
 use num_modular::{FixedTrinomialSolinas, FixedTrinomialSolinas32, FixedTrinomialSolinas64, Reducer};
 use rand::random;
 
-/// Solinas-like prime 2^6 - 2^2 + 1 = 61, fits in u32, u64, and u128.
-const P1: u8 = 6;
-const P2: u8 = 2;
+const N: usize = 256;
+
+// 2^31 - 2^13 + 1; forces widening mul / reduce_double on u32 and u64.
+const P1: u8 = 31;
+const P2: u8 = 13;
 const K32: i32 = 1;
 const K64: i64 = 1;
 const K128: i128 = 1;
@@ -15,7 +17,12 @@ const MOD32: u32 = (1u32 << P1) - (1u32 << P2) + (K32 as u32);
 const MOD64: u64 = (1u64 << P1) - (1u64 << P2) + (K64 as u64);
 const MOD128: u128 = (1u128 << P1) - (1u128 << P2) + (K128 as u128);
 
-const N: usize = 256;
+// 2^127 - 2^64 + 1; forces u128 widening mul / udouble reduce_double.
+const XP1: u8 = 127;
+const XP2: u8 = 64;
+const XK128: i128 = 1;
+
+const XMOD128: u128 = (1u128 << XP1) - (1u128 << XP2) + (XK128 as u128);
 
 pub fn bench_transform(c: &mut Criterion) {
     let mut inputs: [u32; N] = [0; N];
@@ -27,7 +34,7 @@ pub fn bench_transform(c: &mut Criterion) {
     let reducer64 = FixedTrinomialSolinas64::<P1, P2, K64>::new(&MOD64);
     let reducer128 = FixedTrinomialSolinas::<P1, P2, K128>::new(&MOD128);
 
-    let mut group = c.benchmark_group("solinas transform (2^6 - 2^2 + 1)");
+    let mut group = c.benchmark_group("solinas transform (2^31 - 2^13 + 1)");
     group.bench_function("FixedTrinomialSolinas32", |b| {
         b.iter(|| {
             inputs
@@ -74,7 +81,7 @@ pub fn bench_mul(c: &mut Criterion) {
     let lhs128: Vec<u128> = lhs.iter().map(|&v| reducer128.transform(v as u128)).collect();
     let rhs128: Vec<u128> = rhs.iter().map(|&v| reducer128.transform(v as u128)).collect();
 
-    let mut group = c.benchmark_group("solinas mul (2^6 - 2^2 + 1)");
+    let mut group = c.benchmark_group("solinas mul (2^31 - 2^13 + 1)");
     group.bench_function("FixedTrinomialSolinas32", |b| {
         b.iter(|| {
             lhs32
@@ -119,7 +126,7 @@ pub fn bench_sqr(c: &mut Criterion) {
     let sqr64: Vec<u64> = inputs.iter().map(|&v| reducer64.transform(v as u64)).collect();
     let sqr128: Vec<u128> = inputs.iter().map(|&v| reducer128.transform(v as u128)).collect();
 
-    let mut group = c.benchmark_group("solinas sqr (2^6 - 2^2 + 1)");
+    let mut group = c.benchmark_group("solinas sqr (2^31 - 2^13 + 1)");
     group.bench_function("FixedTrinomialSolinas32", |b| {
         b.iter(|| {
             sqr32
@@ -147,6 +154,52 @@ pub fn bench_sqr(c: &mut Criterion) {
     group.finish();
 }
 
+pub fn bench_mul_xlarge(c: &mut Criterion) {
+    let mut lhs: [u128; N] = [0; N];
+    let mut rhs: [u128; N] = [0; N];
+    for i in 0..N {
+        lhs[i] = random::<u128>() % XMOD128;
+        rhs[i] = random::<u128>() % XMOD128;
+    }
+
+    let reducer = FixedTrinomialSolinas::<XP1, XP2, XK128>::new(&XMOD128);
+    let lhs128: Vec<u128> = lhs.iter().map(|&v| reducer.transform(v)).collect();
+    let rhs128: Vec<u128> = rhs.iter().map(|&v| reducer.transform(v)).collect();
+
+    let mut group = c.benchmark_group("solinas mul (2^127 - 2^64 + 1)");
+    group.bench_function("FixedTrinomialSolinas", |b| {
+        b.iter(|| {
+            lhs128
+                .iter()
+                .zip(rhs128.iter())
+                .map(|(a, b)| reducer.mul(a, b))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.finish();
+}
+
+pub fn bench_sqr_xlarge(c: &mut Criterion) {
+    let mut inputs: [u128; N] = [0; N];
+    for i in 0..N {
+        inputs[i] = random::<u128>() % XMOD128;
+    }
+
+    let reducer = FixedTrinomialSolinas::<XP1, XP2, XK128>::new(&XMOD128);
+    let sqr128: Vec<u128> = inputs.iter().map(|&v| reducer.transform(v)).collect();
+
+    let mut group = c.benchmark_group("solinas sqr (2^127 - 2^64 + 1)");
+    group.bench_function("FixedTrinomialSolinas", |b| {
+        b.iter(|| {
+            sqr128
+                .iter()
+                .map(|&v| reducer.sqr(v))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.finish();
+}
+
 pub fn bench_add(c: &mut Criterion) {
     let mut lhs: [u32; N] = [0; N];
     let mut rhs: [u32; N] = [0; N];
@@ -166,7 +219,7 @@ pub fn bench_add(c: &mut Criterion) {
     let lhs128: Vec<u128> = lhs.iter().map(|&v| reducer128.transform(v as u128)).collect();
     let rhs128: Vec<u128> = rhs.iter().map(|&v| reducer128.transform(v as u128)).collect();
 
-    let mut group = c.benchmark_group("solinas add (2^6 - 2^2 + 1)");
+    let mut group = c.benchmark_group("solinas add (2^31 - 2^13 + 1)");
     group.bench_function("FixedTrinomialSolinas32", |b| {
         b.iter(|| {
             lhs32
@@ -198,7 +251,6 @@ pub fn bench_add(c: &mut Criterion) {
 }
 
 pub fn bench_inv(c: &mut Criterion) {
-    // Generate values coprime to 61 (guaranteed since modulus is prime)
     let mut inputs: [u32; N] = [0; N];
     for i in 0..N {
         let v = random::<u32>() % MOD32;
@@ -213,7 +265,7 @@ pub fn bench_inv(c: &mut Criterion) {
     let inv64: Vec<u64> = inputs.iter().map(|&v| reducer64.transform(v as u64)).collect();
     let inv128: Vec<u128> = inputs.iter().map(|&v| reducer128.transform(v as u128)).collect();
 
-    let mut group = c.benchmark_group("solinas inv (2^6 - 2^2 + 1)");
+    let mut group = c.benchmark_group("solinas inv (2^31 - 2^13 + 1)");
     group.bench_function("FixedTrinomialSolinas32", |b| {
         b.iter(|| {
             inv32
@@ -241,5 +293,14 @@ pub fn bench_inv(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_transform, bench_add, bench_mul, bench_sqr, bench_inv);
+criterion_group!(
+    benches,
+    bench_transform,
+    bench_add,
+    bench_mul,
+    bench_sqr,
+    bench_mul_xlarge,
+    bench_sqr_xlarge,
+    bench_inv
+);
 criterion_main!(benches);
