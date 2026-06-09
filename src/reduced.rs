@@ -202,7 +202,7 @@ macro_rules! impl_assign_ops {
                 r.$reducer_method(a, &rhs);
             }
         }
-    }
+    };
 }
 impl_assign_ops!(add_assign, impl AddAssign, with add_in_place);
 impl_assign_ops!(sub_assign, impl SubAssign, with sub_in_place);

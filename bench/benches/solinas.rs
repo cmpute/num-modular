@@ -346,7 +346,9 @@ pub fn bench_mul_near_width(c: &mut Criterion) {
     let mut group = c.benchmark_group("solinas mul (2^64 - 2^32 + 1)");
     group.bench_function("FixedTrinomialSolinas64", |b| {
         b.iter(|| {
-            lhs64.iter().zip(rhs64.iter())
+            lhs64
+                .iter()
+                .zip(rhs64.iter())
                 .map(|(a, b)| reducer64.mul(a, b))
                 .reduce(|a, b| a.wrapping_add(b))
         })
@@ -364,7 +366,9 @@ pub fn bench_sqr_near_width(c: &mut Criterion) {
     let mut group = c.benchmark_group("solinas sqr (2^64 - 2^32 + 1)");
     group.bench_function("FixedTrinomialSolinas64", |b| {
         b.iter(|| {
-            sqr64.iter().map(|&v| reducer64.sqr(v))
+            sqr64
+                .iter()
+                .map(|&v| reducer64.sqr(v))
                 .reduce(|a, b| a.wrapping_add(b))
         })
     });

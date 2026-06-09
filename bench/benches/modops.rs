@@ -2,8 +2,8 @@
 extern crate criterion;
 use criterion::Criterion;
 use num_modular::{
-    FixedMersenne64, FixedMersenneInt, FixedTrinomialSolinas64, ModularCoreOps,
-    ModularPow, ModularUnaryOps, Montgomery, PreMulInv2by1, Reducer,
+    FixedMersenne64, FixedMersenneInt, FixedTrinomialSolinas64, ModularCoreOps, ModularPow,
+    ModularUnaryOps, Montgomery, PreMulInv2by1, Reducer,
 };
 use rand::random;
 
