@@ -5,6 +5,7 @@ A generic implementation of integer division and modular arithmetics in Rust. It
 - Common modular arithmetics: `add`, `sub`, `mul`, `div`, `neg`, `double`, `square`, `inv`, `pow`
 - Optimized modular arithmetics in **Montgomery form**
 - Optimized modular arithmetics with **pseudo Mersenne primes** as moduli
+- Optimized modular arithmetics with **trinomial Solinas primes** as moduli
 - Fast **integer divisibility** check
 - **Legendre**, **Jacobi** and **Kronecker** symbols
 

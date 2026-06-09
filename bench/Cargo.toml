@@ -16,6 +16,10 @@ harness = false
 name = "mersenne"
 harness = false
 
+[[bench]]
+name = "solinas"
+harness = false
+
 [dependencies]
 num-integer = "0.1.0"
 num-traits = "0.2.0"

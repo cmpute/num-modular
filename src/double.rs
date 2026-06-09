@@ -7,6 +7,10 @@ use core::ops::*;
 #[allow(non_camel_case_types)]
 pub type umax = u128;
 
+/// Alias of the builtin signed integer type with max width (currently [i128])
+#[allow(non_camel_case_types)]
+pub type imax = i128;
+
 const HALF_BITS: u32 = umax::BITS / 2;
 
 // Split umax into hi and lo parts. Tt's critical to use inline here
