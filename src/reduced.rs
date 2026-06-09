@@ -112,8 +112,9 @@ macro_rules! impl_binops {
             }
         }
 
-        impl<T: PartialEq, R: Reducer<T>> $op<T> for ReducedInt<T, R> {
+        impl<T, R: Reducer<T>> $op<T> for ReducedInt<T, R> {
             type Output = Self;
+            #[inline]
             fn $method(self, rhs: T) -> Self::Output {
                 let Self { a, r } = self;
                 let rhs = r.transform(rhs);
@@ -124,6 +125,7 @@ macro_rules! impl_binops {
 
         impl<T: PartialEq + Clone, R: Reducer<T>> $op<&T> for ReducedInt<T, R> {
             type Output = Self;
+            #[inline]
             fn $method(self, rhs: &T) -> Self::Output {
                 let Self { a, r } = self;
                 let rhs = r.transform(rhs.clone());
@@ -132,8 +134,9 @@ macro_rules! impl_binops {
             }
         }
 
-        impl<T: PartialEq, R: Reducer<T> + Clone> $op<T> for &ReducedInt<T, R> {
+        impl<T, R: Reducer<T> + Clone> $op<T> for &ReducedInt<T, R> {
             type Output = ReducedInt<T, R>;
+            #[inline]
             fn $method(self, rhs: T) -> Self::Output {
                 let rhs = self.r.transform(rhs);
                 let a = self.r.$method(&self.a, &rhs);
@@ -146,6 +149,7 @@ macro_rules! impl_binops {
 
         impl<T: PartialEq + Clone, R: Reducer<T> + Clone> $op<&T> for &ReducedInt<T, R> {
             type Output = ReducedInt<T, R>;
+            #[inline]
             fn $method(self, rhs: &T) -> Self::Output {
                 let rhs = self.r.transform(rhs.clone());
                 let a = self.r.$method(&self.a, &rhs);
@@ -164,6 +168,7 @@ impl_binops!(mul, impl Mul);
 macro_rules! impl_assign_ops {
     ($method:ident, impl $op:ident, with $reducer_method:ident) => {
         impl<T: PartialEq, R: Reducer<T>> $op for ReducedInt<T, R> {
+            #[inline]
             fn $method(&mut self, rhs: Self) {
                 self.check_modulus_eq(&rhs);
                 let Self { a, r } = self;
@@ -172,6 +177,7 @@ macro_rules! impl_assign_ops {
         }
 
         impl<T: PartialEq, R: Reducer<T>> $op<&Self> for ReducedInt<T, R> {
+            #[inline]
             fn $method(&mut self, rhs: &Self) {
                 self.check_modulus_eq(rhs);
                 let Self { a, r } = self;
@@ -179,7 +185,8 @@ macro_rules! impl_assign_ops {
             }
         }
 
-        impl<T: PartialEq, R: Reducer<T>> $op<T> for ReducedInt<T, R> {
+        impl<T, R: Reducer<T>> $op<T> for ReducedInt<T, R> {
+            #[inline]
             fn $method(&mut self, rhs: T) {
                 let Self { a, r } = self;
                 let rhs = r.transform(rhs);
@@ -188,6 +195,7 @@ macro_rules! impl_assign_ops {
         }
 
         impl<T: PartialEq + Clone, R: Reducer<T>> $op<&T> for ReducedInt<T, R> {
+            #[inline]
             fn $method(&mut self, rhs: &T) {
                 let Self { a, r } = self;
                 let rhs = r.transform(rhs.clone());
@@ -565,6 +573,61 @@ pub(crate) mod tests {
                     if let Some(v) = a.invm(&m) {
                         assert_eq!(am.inv().unwrap().residue(), v, "incorrect inv");
                     }
+
+                    // Test new binary operator variants
+                    // ReducedInt op &T
+                    assert_eq!((am + &b).residue(), a.addm(b, &m), "incorrect add<&T>");
+                    assert_eq!((am - &b).residue(), a.subm(b, &m), "incorrect sub<&T>");
+                    assert_eq!((am * &b).residue(), a.mulm(b, &m), "incorrect mul<&T>");
+                    // &ReducedInt op T
+                    assert_eq!((&am + a).residue(), a.addm(a, &m), "incorrect &add<T>");
+                    assert_eq!((&am - a).residue(), a.subm(a, &m), "incorrect &sub<T>");
+                    assert_eq!((&am * a).residue(), a.mulm(a, &m), "incorrect &mul<T>");
+                    // &ReducedInt op &T
+                    assert_eq!((&am + &b).residue(), a.addm(b, &m), "incorrect &add<&T>");
+                    assert_eq!((&am - &b).residue(), a.subm(b, &m), "incorrect &sub<&T>");
+                    assert_eq!((&am * &b).residue(), a.mulm(b, &m), "incorrect &mul<&T>");
+
+                    // Assign ops
+                    let mut tmp;
+                    tmp = am;
+                    tmp += bm;
+                    assert_eq!(tmp.residue(), a.addm(b, &m), "incorrect add_assign<Self>");
+                    tmp = am;
+                    tmp += &bm;
+                    assert_eq!(tmp.residue(), a.addm(b, &m), "incorrect add_assign<&Self>");
+                    tmp = am;
+                    tmp += b;
+                    assert_eq!(tmp.residue(), a.addm(b, &m), "incorrect add_assign<T>");
+                    tmp = am;
+                    tmp += &b;
+                    assert_eq!(tmp.residue(), a.addm(b, &m), "incorrect add_assign<&T>");
+
+                    tmp = am;
+                    tmp -= bm;
+                    assert_eq!(tmp.residue(), a.subm(b, &m), "incorrect sub_assign<Self>");
+                    tmp = am;
+                    tmp -= &bm;
+                    assert_eq!(tmp.residue(), a.subm(b, &m), "incorrect sub_assign<&Self>");
+                    tmp = am;
+                    tmp -= b;
+                    assert_eq!(tmp.residue(), a.subm(b, &m), "incorrect sub_assign<T>");
+                    tmp = am;
+                    tmp -= &b;
+                    assert_eq!(tmp.residue(), a.subm(b, &m), "incorrect sub_assign<&T>");
+
+                    tmp = am;
+                    tmp *= bm;
+                    assert_eq!(tmp.residue(), a.mulm(b, &m), "incorrect mul_assign<Self>");
+                    tmp = am;
+                    tmp *= &bm;
+                    assert_eq!(tmp.residue(), a.mulm(b, &m), "incorrect mul_assign<&Self>");
+                    tmp = am;
+                    tmp *= b;
+                    assert_eq!(tmp.residue(), a.mulm(b, &m), "incorrect mul_assign<T>");
+                    tmp = am;
+                    tmp *= &b;
+                    assert_eq!(tmp.residue(), a.mulm(b, &m), "incorrect mul_assign<&T>");
                 }
             }
         )*};
