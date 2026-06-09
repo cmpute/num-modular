@@ -8,7 +8,7 @@ use num_modular::udouble;
 pub fn bench_mul(c: &mut Criterion) {
     let mut group = c.benchmark_group("single mul single");
 
-    const N: usize = 12;
+    const N: usize = 256;
     let mut lhs: [u128; N] = [0; N];
     let mut rhs: [u128; N] = [0; N];
     for i in 0..N {
@@ -99,12 +99,13 @@ pub fn bench_mul(c: &mut Criterion) {
 pub fn bench_div(c: &mut Criterion) {
     let mut group = c.benchmark_group("double div single");
 
-    const N: usize = 12;
+    const N: usize = 256;
     let mut lhs: [(u128, u128); N] = [(0, 0); N];
     let mut rhs: [u128; N] = [0; N];
     for i in 0..N {
         lhs[i] = (random(), random());
-        rhs[i] = random();
+        let r = random();
+        rhs[i] = if r == 0 { 1 } else { r };
     }
 
     group.bench_function("ours", |b| {

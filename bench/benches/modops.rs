@@ -8,7 +8,11 @@ pub fn bench_u128(c: &mut Criterion) {
     const N: usize = 256;
     let mut cases: [(u128, u128, u128); N] = [(0, 0, 0); N];
     for i in 0..N {
-        cases[i] = (random(), random(), random());
+        let (a, b, mut m) = (random(), random(), random());
+        if m == 0 {
+            m = 1;
+        }
+        cases[i] = (a, b, m);
     }
 
     let mut group = c.benchmark_group("u128 modular ops");
@@ -28,6 +32,8 @@ pub fn bench_u128(c: &mut Criterion) {
                 .reduce(|a, b| a.wrapping_add(b))
         })
     });
+
+    group.finish();
 }
 
 pub fn bench_modinv(c: &mut Criterion) {
