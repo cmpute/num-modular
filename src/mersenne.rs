@@ -30,7 +30,7 @@ macro_rules! impl_fixed_mersenne {
             const FOLDS: u32 = if K == 1 {
                 2
             } else {
-                let s = K.ilog2() + 1; // bit-width of K
+                let s = <$T>::BITS - K.leading_zeros(); // bit-width of K
                 let gap = P as u32 - s;
                 let folds_ceil = (P as u32 + gap - 1) / gap;
                 folds_ceil + 1

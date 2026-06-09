@@ -23,9 +23,10 @@ macro_rules! impl_fixed_trinomial_solinas {
                     Some(v) => v,
                     None => 0,
                 };
-                let p2 = (1 as $T)
-                    .checked_shl(P2 as u32)
-                    .expect("P2 exceeds type width");
+                let p2 = match (1 as $T).checked_shl(P2 as u32) {
+                    Some(v) => v,
+                    None => panic!("P2 exceeds type width"),
+                };
                 if K >= 0 {
                     p1.wrapping_sub(p2).wrapping_add(K as $T)
                 } else {
@@ -197,9 +198,9 @@ macro_rules! impl_fixed_trinomial_solinas {
                 let hi = v >> P1;
                 let mut sum = (hi << (P2 as u32)) + lo;
                 if K > 0 {
-                    sum = sum - hi * (K as umax);
+                    sum -= hi * (K as umax);
                 } else if K < 0 {
-                    sum = sum + hi * ((-K) as umax);
+                    sum += hi * ((-K) as umax);
                 }
                 v = sum;
             }
@@ -265,8 +266,8 @@ macro_rules! impl_fixed_trinomial_solinas {
             macro_rules! udouble_fold {
                 () => {
                     let mut sum = (hi << (P2 as u32)) + lo;
-                    if K > 0 { sum = sum - hi * (K as umax); }
-                    else if K < 0 { sum = sum + hi * ((-K) as umax); }
+                    if K > 0 { sum -= hi * (K as umax); }
+                    else if K < 0 { sum += hi * ((-K) as umax); }
                     lo = sum.lo & Self::BITMASK;
                     hi = sum >> P1;
                 };
