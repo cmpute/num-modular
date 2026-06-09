@@ -540,60 +540,74 @@ mod bigint_impl {
     use num_traits::Zero;
 
     impl Reducer<BigUint> for Vanilla<BigUint> {
+        #[inline]
         fn new(m: &BigUint) -> Self {
             assert!(!m.is_zero());
             Self(m.clone())
         }
 
+        #[inline]
         fn transform(&self, target: BigUint) -> BigUint {
             target % &self.0
         }
 
+        #[inline]
         fn check(&self, target: &BigUint) -> bool {
             target < &self.0
         }
 
+        #[inline]
         fn modulus(&self) -> BigUint {
             self.0.clone()
         }
 
+        #[inline]
         fn residue(&self, target: BigUint) -> BigUint {
             target
         }
 
+        #[inline]
         fn is_zero(&self, target: &BigUint) -> bool {
             target.is_zero()
         }
 
-        fn add(&self, lhs: &BigUint, rhs: &BigUint) -> num_bigint::BigUint {
+        #[inline]
+        fn add(&self, lhs: &BigUint, rhs: &BigUint) -> BigUint {
             lhs.addm(rhs, &self.0)
         }
 
-        fn dbl(&self, target: num_bigint::BigUint) -> num_bigint::BigUint {
+        #[inline]
+        fn dbl(&self, target: BigUint) -> BigUint {
             target.dblm(&self.0)
         }
 
-        fn sub(&self, lhs: &num_bigint::BigUint, rhs: &num_bigint::BigUint) -> num_bigint::BigUint {
+        #[inline]
+        fn sub(&self, lhs: &BigUint, rhs: &BigUint) -> BigUint {
             lhs.subm(rhs, &self.0)
         }
 
-        fn neg(&self, target: num_bigint::BigUint) -> num_bigint::BigUint {
+        #[inline]
+        fn neg(&self, target: BigUint) -> BigUint {
             target.negm(&self.0)
         }
 
-        fn mul(&self, lhs: &num_bigint::BigUint, rhs: &num_bigint::BigUint) -> num_bigint::BigUint {
+        #[inline]
+        fn mul(&self, lhs: &BigUint, rhs: &BigUint) -> BigUint {
             lhs.mulm(rhs, &self.0)
         }
 
-        fn inv(&self, target: num_bigint::BigUint) -> Option<num_bigint::BigUint> {
+        #[inline]
+        fn inv(&self, target: BigUint) -> Option<BigUint> {
             target.invm(&self.0)
         }
 
-        fn sqr(&self, target: num_bigint::BigUint) -> num_bigint::BigUint {
+        #[inline]
+        fn sqr(&self, target: BigUint) -> BigUint {
             target.sqm(&self.0)
         }
 
-        fn pow(&self, base: num_bigint::BigUint, exp: &num_bigint::BigUint) -> num_bigint::BigUint {
+        #[inline]
+        fn pow(&self, base: BigUint, exp: &BigUint) -> BigUint {
             base.powm(exp, &self.0)
         }
     }
@@ -714,7 +728,7 @@ pub(crate) mod tests {
         }
     }
 
-    #[cfg(all(feature = "num-bigint", feature = "num-bigint"))]
+    #[cfg(all(feature = "num-bigint", feature = "num-traits"))]
     #[test]
     fn test_binops_no_copy_compiles() {
         use num_bigint::BigUint;
@@ -746,5 +760,7 @@ pub(crate) mod tests {
         m *= &m.clone();
         m *= v.clone();
         m *= &v;
+
+        assert_eq!(m.residue(), 0u8.into());
     }
 }
