@@ -2,8 +2,8 @@
 extern crate criterion;
 use criterion::Criterion;
 use num_modular::{
-    FixedMersenne64, FixedMersenneInt, FixedTrinomialSolinas64, ModularCoreOps, ModularPow,
-    ModularUnaryOps, Montgomery, PreMulInv2by1, Reducer,
+    FixedMersenne64, FixedMersenneInt, FixedProth64, FixedTrinomialSolinas64, ModularCoreOps,
+    ModularPow, ModularUnaryOps, Montgomery, PreMulInv2by1, Reducer,
 };
 use rand::random;
 
@@ -119,7 +119,7 @@ pub fn bench_modinv(c: &mut Criterion) {
     group.finish();
 }
 
-pub fn bench_mod_pow(c: &mut Criterion) {
+pub fn bench_mod_pow_goldilocks(c: &mut Criterion) {
     const N: usize = 256;
 
     // Goldilocks prime: 2^64 - 2^32 + 1
@@ -179,5 +179,58 @@ pub fn bench_mod_pow(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_modinv, bench_u128, bench_mod_pow);
+pub fn bench_mod_pow_proth(c: &mut Criterion) {
+    const N: usize = 256;
+
+    // Proth prime: 3 * 2^32 + 1
+    type Pro = FixedProth64<32, 3>;
+    const MOD: u64 = <Pro>::MODULUS;
+
+    let pro = Pro::new(&MOD);
+    let monty = Montgomery::<u64>::new(MOD);
+    let premul = PreMulInv2by1::<u64>::new(MOD);
+
+    // Generate random bases, pre-transform into each reducer's form
+    let mut bases_pro = [0u64; N];
+    for i in 0..N {
+        bases_pro[i] = pro.transform(random::<u64>() % MOD);
+    }
+
+    let exp = MOD - 2;
+
+    let mut group = c.benchmark_group("mod_pow proth 3*2^32+1");
+    group.bench_function("FixedProth64", |b| {
+        b.iter(|| {
+            bases_pro
+                .iter()
+                .map(|&v| pro.pow(v, &exp))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.bench_function("Montgomery", |b| {
+        b.iter(|| {
+            bases_pro
+                .iter()
+                .map(|&v| monty.pow(v, &exp))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.bench_function("PreMulInv2by1", |b| {
+        b.iter(|| {
+            bases_pro
+                .iter()
+                .map(|&v| premul.pow(v, &exp))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_modinv,
+    bench_u128,
+    bench_mod_pow_goldilocks,
+    bench_mod_pow_proth
+);
 criterion_main!(benches);

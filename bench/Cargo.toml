@@ -20,6 +20,10 @@ harness = false
 name = "solinas"
 harness = false
 
+[[bench]]
+name = "proth"
+harness = false
+
 [dependencies]
 num-integer = "0.1.0"
 num-traits = "0.2.0"

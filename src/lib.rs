@@ -286,6 +286,7 @@ mod mersenne;
 mod monty;
 mod preinv;
 mod prim;
+mod proth;
 mod reduced;
 mod solinas;
 mod word;
@@ -297,6 +298,7 @@ pub use double::{imax, udouble, umax};
 pub use mersenne::{FixedMersenne, FixedMersenne32, FixedMersenne64};
 pub use monty::Montgomery;
 pub use preinv::PreModInv;
+pub use proth::{FixedProth, FixedProth32, FixedProth64};
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 pub use solinas::{FixedTrinomialSolinas, FixedTrinomialSolinas32, FixedTrinomialSolinas64};
 
@@ -323,6 +325,15 @@ pub type FixedSolinasInt32<const P1: u8, const P2: u8, const K: i32> =
 /// An integer in modulo ring with a fixed Solinas number as modulus (64-bit)
 pub type FixedSolinasInt64<const P1: u8, const P2: u8, const K: i64> =
     ReducedInt<u64, FixedTrinomialSolinas64<P1, P2, K>>;
+
+/// An integer in modulo ring with a fixed Proth number as modulus
+pub type FixedProthInt<const N: u8, const K: umax> = ReducedInt<umax, FixedProth<N, K>>;
+
+/// An integer in modulo ring with a fixed Proth number as modulus (32-bit)
+pub type FixedProthInt32<const N: u8, const K: u32> = ReducedInt<u32, FixedProth32<N, K>>;
+
+/// An integer in modulo ring with a fixed Proth number as modulus (64-bit)
+pub type FixedProthInt64<const N: u8, const K: u64> = ReducedInt<u64, FixedProth64<N, K>>;
 
 // pub type BarrettInt<T> = ReducedInt<T, BarrettInt<T>>;
 

@@ -538,6 +538,22 @@ impl Rem<umax> for udouble {
     }
 }
 
+impl Div<udouble> for udouble {
+    type Output = udouble;
+    #[inline]
+    fn div(self, rhs: udouble) -> Self::Output {
+        self.div_rem_2by2(rhs).0
+    }
+}
+
+impl Rem<udouble> for udouble {
+    type Output = udouble;
+    #[inline]
+    fn rem(self, rhs: udouble) -> Self::Output {
+        self.div_rem_2by2(rhs).1
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
