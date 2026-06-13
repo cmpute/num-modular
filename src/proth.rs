@@ -11,8 +11,8 @@ use crate::{powm_u32, powm_u64, udouble, umax, ModularUnaryOps, Reducer};
 //
 // The product m·p inside REDC is expanded using the Proth form:
 //   m·(K·2^N + 1) = (m·K)<<N + m
-// which replaces a full-width multiply-add with a narrow multiply
-// (K is small), a shift, and an add.
+// Since K ≤ 255 (u8), the (m·K) multiply is narrow (at most 8 bits),
+// replacing a full-width multiply-add with a shift and an add.
 
 // --- macro for FixedProth32 / FixedProth64 ----------------------------------
 
@@ -32,7 +32,7 @@ macro_rules! debug_assert_prime_candidate {
 
 macro_rules! impl_fixed_proth_inherent {
     ($TypeName:ident, $T:ty, $D:ty, $neginv_fn:path, $powm:ident) => {
-        impl<const N: u8, const K: $T> $TypeName<N, K> {
+        impl<const N: u8, const K: u8> $TypeName<N, K> {
             /// Compile-time guard: N must be strictly less than the type bit-width.
             const _N_BOUND_CHECK: () = assert!((N as u32) < <$T>::BITS);
 
@@ -41,7 +41,19 @@ macro_rules! impl_fixed_proth_inherent {
                     Some(v) => v,
                     None => unreachable!(),
                 };
-                K.wrapping_mul(p2n).wrapping_add(1)
+                let m = (K as $T).wrapping_mul(p2n).wrapping_add(1);
+                // MODULUS ≤ φ·R guarantees `reduce` never overflows the double-word
+                // sum (φ = (√5−1)/2 ≈ 0.618).
+                assert!(
+                    m as u128
+                        <= match <$T>::BITS {
+                            32 => 2_654_435_769u128,
+                            64 => 11_400_714_819_323_199_485u128,
+                            _ => unreachable!(),
+                        },
+                    "MODULUS exceeds overflow-free bound; lower N or use FixedMontgomery"
+                );
+                m
             };
 
             /// Montgomery constant:  -MODULUS⁻¹ mod 2^BITS
@@ -53,15 +65,14 @@ macro_rules! impl_fixed_proth_inherent {
             #[inline]
             pub fn reduce(&self, t: $D) -> $T {
                 // Standard Montgomery REDC with Proth-optimised m·p product.
+                // MODULUS ≤ φ·R (guaranteed at compile time) ensures the sum
+                // t + m·MODULUS never exceeds the double-word width.
                 let m = (t as $T).wrapping_mul(Self::N0);
                 // m·p = m·(K·2^N + 1) = (m·K)<<N + m
                 let mp = ((m as $D) * (K as $D)) << N;
                 let mp = mp.wrapping_add(m as $D);
-                let (sum, overflow) = t.overflowing_add(mp);
-                let r = (sum >> <$T>::BITS) as $T;
-                if overflow {
-                    r.wrapping_add(Self::MODULUS.wrapping_neg())
-                } else if r >= Self::MODULUS {
+                let r = (t.wrapping_add(mp) >> <$T>::BITS) as $T;
+                if r >= Self::MODULUS {
                     r - Self::MODULUS
                 } else {
                     r
@@ -81,8 +92,8 @@ macro_rules! impl_fixed_proth_inherent {
 /// use num_modular::{FixedProth32, Reducer};
 ///
 /// const N: u8 = 4;
-/// const K: u32 = 1;
-/// let modulus = K * (1u32 << N) + 1; // 1*2^4 + 1 = 17
+/// const K: u8 = 1;
+/// let modulus = (K as u32) * (1u32 << N) + 1; // 1*2^4 + 1 = 17
 /// let reducer = FixedProth32::<N, K>::new(&modulus);
 /// let a = reducer.transform(3);
 /// let b = reducer.transform(5);
@@ -90,7 +101,7 @@ macro_rules! impl_fixed_proth_inherent {
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), 15);
 /// ```
 #[derive(Debug, Clone, Copy)]
-pub struct FixedProth32<const N: u8, const K: u32>;
+pub struct FixedProth32<const N: u8, const K: u8>;
 
 impl_fixed_proth_inherent!(
     FixedProth32,
@@ -100,7 +111,7 @@ impl_fixed_proth_inherent!(
     powm_u32
 );
 
-impl<const N: u8, const K: u32> Reducer<u32> for FixedProth32<N, K> {
+impl<const N: u8, const K: u8> Reducer<u32> for FixedProth32<N, K> {
     #[inline]
     fn new(m: &u32) -> Self {
         assert!(
@@ -112,16 +123,10 @@ impl<const N: u8, const K: u32> Reducer<u32> for FixedProth32<N, K> {
         assert!(K > 0, "K must be positive");
         assert!(K % 2 == 1, "K must be odd");
         assert!(
-            {
-                let two_n = 1_u64 << (N as u32);
-                (K as u64) * two_n < u32::MAX as u64
-            },
+            (K as u64) * (1_u64 << (N as u32)) < u32::MAX as u64,
             "K·2^N + 1 exceeds type maximum"
         );
-        debug_assert!(
-            (K as u128) < (1u128 << (N as u32)),
-            "K must be less than 2^N"
-        );
+        debug_assert!((K as u32) < (1u32 << (N as u32)), "K must be less than 2^N");
         debug_assert_prime_candidate!(Self::MODULUS);
         Self {}
     }
@@ -138,15 +143,15 @@ impl<const N: u8, const K: u32> Reducer<u32> for FixedProth32<N, K> {
 /// use num_modular::{FixedProth64, Reducer};
 ///
 /// const N: u8 = 5;
-/// const K: u64 = 3;
-/// let modulus = K * (1u64 << N) + 1; // 3*2^5 + 1 = 97
+/// const K: u8 = 3;
+/// let modulus = (K as u64) * (1u64 << N) + 1; // 3*2^5 + 1 = 97
 /// let reducer = FixedProth64::<N, K>::new(&modulus);
 /// let a = reducer.transform(10);
 /// let b = reducer.transform(20);
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (10u64 * 20) % 97);
 /// ```
 #[derive(Debug, Clone, Copy)]
-pub struct FixedProth64<const N: u8, const K: u64>;
+pub struct FixedProth64<const N: u8, const K: u8>;
 
 impl_fixed_proth_inherent!(
     FixedProth64,
@@ -156,7 +161,7 @@ impl_fixed_proth_inherent!(
     powm_u64
 );
 
-impl<const N: u8, const K: u64> Reducer<u64> for FixedProth64<N, K> {
+impl<const N: u8, const K: u8> Reducer<u64> for FixedProth64<N, K> {
     #[inline]
     fn new(m: &u64) -> Self {
         assert!(
@@ -168,16 +173,10 @@ impl<const N: u8, const K: u64> Reducer<u64> for FixedProth64<N, K> {
         assert!(K > 0, "K must be positive");
         assert!(K % 2 == 1, "K must be odd");
         assert!(
-            {
-                let two_n = 1_u128 << (N as u32);
-                (K as u128) * two_n < u64::MAX as u128
-            },
+            (K as u128) * (1_u128 << (N as u32)) < u64::MAX as u128,
             "K·2^N + 1 exceeds type maximum"
         );
-        debug_assert!(
-            (K as u128) < (1u128 << (N as u32)),
-            "K must be less than 2^N"
-        );
+        debug_assert!((K as u64) < (1u64 << (N as u32)), "K must be less than 2^N");
         debug_assert_prime_candidate!(Self::MODULUS);
         Self {}
     }
@@ -196,17 +195,17 @@ impl<const N: u8, const K: u64> Reducer<u64> for FixedProth64<N, K> {
 /// use num_modular::{FixedProth, Reducer};
 ///
 /// const N: u8 = 16;
-/// const K: u128 = 1;
-/// let modulus = K * (1u128 << N) + 1; // 2^16 + 1 = 65537
+/// const K: u8 = 1;
+/// let modulus = (K as u128) * (1u128 << N) + 1; // 2^16 + 1 = 65537
 /// let reducer = FixedProth::<N, K>::new(&modulus);
 /// let a = reducer.transform(1000);
 /// let b = reducer.transform(2000);
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (1000u128 * 2000) % modulus);
 /// ```
 #[derive(Debug, Clone, Copy)]
-pub struct FixedProth<const N: u8, const K: umax>;
+pub struct FixedProth<const N: u8, const K: u8>;
 
-impl<const N: u8, const K: umax> FixedProth<N, K> {
+impl<const N: u8, const K: u8> FixedProth<N, K> {
     /// Compile-time guard: N must be strictly less than 128.
     const _N_BOUND_CHECK_U128: () = assert!(N < 128);
 
@@ -215,7 +214,14 @@ impl<const N: u8, const K: umax> FixedProth<N, K> {
             Some(v) => v,
             None => unreachable!(),
         };
-        K.wrapping_mul(p2n).wrapping_add(1)
+        let m = (K as u128).wrapping_mul(p2n).wrapping_add(1);
+        // MODULUS ≤ φ·R guarantees `reduce` never overflows the udouble sum
+        // (φ = (√5−1)/2 ≈ 0.618).
+        assert!(
+            m <= 210_306_068_529_402_891_650_266_558_847_000_772_608,
+            "MODULUS exceeds overflow-free bound; lower N or use FixedMontgomery"
+        );
+        m
     };
 
     /// Montgomery constant:  -MODULUS⁻¹ mod 2¹²⁸
@@ -227,15 +233,16 @@ impl<const N: u8, const K: umax> FixedProth<N, K> {
         udouble::widening_square(r).div_rem_2by1(Self::MODULUS).1 // 2²⁵⁶ mod MODULUS
     };
 
-    /// Montgomery REDC with R = 2¹²⁸.
+    /// Montgomery REDC with R = 2¹²⁸ and Proth-optimised m·p product.
     #[inline]
     pub fn reduce(&self, t: udouble) -> umax {
         let m = t.lo.wrapping_mul(Self::N0);
-        let (sum, overflow) = t.overflowing_add(udouble::widening_mul(m, Self::MODULUS));
-        let r = sum.hi;
-        if overflow {
-            r.wrapping_add(Self::MODULUS.wrapping_neg())
-        } else if r >= Self::MODULUS {
+        // m·p = m·(K·2^N + 1) = (m·K)<<N + m
+        // K ≤ 255, so the widening_mul is narrow (at most 8 bits).
+        let mk = udouble::widening_mul(m, K as u128);
+        let mp = mk.shl_u32(N as u32) + udouble { hi: 0, lo: m };
+        let r = (t + mp).hi;
+        if r >= Self::MODULUS {
             r - Self::MODULUS
         } else {
             r
@@ -243,7 +250,7 @@ impl<const N: u8, const K: umax> FixedProth<N, K> {
     }
 }
 
-impl<const N: u8, const K: umax> Reducer<umax> for FixedProth<N, K> {
+impl<const N: u8, const K: u8> Reducer<umax> for FixedProth<N, K> {
     #[inline]
     fn new(m: &umax) -> Self {
         assert!(
@@ -255,10 +262,10 @@ impl<const N: u8, const K: umax> Reducer<umax> for FixedProth<N, K> {
         assert!(K > 0, "K must be positive");
         assert!(K % 2 == 1, "K must be odd");
         assert!(
-            K <= u128::MAX / (1u128 << (N as u32)),
+            (K as u128) * (1u128 << (N as u32)) < u128::MAX,
             "K·2^N + 1 exceeds type maximum"
         );
-        debug_assert!(K < 1u128 << (N as u32), "K must be less than 2^N");
+        debug_assert!((K as u128) < (1u128 << (N as u32)), "K must be less than 2^N");
         debug_assert_prime_candidate!(Self::MODULUS);
         Self {}
     }
@@ -471,21 +478,22 @@ mod tests {
         assert_eq!(r.residue(dbl), a2.dblm(&M));
     }
 
-    /// FixedProth32 with MODULUS > 0.618·R triggers wrapping_add overflow
-    /// in reduce. Fixed by using overflowing_add with compensation.
+    /// Reduce correctness with MODULUS near the overflow-free bound.
     #[test]
-    fn test_reduce_overflow_proth32() {
-        type S = FixedProth32<30, 3>; // MODULUS = 3·2^30 + 1 = 3,221,225,473
+    fn test_reduce_near_bound() {
+        // 255·2^23 + 1 = 2,139,095,041 (close to φ·2^32 threshold 2,654,435,769)
+        type S = FixedProth32<23, 255>;
         const M: u32 = <S>::MODULUS;
         let r = S::new(&M);
 
-        let a: u32 = 7407402 % M;
-        let b: u32 = 4587526 % M;
-        let a_mont = r.transform(a);
-        let b_mont = r.transform(b);
-        let result = r.residue(r.mul(&a_mont, &b_mont));
-        let expected = a.mulm(b, &M);
-        assert_eq!(result, expected, "reduce overflow bug");
+        for _ in 0..10 {
+            let a = random::<u32>() % M;
+            let b = random::<u32>() % M;
+            let am = r.transform(a);
+            let bm = r.transform(b);
+            let result = r.residue(r.mul(&am, &bm));
+            assert_eq!(result, a.mulm(b, &M));
+        }
     }
 
     /// inv with MODULUS > usize::MAX should not truncate.
