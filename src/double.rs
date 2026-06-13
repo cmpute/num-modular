@@ -150,6 +150,38 @@ impl udouble {
             None
         }
     }
+
+    /// Const-compatible left shift (replaces `Shl<u32>` in const contexts).
+    #[inline]
+    pub const fn shl_u32(self, rhs: u32) -> Self {
+        match rhs {
+            0 => self,
+            s if s >= umax::BITS => Self {
+                hi: self.lo << (s - umax::BITS),
+                lo: 0,
+            },
+            s => Self {
+                lo: self.lo << s,
+                hi: (self.hi << s) | (self.lo >> (umax::BITS - s)),
+            },
+        }
+    }
+
+    /// Const-compatible right shift (replaces `Shr<u32>` in const contexts).
+    #[inline]
+    pub const fn shr_u32(self, rhs: u32) -> Self {
+        match rhs {
+            0 => self,
+            s if s >= umax::BITS => Self {
+                lo: self.hi >> (rhs - umax::BITS),
+                hi: 0,
+            },
+            s => Self {
+                hi: self.hi >> s,
+                lo: (self.lo >> s) | (self.hi << (umax::BITS - s)),
+            },
+        }
+    }
 }
 
 impl From<umax> for udouble {
@@ -441,13 +473,13 @@ impl udouble {
     // double by single to single division.
     // equivalent to `udiv_qrnnd` in C or `divq` in assembly.
     //> (used in Self::{div, rem}::<umax>)
-    fn div_rem_2by1(self, other: umax) -> (umax, umax) {
+    pub const fn div_rem_2by1(self, other: umax) -> (umax, umax) {
         // the following algorithm comes from `ethnum` crate
         const B: umax = 1 << HALF_BITS; // number base (64 bits)
 
         // Normalize the divisor.
         let s = other.leading_zeros();
-        let (n, d) = (self << s, other << s); // numerator, denominator
+        let (n, d) = (self.shl_u32(s), other << s); // numerator, denominator
         let (d1, d0) = split(d);
         let (n1, n0) = split(n.lo); // split lower part of dividend
 
@@ -535,22 +567,6 @@ impl Rem<umax> for udouble {
             .div_rem_2by1(rhs)
             .1
         }
-    }
-}
-
-impl Div<udouble> for udouble {
-    type Output = udouble;
-    #[inline]
-    fn div(self, rhs: udouble) -> Self::Output {
-        self.div_rem_2by2(rhs).0
-    }
-}
-
-impl Rem<udouble> for udouble {
-    type Output = udouble;
-    #[inline]
-    fn rem(self, rhs: udouble) -> Self::Output {
-        self.div_rem_2by2(rhs).1
     }
 }
 

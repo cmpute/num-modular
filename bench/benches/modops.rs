@@ -7,6 +7,52 @@ use num_modular::{
 };
 use rand::random;
 
+// ── Benchmark helper macros ─────────────────────────────────────────────────
+
+/// Register a benchmark for a single-arg operation (pow, sqr).
+macro_rules! bench_fn1 {
+    ($group:expr, $name:expr, $reducer:expr, $bases:expr, $op:ident $(, $arg:expr)?) => {
+        $group.bench_function($name, |b| {
+            b.iter(|| {
+                $bases
+                    .iter()
+                    .map(|&v| $reducer.$op(v $(, $arg)?))
+                    .reduce(|a, b| a.wrapping_add(b))
+            })
+        });
+    };
+}
+
+/// Register a benchmark for `inv` (returns `Option`).
+macro_rules! bench_fn_inv {
+    ($group:expr, $name:expr, $reducer:expr, $bases:expr) => {
+        $group.bench_function($name, |b| {
+            b.iter(|| {
+                $bases
+                    .iter()
+                    .map(|&v| $reducer.inv(v))
+                    .reduce(|a, b| Some(a?.wrapping_add(b?)))
+            })
+        });
+    };
+}
+
+/// Register a benchmark for two-arg operations (add, mul) using zip.
+macro_rules! bench_fn2 {
+    ($group:expr, $name:expr, $reducer:expr, $lhs:expr, $rhs:expr, $op:ident) => {
+        $group.bench_function($name, |b| {
+            b.iter(|| {
+                $lhs.iter()
+                    .zip($rhs.iter())
+                    .map(|(a, b)| $reducer.$op(a, b))
+                    .reduce(|a, b| a.wrapping_add(b))
+            })
+        });
+    };
+}
+
+// ── u128 benchmarks ─────────────────────────────────────────────────────────
+
 pub fn bench_u128(c: &mut Criterion) {
     const N: usize = 256;
     let mut cases: [(u128, u128, u128); N] = [(0, 0, 0); N];
@@ -39,10 +85,11 @@ pub fn bench_u128(c: &mut Criterion) {
     group.finish();
 }
 
+// ── mod_inv ─────────────────────────────────────────────────────────────────
+
 pub fn bench_mod_inv_goldilocks(c: &mut Criterion) {
     const N: usize = 256;
 
-    // Goldilocks prime: 2^64 - 2^32 + 1
     type Sol = FixedTrinomialSolinas64<64, 32, 1>;
     type Mer = FixedMersenne64<64, { (1u64 << 32) - 1 }>;
     const MOD: u64 = <Sol>::MODULUS;
@@ -64,41 +111,11 @@ pub fn bench_mod_inv_goldilocks(c: &mut Criterion) {
     }
 
     let mut group = c.benchmark_group("mod_inv (2^64 - 2^32 + 1)");
-    group.bench_function("Mersenne", |b| {
-        b.iter(|| {
-            bases_mer.iter()
-                .map(|&v| mer.inv(v))
-                .reduce(|a, b| Some(a?.wrapping_add(b?)))
-        })
-    });
-    group.bench_function("Solinas", |b| {
-        b.iter(|| {
-            bases_sol.iter()
-                .map(|&v| sol.inv(v))
-                .reduce(|a, b| Some(a?.wrapping_add(b?)))
-        })
-    });
-    group.bench_function("Montgomery", |b| {
-        b.iter(|| {
-            bases_sol.iter()
-                .map(|&v| monty.inv(v))
-                .reduce(|a, b| Some(a?.wrapping_add(b?)))
-        })
-    });
-    group.bench_function("FixedMontgomery64", |b| {
-        b.iter(|| {
-            bases_fm.iter()
-                .map(|&v| fm.inv(v))
-                .reduce(|a, b| Some(a?.wrapping_add(b?)))
-        })
-    });
-    group.bench_function("PreMulInv2by1", |b| {
-        b.iter(|| {
-            bases_sol.iter()
-                .map(|&v| premul.inv(v))
-                .reduce(|a, b| Some(a?.wrapping_add(b?)))
-        })
-    });
+    bench_fn_inv!(group, "Mersenne", mer, bases_mer);
+    bench_fn_inv!(group, "Solinas", sol, bases_sol);
+    bench_fn_inv!(group, "Montgomery", monty, bases_sol);
+    bench_fn_inv!(group, "FixedMontgomery64", fm, bases_fm);
+    bench_fn_inv!(group, "PreMulInv2by1", premul, bases_sol);
     group.finish();
 }
 
@@ -122,42 +139,18 @@ pub fn bench_mod_inv_proth(c: &mut Criterion) {
     }
 
     let mut group = c.benchmark_group("mod_inv proth 3*2^32+1");
-    group.bench_function("FixedProth64", |b| {
-        b.iter(|| {
-            bases.iter()
-                .map(|&v| pro.inv(v))
-                .reduce(|a, b| Some(a?.wrapping_add(b?)))
-        })
-    });
-    group.bench_function("Montgomery", |b| {
-        b.iter(|| {
-            bases.iter()
-                .map(|&v| monty.inv(v))
-                .reduce(|a, b| Some(a?.wrapping_add(b?)))
-        })
-    });
-    group.bench_function("FixedMontgomery64", |b| {
-        b.iter(|| {
-            bases_fm.iter()
-                .map(|&v| fm.inv(v))
-                .reduce(|a, b| Some(a?.wrapping_add(b?)))
-        })
-    });
-    group.bench_function("PreMulInv2by1", |b| {
-        b.iter(|| {
-            bases.iter()
-                .map(|&v| premul.inv(v))
-                .reduce(|a, b| Some(a?.wrapping_add(b?)))
-        })
-    });
+    bench_fn_inv!(group, "FixedProth64", pro, bases);
+    bench_fn_inv!(group, "Montgomery", monty, bases);
+    bench_fn_inv!(group, "FixedMontgomery64", fm, bases_fm);
+    bench_fn_inv!(group, "PreMulInv2by1", premul, bases);
     group.finish();
 }
+
+// ── mod_pow ─────────────────────────────────────────────────────────────────
 
 pub fn bench_mod_pow_goldilocks(c: &mut Criterion) {
     const N: usize = 256;
 
-    // Goldilocks prime: 2^64 - 2^32 + 1
-    // As Mersenne: 2^64 - K where K = 2^32 - 1
     type Sol = FixedTrinomialSolinas64<64, 32, 1>;
     type Mer = FixedMersenne64<64, { (1u64 << 32) - 1 }>;
     const MOD: u64 = <Sol>::MODULUS;
@@ -168,7 +161,6 @@ pub fn bench_mod_pow_goldilocks(c: &mut Criterion) {
     let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
-    // Generate random bases, pre-transform into each reducer's form
     let mut bases_mer = [0u64; N];
     let mut bases_sol = [0u64; N];
     let mut bases_fm = [0u64; N];
@@ -182,53 +174,52 @@ pub fn bench_mod_pow_goldilocks(c: &mut Criterion) {
     let exp = MOD - 2;
 
     let mut group = c.benchmark_group("mod_pow");
-    group.bench_function("Mersenne (2^64 - 2^32 + 1)", |b| {
-        b.iter(|| {
-            bases_mer
-                .iter()
-                .map(|&v| mer.pow(v, &exp))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("Solinas (2^64 - 2^32 + 1)", |b| {
-        b.iter(|| {
-            bases_sol
-                .iter()
-                .map(|&v| sol.pow(v, &exp))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("Montgomery (2^64 - 2^32 + 1)", |b| {
-        b.iter(|| {
-            bases_sol
-                .iter()
-                .map(|&v| monty.pow(v, &exp))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("FixedMontgomery64 (2^64 - 2^32 + 1)", |b| {
-        b.iter(|| {
-            bases_fm
-                .iter()
-                .map(|&v| fm.pow(v, &exp))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("PreMulInv2by1 (2^64 - 2^32 + 1)", |b| {
-        b.iter(|| {
-            bases_sol
-                .iter()
-                .map(|&v| premul.pow(v, &exp))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
+    bench_fn1!(
+        group,
+        "Mersenne (2^64 - 2^32 + 1)",
+        mer,
+        bases_mer,
+        pow,
+        &exp
+    );
+    bench_fn1!(
+        group,
+        "Solinas (2^64 - 2^32 + 1)",
+        sol,
+        bases_sol,
+        pow,
+        &exp
+    );
+    bench_fn1!(
+        group,
+        "Montgomery (2^64 - 2^32 + 1)",
+        monty,
+        bases_sol,
+        pow,
+        &exp
+    );
+    bench_fn1!(
+        group,
+        "FixedMontgomery64 (2^64 - 2^32 + 1)",
+        fm,
+        bases_fm,
+        pow,
+        &exp
+    );
+    bench_fn1!(
+        group,
+        "PreMulInv2by1 (2^64 - 2^32 + 1)",
+        premul,
+        bases_sol,
+        pow,
+        &exp
+    );
     group.finish();
 }
 
 pub fn bench_mod_pow_proth(c: &mut Criterion) {
     const N: usize = 256;
 
-    // Proth prime: 3 * 2^32 + 1
     type Pro = FixedProth64<32, 3>;
     const MOD: u64 = <Pro>::MODULUS;
 
@@ -237,7 +228,6 @@ pub fn bench_mod_pow_proth(c: &mut Criterion) {
     let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
-    // Generate random bases, pre-transform into each reducer's form
     let mut bases_pro = [0u64; N];
     let mut bases_fm = [0u64; N];
     for i in 0..N {
@@ -249,45 +239,18 @@ pub fn bench_mod_pow_proth(c: &mut Criterion) {
     let exp = MOD - 2;
 
     let mut group = c.benchmark_group("mod_pow proth 3*2^32+1");
-    group.bench_function("FixedProth64", |b| {
-        b.iter(|| {
-            bases_pro
-                .iter()
-                .map(|&v| pro.pow(v, &exp))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("Montgomery", |b| {
-        b.iter(|| {
-            bases_pro
-                .iter()
-                .map(|&v| monty.pow(v, &exp))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("FixedMontgomery64", |b| {
-        b.iter(|| {
-            bases_fm
-                .iter()
-                .map(|&v| fm.pow(v, &exp))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("PreMulInv2by1", |b| {
-        b.iter(|| {
-            bases_pro
-                .iter()
-                .map(|&v| premul.pow(v, &exp))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
+    bench_fn1!(group, "FixedProth64", pro, bases_pro, pow, &exp);
+    bench_fn1!(group, "Montgomery", monty, bases_pro, pow, &exp);
+    bench_fn1!(group, "FixedMontgomery64", fm, bases_fm, pow, &exp);
+    bench_fn1!(group, "PreMulInv2by1", premul, bases_pro, pow, &exp);
     group.finish();
 }
+
+// ── mod_add ─────────────────────────────────────────────────────────────────
 
 pub fn bench_mod_add_goldilocks(c: &mut Criterion) {
     const N: usize = 256;
 
-    // Goldilocks prime: 2^64 - 2^32 + 1
     type Sol = FixedTrinomialSolinas64<64, 32, 1>;
     type Mer = FixedMersenne64<64, { (1u64 << 32) - 1 }>;
     const MOD: u64 = <Sol>::MODULUS;
@@ -314,41 +277,11 @@ pub fn bench_mod_add_goldilocks(c: &mut Criterion) {
     }
 
     let mut group = c.benchmark_group("mod_add (2^64 - 2^32 + 1)");
-    group.bench_function("Mersenne", |b| {
-        b.iter(|| {
-            lhs_mer.iter().zip(rhs_mer.iter())
-                .map(|(a, b)| mer.add(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("Solinas", |b| {
-        b.iter(|| {
-            lhs_sol.iter().zip(rhs_sol.iter())
-                .map(|(a, b)| sol.add(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("Montgomery", |b| {
-        b.iter(|| {
-            lhs_sol.iter().zip(rhs_sol.iter())
-                .map(|(a, b)| monty.add(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("FixedMontgomery64", |b| {
-        b.iter(|| {
-            lhs_fm.iter().zip(rhs_fm.iter())
-                .map(|(a, b)| fm.add(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("PreMulInv2by1", |b| {
-        b.iter(|| {
-            lhs_sol.iter().zip(rhs_sol.iter())
-                .map(|(a, b)| premul.add(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
+    bench_fn2!(group, "Mersenne", mer, lhs_mer, rhs_mer, add);
+    bench_fn2!(group, "Solinas", sol, lhs_sol, rhs_sol, add);
+    bench_fn2!(group, "Montgomery", monty, lhs_sol, rhs_sol, add);
+    bench_fn2!(group, "FixedMontgomery64", fm, lhs_fm, rhs_fm, add);
+    bench_fn2!(group, "PreMulInv2by1", premul, lhs_sol, rhs_sol, add);
     group.finish();
 }
 
@@ -375,36 +308,14 @@ pub fn bench_mod_add_proth(c: &mut Criterion) {
     }
 
     let mut group = c.benchmark_group("mod_add proth 3*2^32+1");
-    group.bench_function("FixedProth64", |b| {
-        b.iter(|| {
-            lhs.iter().zip(rhs.iter())
-                .map(|(a, b)| pro.add(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("Montgomery", |b| {
-        b.iter(|| {
-            lhs.iter().zip(rhs.iter())
-                .map(|(a, b)| monty.add(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("FixedMontgomery64", |b| {
-        b.iter(|| {
-            lhs_fm.iter().zip(rhs_fm.iter())
-                .map(|(a, b)| fm.add(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("PreMulInv2by1", |b| {
-        b.iter(|| {
-            lhs.iter().zip(rhs.iter())
-                .map(|(a, b)| premul.add(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
+    bench_fn2!(group, "FixedProth64", pro, lhs, rhs, add);
+    bench_fn2!(group, "Montgomery", monty, lhs, rhs, add);
+    bench_fn2!(group, "FixedMontgomery64", fm, lhs_fm, rhs_fm, add);
+    bench_fn2!(group, "PreMulInv2by1", premul, lhs, rhs, add);
     group.finish();
 }
+
+// ── mod_mul ─────────────────────────────────────────────────────────────────
 
 pub fn bench_mod_mul_goldilocks(c: &mut Criterion) {
     const N: usize = 256;
@@ -435,41 +346,11 @@ pub fn bench_mod_mul_goldilocks(c: &mut Criterion) {
     }
 
     let mut group = c.benchmark_group("mod_mul (2^64 - 2^32 + 1)");
-    group.bench_function("Mersenne", |b| {
-        b.iter(|| {
-            lhs_mer.iter().zip(rhs_mer.iter())
-                .map(|(a, b)| mer.mul(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("Solinas", |b| {
-        b.iter(|| {
-            lhs_sol.iter().zip(rhs_sol.iter())
-                .map(|(a, b)| sol.mul(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("Montgomery", |b| {
-        b.iter(|| {
-            lhs_sol.iter().zip(rhs_sol.iter())
-                .map(|(a, b)| monty.mul(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("FixedMontgomery64", |b| {
-        b.iter(|| {
-            lhs_fm.iter().zip(rhs_fm.iter())
-                .map(|(a, b)| fm.mul(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("PreMulInv2by1", |b| {
-        b.iter(|| {
-            lhs_sol.iter().zip(rhs_sol.iter())
-                .map(|(a, b)| premul.mul(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
+    bench_fn2!(group, "Mersenne", mer, lhs_mer, rhs_mer, mul);
+    bench_fn2!(group, "Solinas", sol, lhs_sol, rhs_sol, mul);
+    bench_fn2!(group, "Montgomery", monty, lhs_sol, rhs_sol, mul);
+    bench_fn2!(group, "FixedMontgomery64", fm, lhs_fm, rhs_fm, mul);
+    bench_fn2!(group, "PreMulInv2by1", premul, lhs_sol, rhs_sol, mul);
     group.finish();
 }
 
@@ -496,34 +377,10 @@ pub fn bench_mod_mul_proth(c: &mut Criterion) {
     }
 
     let mut group = c.benchmark_group("mod_mul proth 3*2^32+1");
-    group.bench_function("FixedProth64", |b| {
-        b.iter(|| {
-            lhs.iter().zip(rhs.iter())
-                .map(|(a, b)| pro.mul(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("Montgomery", |b| {
-        b.iter(|| {
-            lhs.iter().zip(rhs.iter())
-                .map(|(a, b)| monty.mul(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("FixedMontgomery64", |b| {
-        b.iter(|| {
-            lhs_fm.iter().zip(rhs_fm.iter())
-                .map(|(a, b)| fm.mul(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
-    group.bench_function("PreMulInv2by1", |b| {
-        b.iter(|| {
-            lhs.iter().zip(rhs.iter())
-                .map(|(a, b)| premul.mul(a, b))
-                .reduce(|a, b| a.wrapping_add(b))
-        })
-    });
+    bench_fn2!(group, "FixedProth64", pro, lhs, rhs, mul);
+    bench_fn2!(group, "Montgomery", monty, lhs, rhs, mul);
+    bench_fn2!(group, "FixedMontgomery64", fm, lhs_fm, rhs_fm, mul);
+    bench_fn2!(group, "PreMulInv2by1", premul, lhs, rhs, mul);
     group.finish();
 }
 

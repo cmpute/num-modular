@@ -1,5 +1,5 @@
-use crate::reduced::impl_reduced_binary_pow;
-use crate::{imax, udouble, umax, ModularUnaryOps, Reducer, Vanilla};
+use crate::reduced::{impl_reduced_binary_pow, impl_reduced_ops};
+use crate::{imax, udouble, umax, ModularUnaryOps, Reducer};
 
 // REF: Handbook of Cryptography 14.3.4
 
@@ -79,38 +79,12 @@ macro_rules! impl_fixed_trinomial_solinas {
                 Self::reduce_single(target)
             }
             #[inline]
-            fn check(&self, target: &$T) -> bool {
-                *target < Self::MODULUS
-            }
-            #[inline]
             fn residue(&self, target: $T) -> $T {
                 target
             }
-            #[inline]
-            fn modulus(&self) -> $T {
-                Self::MODULUS
-            }
-            #[inline]
-            fn is_zero(&self, target: &$T) -> bool {
-                target == &0
-            }
 
-            #[inline]
-            fn add(&self, lhs: &$T, rhs: &$T) -> $T {
-                Vanilla::<$T>::add(&Self::MODULUS, *lhs, *rhs)
-            }
-            #[inline]
-            fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
-                Vanilla::<$T>::sub(&Self::MODULUS, *lhs, *rhs)
-            }
-            #[inline]
-            fn dbl(&self, target: $T) -> $T {
-                Vanilla::<$T>::dbl(&Self::MODULUS, target)
-            }
-            #[inline]
-            fn neg(&self, target: $T) -> $T {
-                Vanilla::<$T>::neg(&Self::MODULUS, target)
-            }
+            impl_reduced_ops!($T);
+
             #[inline]
             fn mul(&self, lhs: &$T, rhs: &$T) -> $T {
                 if (P1 as u32) < $half_bits {

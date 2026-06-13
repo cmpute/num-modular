@@ -405,6 +405,44 @@ macro_rules! impl_uprim_vanilla_core_const {
 }
 impl_uprim_vanilla_core_const!(u8 u16 u32 u64 u128 usize);
 
+/// Generate the seven trivial `Reducer` trait methods that are identical
+/// across all fixed reducer types (check, modulus, is_zero, add, sub, dbl, neg).
+macro_rules! impl_reduced_ops {
+    ($T:ty) => {
+        #[inline]
+        fn check(&self, target: &$T) -> bool {
+            *target < Self::MODULUS
+        }
+        #[inline]
+        fn modulus(&self) -> $T {
+            Self::MODULUS
+        }
+        #[inline]
+        fn is_zero(&self, target: &$T) -> bool {
+            target == &0
+        }
+
+        #[inline]
+        fn add(&self, lhs: &$T, rhs: &$T) -> $T {
+            $crate::Vanilla::<$T>::add(&Self::MODULUS, *lhs, *rhs)
+        }
+        #[inline]
+        fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
+            $crate::Vanilla::<$T>::sub(&Self::MODULUS, *lhs, *rhs)
+        }
+        #[inline]
+        fn dbl(&self, target: $T) -> $T {
+            $crate::Vanilla::<$T>::dbl(&Self::MODULUS, target)
+        }
+        #[inline]
+        fn neg(&self, target: $T) -> $T {
+            $crate::Vanilla::<$T>::neg(&Self::MODULUS, target)
+        }
+    };
+}
+
+pub(crate) use impl_reduced_ops;
+
 macro_rules! impl_reduced_binary_pow {
     ($T:ty) => {
         fn pow(&self, base: $T, exp: &$T) -> $T {

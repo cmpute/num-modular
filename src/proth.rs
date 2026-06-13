@@ -1,6 +1,6 @@
 use crate::impl_fixed_monty_ops;
-use crate::reduced::impl_reduced_binary_pow;
-use crate::{powm_u32, powm_u64, udouble, umax, ModularUnaryOps, Reducer, Vanilla};
+use crate::reduced::{impl_reduced_binary_pow, impl_reduced_ops};
+use crate::{powm_u32, powm_u64, udouble, umax, ModularUnaryOps, Reducer};
 
 // Proth primes: m = K * 2^N + 1 (K odd, K < 2^N)
 //
@@ -16,13 +16,30 @@ use crate::{powm_u32, powm_u64, udouble, umax, ModularUnaryOps, Reducer, Vanilla
 
 // --- macro for FixedProth32 / FixedProth64 ----------------------------------
 
+/// Debug-only primality heuristic: checks that `m` is not divisible by
+/// small primes (3, 5, 7, 11, 13), allowing `m` to be the small prime itself.
+macro_rules! debug_assert_prime_candidate {
+    ($m:expr) => {
+        debug_assert!(
+            ($m == 3 || $m % 3 != 0)
+                && ($m == 5 || $m % 5 != 0)
+                && ($m == 7 || $m % 7 != 0)
+                && ($m == 11 || $m % 11 != 0)
+                && ($m == 13 || $m % 13 != 0)
+        )
+    };
+}
+
 macro_rules! impl_fixed_proth_inherent {
-    ($TypeName:ident, $T:ty, $D:ty, $max_N:expr, $neginv_fn:path, $powm:ident) => {
+    ($TypeName:ident, $T:ty, $D:ty, $neginv_fn:path, $powm:ident) => {
         impl<const N: u8, const K: $T> $TypeName<N, K> {
+            /// Compile-time guard: N must be strictly less than the type bit-width.
+            const _N_BOUND_CHECK: () = assert!((N as u32) < <$T>::BITS);
+
             pub const MODULUS: $T = {
                 let p2n = match (1 as $T).checked_shl(N as u32) {
                     Some(v) => v,
-                    None => 0,
+                    None => unreachable!(),
                 };
                 K.wrapping_mul(p2n).wrapping_add(1)
             };
@@ -40,8 +57,11 @@ macro_rules! impl_fixed_proth_inherent {
                 // m·p = m·(K·2^N + 1) = (m·K)<<N + m
                 let mp = ((m as $D) * (K as $D)) << N;
                 let mp = mp.wrapping_add(m as $D);
-                let r = (t.wrapping_add(mp) >> <$T>::BITS) as $T;
-                if r >= Self::MODULUS {
+                let (sum, overflow) = t.overflowing_add(mp);
+                let r = (sum >> <$T>::BITS) as $T;
+                if overflow {
+                    r.wrapping_add(Self::MODULUS.wrapping_neg())
+                } else if r >= Self::MODULUS {
                     r - Self::MODULUS
                 } else {
                     r
@@ -73,8 +93,11 @@ macro_rules! impl_fixed_proth_inherent {
 pub struct FixedProth32<const N: u8, const K: u32>;
 
 impl_fixed_proth_inherent!(
-    FixedProth32, u32, u64, 31,
-    crate::monty::neg_mod_inv::u32::neginv, powm_u32
+    FixedProth32,
+    u32,
+    u64,
+    crate::monty::neg_mod_inv::u32::neginv,
+    powm_u32
 );
 
 impl<const N: u8, const K: u32> Reducer<u32> for FixedProth32<N, K> {
@@ -84,21 +107,25 @@ impl<const N: u8, const K: u32> Reducer<u32> for FixedProth32<N, K> {
             *m == Self::MODULUS,
             "the given modulus doesn't match with the generic params"
         );
-        debug_assert!(N <= 31);
-        debug_assert!(N > 0);
-        debug_assert!(K > 0);
-        debug_assert!(K % 2 == 1);
-        debug_assert!((K as u128) < (1u128 << (N as u32)));
-        debug_assert!(
-            (Self::MODULUS == 3 || Self::MODULUS % 3 != 0)
-                && (Self::MODULUS == 5 || Self::MODULUS % 5 != 0)
-                && (Self::MODULUS == 7 || Self::MODULUS % 7 != 0)
-                && (Self::MODULUS == 11 || Self::MODULUS % 11 != 0)
-                && (Self::MODULUS == 13 || Self::MODULUS % 13 != 0)
+        assert!(N < 32, "N must be less than type bit width");
+        assert!(N > 0, "N must be positive");
+        assert!(K > 0, "K must be positive");
+        assert!(K % 2 == 1, "K must be odd");
+        assert!(
+            {
+                let two_n = 1_u64 << (N as u32);
+                (K as u64) * two_n < u32::MAX as u64
+            },
+            "K·2^N + 1 exceeds type maximum"
         );
+        debug_assert!(
+            (K as u128) < (1u128 << (N as u32)),
+            "K must be less than 2^N"
+        );
+        debug_assert_prime_candidate!(Self::MODULUS);
         Self {}
     }
-    impl_fixed_monty_ops!(u32, u64, Self::R2);
+    impl_fixed_monty_ops!(u32, u64, Self::R2, primitive);
 }
 
 /// A modular reducer for Proth primes `K * 2^N + 1` with 64-bit operands.
@@ -122,8 +149,11 @@ impl<const N: u8, const K: u32> Reducer<u32> for FixedProth32<N, K> {
 pub struct FixedProth64<const N: u8, const K: u64>;
 
 impl_fixed_proth_inherent!(
-    FixedProth64, u64, u128, 63,
-    crate::monty::neg_mod_inv::u64::neginv, powm_u64
+    FixedProth64,
+    u64,
+    u128,
+    crate::monty::neg_mod_inv::u64::neginv,
+    powm_u64
 );
 
 impl<const N: u8, const K: u64> Reducer<u64> for FixedProth64<N, K> {
@@ -133,21 +163,25 @@ impl<const N: u8, const K: u64> Reducer<u64> for FixedProth64<N, K> {
             *m == Self::MODULUS,
             "the given modulus doesn't match with the generic params"
         );
-        debug_assert!(N <= 63);
-        debug_assert!(N > 0);
-        debug_assert!(K > 0);
-        debug_assert!(K % 2 == 1);
-        debug_assert!((K as u128) < (1u128 << (N as u32)));
-        debug_assert!(
-            (Self::MODULUS == 3 || Self::MODULUS % 3 != 0)
-                && (Self::MODULUS == 5 || Self::MODULUS % 5 != 0)
-                && (Self::MODULUS == 7 || Self::MODULUS % 7 != 0)
-                && (Self::MODULUS == 11 || Self::MODULUS % 11 != 0)
-                && (Self::MODULUS == 13 || Self::MODULUS % 13 != 0)
+        assert!(N < 64, "N must be less than type bit width");
+        assert!(N > 0, "N must be positive");
+        assert!(K > 0, "K must be positive");
+        assert!(K % 2 == 1, "K must be odd");
+        assert!(
+            {
+                let two_n = 1_u128 << (N as u32);
+                (K as u128) * two_n < u64::MAX as u128
+            },
+            "K·2^N + 1 exceeds type maximum"
         );
+        debug_assert!(
+            (K as u128) < (1u128 << (N as u32)),
+            "K must be less than 2^N"
+        );
+        debug_assert_prime_candidate!(Self::MODULUS);
         Self {}
     }
-    impl_fixed_monty_ops!(u64, u128, Self::R2);
+    impl_fixed_monty_ops!(u64, u128, Self::R2, primitive);
 }
 
 // ── FixedProth (umax / udouble) ──────────────────────────────────────────────
@@ -170,43 +204,35 @@ impl<const N: u8, const K: u64> Reducer<u64> for FixedProth64<N, K> {
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (1000u128 * 2000) % modulus);
 /// ```
 #[derive(Debug, Clone, Copy)]
-pub struct FixedProth<const N: u8, const K: umax> {
-    n0: umax,
-    r2: umax,
-}
-
-/// Compute -x⁻¹ mod 2¹²⁸ using Newton iteration.
-fn neginv_u128(x: u128) -> u128 {
-    let mut inv = 1u128;
-    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2²
-    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁴
-    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁸
-    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2¹⁶
-    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2³²
-    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁶⁴
-    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2¹²⁸
-    0u128.wrapping_sub(inv)
-}
+pub struct FixedProth<const N: u8, const K: umax>;
 
 impl<const N: u8, const K: umax> FixedProth<N, K> {
+    /// Compile-time guard: N must be strictly less than 128.
+    const _N_BOUND_CHECK_U128: () = assert!(N < 128);
+
     pub const MODULUS: umax = {
         let p2n = match 1u128.checked_shl(N as u32) {
             Some(v) => v,
-            None => 0,
+            None => unreachable!(),
         };
         K.wrapping_mul(p2n).wrapping_add(1)
     };
 
-    /// Montgomery REDC with R = 2¹²⁸ and Proth-optimised m·p product.
+    /// Montgomery constant:  -MODULUS⁻¹ mod 2¹²⁸
+    const N0: umax = crate::monty::neg_mod_inv::u128::neginv(Self::MODULUS);
+
+    /// R² mod MODULUS  (R = 2¹²⁸, so R² = 2²⁵⁶)
+    const R2: umax = {
+        let r = udouble { hi: 1, lo: 0 }.div_rem_2by1(Self::MODULUS).1; // 2¹²⁸ mod MODULUS
+        udouble::widening_square(r).div_rem_2by1(Self::MODULUS).1 // 2²⁵⁶ mod MODULUS
+    };
+
+    /// Montgomery REDC with R = 2¹²⁸.
     #[inline]
     pub fn reduce(&self, t: udouble) -> umax {
-        let m = t.lo.wrapping_mul(self.n0);
-        // m·p = m·(K·2^N + 1) = (m·K)<<N + m
-        let mp = (udouble::widening_mul(m, K) << N)
-            .overflowing_add(udouble { hi: 0, lo: m })
-            .0;
-        let (r, overflow) = t.overflowing_add(mp);
-        let r = r.hi;
+        let m = t.lo.wrapping_mul(Self::N0);
+        let (sum, overflow) = t.overflowing_add(udouble::widening_mul(m, Self::MODULUS));
+        let r = sum.hi;
         if overflow {
             r.wrapping_add(Self::MODULUS.wrapping_neg())
         } else if r >= Self::MODULUS {
@@ -224,96 +250,19 @@ impl<const N: u8, const K: umax> Reducer<umax> for FixedProth<N, K> {
             *m == Self::MODULUS,
             "the given modulus doesn't match with the generic params"
         );
-        debug_assert!(N <= 127);
-        debug_assert!(N > 0);
-        debug_assert!(K > 0);
-        debug_assert!(K % 2 == 1);
-        debug_assert!((K as u128) < (1u128 << (N as u32)));
-        debug_assert!(
-            (Self::MODULUS == 3 || Self::MODULUS % 3 != 0)
-                && (Self::MODULUS == 5 || Self::MODULUS % 5 != 0)
-                && (Self::MODULUS == 7 || Self::MODULUS % 7 != 0)
-                && (Self::MODULUS == 11 || Self::MODULUS % 11 != 0)
-                && (Self::MODULUS == 13 || Self::MODULUS % 13 != 0)
+        assert!(N < 128, "N must be less than type bit width");
+        assert!(N > 0, "N must be positive");
+        assert!(K > 0, "K must be positive");
+        assert!(K % 2 == 1, "K must be odd");
+        assert!(
+            K <= u128::MAX / (1u128 << (N as u32)),
+            "K·2^N + 1 exceeds type maximum"
         );
-
-        let n0 = neginv_u128(Self::MODULUS);
-
-        // R = 2¹²⁸,  R² = 2²⁵⁶ mod MODULUS
-        let r = udouble { hi: 1, lo: 0 } % Self::MODULUS; // 2¹²⁸ mod m
-        let r2 = udouble::widening_square(r) % Self::MODULUS;
-
-        Self { n0, r2 }
+        debug_assert!(K < 1u128 << (N as u32), "K must be less than 2^N");
+        debug_assert_prime_candidate!(Self::MODULUS);
+        Self {}
     }
-    #[inline]
-    fn transform(&self, target: umax) -> umax {
-        if target == 0 {
-            return 0;
-        }
-        self.reduce(udouble::widening_mul(target, self.r2))
-    }
-    #[inline]
-    fn check(&self, target: &umax) -> bool {
-        *target < Self::MODULUS
-    }
-    #[inline]
-    fn residue(&self, target: umax) -> umax {
-        if target == 0 {
-            return 0;
-        }
-        self.reduce(udouble { hi: 0, lo: target })
-    }
-    #[inline]
-    fn modulus(&self) -> umax {
-        Self::MODULUS
-    }
-    #[inline]
-    fn is_zero(&self, target: &umax) -> bool {
-        target == &0
-    }
-
-    #[inline]
-    fn add(&self, lhs: &umax, rhs: &umax) -> umax {
-        Vanilla::<umax>::add(&Self::MODULUS, *lhs, *rhs)
-    }
-    #[inline]
-    fn sub(&self, lhs: &umax, rhs: &umax) -> umax {
-        Vanilla::<umax>::sub(&Self::MODULUS, *lhs, *rhs)
-    }
-    #[inline]
-    fn dbl(&self, target: umax) -> umax {
-        Vanilla::<umax>::dbl(&Self::MODULUS, target)
-    }
-    #[inline]
-    fn neg(&self, target: umax) -> umax {
-        Vanilla::<umax>::neg(&Self::MODULUS, target)
-    }
-
-    #[inline]
-    fn mul(&self, lhs: &umax, rhs: &umax) -> umax {
-        self.reduce(udouble::widening_mul(*lhs, *rhs))
-    }
-    #[inline]
-    fn sqr(&self, target: umax) -> umax {
-        self.reduce(udouble::widening_square(target))
-    }
-    #[inline]
-    fn inv(&self, target: umax) -> Option<umax> {
-        let plain = self.residue(target);
-        let inv_plain = if (N as u32) < usize::BITS {
-            (plain as usize)
-                .invm(&(Self::MODULUS as usize))
-                .map(|v| v as umax)
-        } else {
-            plain.invm(&Self::MODULUS)
-        }?;
-        if inv_plain == 0 {
-            return Some(0);
-        }
-        Some(self.reduce(udouble::widening_mul(inv_plain, self.r2)))
-    }
-
-    impl_reduced_binary_pow!(umax);
+    impl_fixed_monty_ops!(umax, udouble, Self::R2, udouble);
 }
 
 #[cfg(test)]
@@ -323,23 +272,23 @@ mod tests {
     use rand::random;
 
     // u128 types
-    type P128_1 = FixedProth<2, 1>;   // m = 5
-    type P128_2 = FixedProth<4, 1>;   // m = 17
-    type P128_3 = FixedProth<5, 3>;   // m = 97
-    type P128_4 = FixedProth<8, 3>;   // m = 769
-    type P128_5 = FixedProth<16, 1>;  // m = 65537
+    type P128_1 = FixedProth<2, 1>; // m = 5
+    type P128_2 = FixedProth<4, 1>; // m = 17
+    type P128_3 = FixedProth<5, 3>; // m = 97
+    type P128_4 = FixedProth<8, 3>; // m = 769
+    type P128_5 = FixedProth<16, 1>; // m = 65537
 
     // u64 types
-    type P64_1 = FixedProth64<4, 1>;   // m = 17
-    type P64_2 = FixedProth64<5, 3>;   // m = 97
-    type P64_3 = FixedProth64<8, 1>;   // m = 257
-    type P64_4 = FixedProth64<16, 1>;  // m = 65537
+    type P64_1 = FixedProth64<4, 1>; // m = 17
+    type P64_2 = FixedProth64<5, 3>; // m = 97
+    type P64_3 = FixedProth64<8, 1>; // m = 257
+    type P64_4 = FixedProth64<16, 1>; // m = 65537
 
     // u32 types
-    type P32_1 = FixedProth32<2, 1>;  // m = 5
-    type P32_2 = FixedProth32<2, 3>;  // m = 13
-    type P32_3 = FixedProth32<4, 1>;  // m = 17
-    type P32_4 = FixedProth32<3, 5>;  // m = 41
+    type P32_1 = FixedProth32<2, 1>; // m = 5
+    type P32_2 = FixedProth32<2, 3>; // m = 13
+    type P32_3 = FixedProth32<4, 1>; // m = 17
+    type P32_4 = FixedProth32<3, 5>; // m = 41
 
     const NRANDOM: u32 = 10;
 
@@ -520,5 +469,69 @@ mod tests {
         let a2m = r.transform(a2);
         let dbl = r.dbl(a2m);
         assert_eq!(r.residue(dbl), a2.dblm(&M));
+    }
+
+    /// FixedProth32 with MODULUS > 0.618·R triggers wrapping_add overflow
+    /// in reduce. Fixed by using overflowing_add with compensation.
+    #[test]
+    fn test_reduce_overflow_proth32() {
+        type S = FixedProth32<30, 3>; // MODULUS = 3·2^30 + 1 = 3,221,225,473
+        const M: u32 = <S>::MODULUS;
+        let r = S::new(&M);
+
+        let a: u32 = 7407402 % M;
+        let b: u32 = 4587526 % M;
+        let a_mont = r.transform(a);
+        let b_mont = r.transform(b);
+        let result = r.residue(r.mul(&a_mont, &b_mont));
+        let expected = a.mulm(b, &M);
+        assert_eq!(result, expected, "reduce overflow bug");
+    }
+
+    /// inv with MODULUS > usize::MAX should not truncate.
+    #[test]
+    fn test_inv_no_truncation_u128() {
+        // N=60 < 64 but MODULUS = 31·2^60+1 > u64::MAX, so the old
+        // `N < usize::BITS` gate would incorrectly take the usize path.
+        type S = FixedProth<60, 31>;
+        const M: u128 = <S>::MODULUS;
+        assert!(
+            M > u64::MAX as u128,
+            "MODULUS must exceed usize for this test"
+        );
+        let r = S::new(&M);
+
+        let a: u128 = 1234567890123456789 % M;
+        let a_mont = r.transform(a);
+        let inv = r.inv(a_mont).expect("inv should succeed");
+        let result = r.residue(inv);
+        assert_eq!(result.mulm(a, &M), 1u128, "inv truncation bug");
+    }
+
+    /// K·2^N exceeding type max should panic, not silently wrap.
+    #[test]
+    #[should_panic(expected = "exceeds type maximum")]
+    fn test_modulus_overflow_panics_u32() {
+        type S = FixedProth32<31, 3>; // 3·2^31+1 > 2^32
+        const M: u32 = <S>::MODULUS; // wraps to 2^31+1
+        S::new(&M); // should panic
+    }
+
+    /// FixedProth with N>64 should compute reduce correctly
+    /// (no shift truncation in the Proth-optimised m·p product).
+    #[test]
+    fn test_reduce_n_gt_64() {
+        type S = FixedProth<65, 3>; // MODULUS = 3·2^65 + 1
+        const M: u128 = <S>::MODULUS;
+        let r = S::new(&M);
+
+        for _ in 0..10 {
+            let a = random::<u128>() % M;
+            let b = random::<u128>() % M;
+            let am = r.transform(a);
+            let bm = r.transform(b);
+            let result = r.residue(r.mul(&am, &bm));
+            assert_eq!(result, a.mulm(b, &M), "shift truncation bug for N>64");
+        }
     }
 }
