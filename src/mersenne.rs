@@ -1,5 +1,5 @@
 use crate::reduced::impl_reduced_binary_pow;
-use crate::{udouble, umax, ModularUnaryOps, Reducer};
+use crate::{udouble, umax, ModularUnaryOps, Reducer, Vanilla};
 
 macro_rules! impl_fixed_mersenne {
     (
@@ -105,31 +105,19 @@ macro_rules! impl_fixed_mersenne {
 
             #[inline]
             fn add(&self, lhs: &$T, rhs: &$T) -> $T {
-                let mut sum = lhs + rhs;
-                if sum >= Self::MODULUS {
-                    sum -= Self::MODULUS
-                }
-                sum
+                Vanilla::<$T>::add(&Self::MODULUS, *lhs, *rhs)
             }
             #[inline]
             fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
-                if lhs >= rhs {
-                    lhs - rhs
-                } else {
-                    Self::MODULUS - (rhs - lhs)
-                }
+                Vanilla::<$T>::sub(&Self::MODULUS, *lhs, *rhs)
             }
             #[inline]
             fn dbl(&self, target: $T) -> $T {
-                self.add(&target, &target)
+                Vanilla::<$T>::dbl(&Self::MODULUS, target)
             }
             #[inline]
             fn neg(&self, target: $T) -> $T {
-                if target == 0 {
-                    0
-                } else {
-                    Self::MODULUS - target
-                }
+                Vanilla::<$T>::neg(&Self::MODULUS, target)
             }
             #[inline]
             fn mul(&self, lhs: &$T, rhs: &$T) -> $T {

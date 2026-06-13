@@ -1,5 +1,5 @@
 use crate::reduced::impl_reduced_binary_pow;
-use crate::{imax, udouble, umax, ModularUnaryOps, Reducer};
+use crate::{imax, udouble, umax, ModularUnaryOps, Reducer, Vanilla};
 
 // REF: Handbook of Cryptography 14.3.4
 
@@ -97,39 +97,19 @@ macro_rules! impl_fixed_trinomial_solinas {
 
             #[inline]
             fn add(&self, lhs: &$T, rhs: &$T) -> $T {
-                let (sum, overflow) = lhs.overflowing_add(*rhs);
-                if overflow || sum >= Self::MODULUS {
-                    let (sum2, _) = sum.overflowing_sub(Self::MODULUS);
-                    sum2
-                } else {
-                    sum
-                }
+                Vanilla::<$T>::add(&Self::MODULUS, *lhs, *rhs)
             }
             #[inline]
             fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
-                if lhs >= rhs {
-                    lhs - rhs
-                } else {
-                    Self::MODULUS - (rhs - lhs)
-                }
+                Vanilla::<$T>::sub(&Self::MODULUS, *lhs, *rhs)
             }
             #[inline]
             fn dbl(&self, target: $T) -> $T {
-                let (sum, overflow) = target.overflowing_add(target);
-                if overflow || sum >= Self::MODULUS {
-                    let (sum2, _) = sum.overflowing_sub(Self::MODULUS);
-                    sum2
-                } else {
-                    sum
-                }
+                Vanilla::<$T>::dbl(&Self::MODULUS, target)
             }
             #[inline]
             fn neg(&self, target: $T) -> $T {
-                if target == 0 {
-                    0
-                } else {
-                    Self::MODULUS - target
-                }
+                Vanilla::<$T>::neg(&Self::MODULUS, target)
             }
             #[inline]
             fn mul(&self, lhs: &$T, rhs: &$T) -> $T {
