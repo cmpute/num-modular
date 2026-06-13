@@ -331,7 +331,7 @@ macro_rules! impl_fixed_trinomial_solinas {
 
 /// A modular reducer for trinomial Solinas numbers `2^P1 - 2^P2 + K` as modulus with 32-bit operands.
 ///
-/// Supports `P1` up to 31, `P2 < P1`, and odd signed `K` with `|K| < 2^P2`. All inputs and outputs are `u32`.
+/// Supports `P1` up to 32, `P2 < P1`, and odd signed `K` with `|K| < 2^P2`. All inputs and outputs are `u32`.
 /// The modulus `2^P1 - 2^P2 + K` must be prime for modular inverse and Fermat-based operations to be valid.
 ///
 /// # Example
@@ -351,7 +351,7 @@ macro_rules! impl_fixed_trinomial_solinas {
 #[derive(Debug, Clone, Copy)]
 pub struct FixedTrinomialSolinas32<const P1: u8, const P2: u8, const K: i32>();
 
-impl_fixed_trinomial_solinas!(FixedTrinomialSolinas32, u32, i32, u64, 16, 31, primitive);
+impl_fixed_trinomial_solinas!(FixedTrinomialSolinas32, u32, i32, u64, 16, 32, primitive);
 
 /// A modular reducer for trinomial Solinas numbers `2^P1 - 2^P2 + K` as modulus with 64-bit operands.
 ///
@@ -428,6 +428,7 @@ mod tests {
     type S32_1 = FixedTrinomialSolinas32<4, 2, 1>;
     type S32_2 = FixedTrinomialSolinas32<5, 3, -1>;
     type S32_3 = FixedTrinomialSolinas32<6, 2, 1>;
+    type S32_4 = FixedTrinomialSolinas32<32, 20, 1>;
 
     const NRANDOM: u32 = 10;
 
@@ -499,6 +500,9 @@ mod tests {
             const P3: u32 = <S32_3>::MODULUS;
             let m3 = S32_3::new(&P3);
             assert_eq!(m3.residue(m3.transform(a)), a % P3);
+            const P4: u32 = <S32_4>::MODULUS;
+            let m4 = S32_4::new(&P4);
+            assert_eq!(m4.residue(m4.transform(a)), a % P4);
         }
     }
 
@@ -578,7 +582,7 @@ mod tests {
             let a = random::<u32>();
             let b = random::<u32>();
             let e = random::<u8>() as u32;
-            tests_for!(a, b, e; S32_1 S32_2 S32_3);
+            tests_for!(a, b, e; S32_1 S32_2 S32_3 S32_4);
         }
     }
 
