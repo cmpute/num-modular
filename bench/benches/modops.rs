@@ -2,8 +2,8 @@
 extern crate criterion;
 use criterion::Criterion;
 use num_modular::{
-    FixedMersenne64, FixedProth64, FixedTrinomialSolinas64, ModularCoreOps, Montgomery,
-    PreMulInv2by1, Reducer,
+    FixedMersenne64, FixedMontgomery64, FixedProth64, FixedTrinomialSolinas64, ModularCoreOps,
+    Montgomery, PreMulInv2by1, Reducer,
 };
 use rand::random;
 
@@ -50,14 +50,17 @@ pub fn bench_mod_inv_goldilocks(c: &mut Criterion) {
     let mer = Mer::new(&MOD);
     let sol = Sol::new(&MOD);
     let monty = Montgomery::<u64>::new(MOD);
+    let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
     let mut bases_mer = [0u64; N];
     let mut bases_sol = [0u64; N];
+    let mut bases_fm = [0u64; N];
     for i in 0..N {
         let v = random::<u64>() % MOD;
         bases_mer[i] = mer.transform(if v == 0 { 1 } else { v });
         bases_sol[i] = sol.transform(if v == 0 { 1 } else { v });
+        bases_fm[i] = fm.transform(if v == 0 { 1 } else { v });
     }
 
     let mut group = c.benchmark_group("mod_inv (2^64 - 2^32 + 1)");
@@ -82,6 +85,13 @@ pub fn bench_mod_inv_goldilocks(c: &mut Criterion) {
                 .reduce(|a, b| Some(a?.wrapping_add(b?)))
         })
     });
+    group.bench_function("FixedMontgomery64", |b| {
+        b.iter(|| {
+            bases_fm.iter()
+                .map(|&v| fm.inv(v))
+                .reduce(|a, b| Some(a?.wrapping_add(b?)))
+        })
+    });
     group.bench_function("PreMulInv2by1", |b| {
         b.iter(|| {
             bases_sol.iter()
@@ -100,12 +110,15 @@ pub fn bench_mod_inv_proth(c: &mut Criterion) {
 
     let pro = Pro::new(&MOD);
     let monty = Montgomery::<u64>::new(MOD);
+    let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
     let mut bases = [0u64; N];
+    let mut bases_fm = [0u64; N];
     for i in 0..N {
         let v = random::<u64>() % MOD;
         bases[i] = pro.transform(if v == 0 { 1 } else { v });
+        bases_fm[i] = fm.transform(if v == 0 { 1 } else { v });
     }
 
     let mut group = c.benchmark_group("mod_inv proth 3*2^32+1");
@@ -120,6 +133,13 @@ pub fn bench_mod_inv_proth(c: &mut Criterion) {
         b.iter(|| {
             bases.iter()
                 .map(|&v| monty.inv(v))
+                .reduce(|a, b| Some(a?.wrapping_add(b?)))
+        })
+    });
+    group.bench_function("FixedMontgomery64", |b| {
+        b.iter(|| {
+            bases_fm.iter()
+                .map(|&v| fm.inv(v))
                 .reduce(|a, b| Some(a?.wrapping_add(b?)))
         })
     });
@@ -145,14 +165,18 @@ pub fn bench_mod_pow_goldilocks(c: &mut Criterion) {
     let mer = Mer::new(&MOD);
     let sol = Sol::new(&MOD);
     let monty = Montgomery::<u64>::new(MOD);
+    let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
     // Generate random bases, pre-transform into each reducer's form
     let mut bases_mer = [0u64; N];
     let mut bases_sol = [0u64; N];
+    let mut bases_fm = [0u64; N];
     for i in 0..N {
-        bases_mer[i] = mer.transform(random::<u64>() % MOD);
-        bases_sol[i] = sol.transform(random::<u64>() % MOD);
+        let v = random::<u64>() % MOD;
+        bases_mer[i] = mer.transform(v);
+        bases_sol[i] = sol.transform(v);
+        bases_fm[i] = fm.transform(v);
     }
 
     let exp = MOD - 2;
@@ -182,6 +206,14 @@ pub fn bench_mod_pow_goldilocks(c: &mut Criterion) {
                 .reduce(|a, b| a.wrapping_add(b))
         })
     });
+    group.bench_function("FixedMontgomery64 (2^64 - 2^32 + 1)", |b| {
+        b.iter(|| {
+            bases_fm
+                .iter()
+                .map(|&v| fm.pow(v, &exp))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
     group.bench_function("PreMulInv2by1 (2^64 - 2^32 + 1)", |b| {
         b.iter(|| {
             bases_sol
@@ -202,12 +234,16 @@ pub fn bench_mod_pow_proth(c: &mut Criterion) {
 
     let pro = Pro::new(&MOD);
     let monty = Montgomery::<u64>::new(MOD);
+    let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
     // Generate random bases, pre-transform into each reducer's form
     let mut bases_pro = [0u64; N];
+    let mut bases_fm = [0u64; N];
     for i in 0..N {
-        bases_pro[i] = pro.transform(random::<u64>() % MOD);
+        let v = random::<u64>() % MOD;
+        bases_pro[i] = pro.transform(v);
+        bases_fm[i] = fm.transform(v);
     }
 
     let exp = MOD - 2;
@@ -226,6 +262,14 @@ pub fn bench_mod_pow_proth(c: &mut Criterion) {
             bases_pro
                 .iter()
                 .map(|&v| monty.pow(v, &exp))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.bench_function("FixedMontgomery64", |b| {
+        b.iter(|| {
+            bases_fm
+                .iter()
+                .map(|&v| fm.pow(v, &exp))
                 .reduce(|a, b| a.wrapping_add(b))
         })
     });
@@ -251,17 +295,22 @@ pub fn bench_mod_add_goldilocks(c: &mut Criterion) {
     let mer = Mer::new(&MOD);
     let sol = Sol::new(&MOD);
     let monty = Montgomery::<u64>::new(MOD);
+    let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
     let mut lhs_mer = [0u64; N];
     let mut rhs_mer = [0u64; N];
     let mut lhs_sol = [0u64; N];
     let mut rhs_sol = [0u64; N];
+    let mut lhs_fm = [0u64; N];
+    let mut rhs_fm = [0u64; N];
     for i in 0..N {
         lhs_mer[i] = mer.transform(random::<u64>() % MOD);
         rhs_mer[i] = mer.transform(random::<u64>() % MOD);
         lhs_sol[i] = sol.transform(random::<u64>() % MOD);
         rhs_sol[i] = sol.transform(random::<u64>() % MOD);
+        lhs_fm[i] = fm.transform(random::<u64>() % MOD);
+        rhs_fm[i] = fm.transform(random::<u64>() % MOD);
     }
 
     let mut group = c.benchmark_group("mod_add (2^64 - 2^32 + 1)");
@@ -286,6 +335,13 @@ pub fn bench_mod_add_goldilocks(c: &mut Criterion) {
                 .reduce(|a, b| a.wrapping_add(b))
         })
     });
+    group.bench_function("FixedMontgomery64", |b| {
+        b.iter(|| {
+            lhs_fm.iter().zip(rhs_fm.iter())
+                .map(|(a, b)| fm.add(a, b))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
     group.bench_function("PreMulInv2by1", |b| {
         b.iter(|| {
             lhs_sol.iter().zip(rhs_sol.iter())
@@ -304,13 +360,18 @@ pub fn bench_mod_add_proth(c: &mut Criterion) {
 
     let pro = Pro::new(&MOD);
     let monty = Montgomery::<u64>::new(MOD);
+    let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
     let mut lhs = [0u64; N];
     let mut rhs = [0u64; N];
+    let mut lhs_fm = [0u64; N];
+    let mut rhs_fm = [0u64; N];
     for i in 0..N {
         lhs[i] = pro.transform(random::<u64>() % MOD);
         rhs[i] = pro.transform(random::<u64>() % MOD);
+        lhs_fm[i] = fm.transform(random::<u64>() % MOD);
+        rhs_fm[i] = fm.transform(random::<u64>() % MOD);
     }
 
     let mut group = c.benchmark_group("mod_add proth 3*2^32+1");
@@ -325,6 +386,13 @@ pub fn bench_mod_add_proth(c: &mut Criterion) {
         b.iter(|| {
             lhs.iter().zip(rhs.iter())
                 .map(|(a, b)| monty.add(a, b))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.bench_function("FixedMontgomery64", |b| {
+        b.iter(|| {
+            lhs_fm.iter().zip(rhs_fm.iter())
+                .map(|(a, b)| fm.add(a, b))
                 .reduce(|a, b| a.wrapping_add(b))
         })
     });
@@ -348,17 +416,22 @@ pub fn bench_mod_mul_goldilocks(c: &mut Criterion) {
     let mer = Mer::new(&MOD);
     let sol = Sol::new(&MOD);
     let monty = Montgomery::<u64>::new(MOD);
+    let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
     let mut lhs_mer = [0u64; N];
     let mut rhs_mer = [0u64; N];
     let mut lhs_sol = [0u64; N];
     let mut rhs_sol = [0u64; N];
+    let mut lhs_fm = [0u64; N];
+    let mut rhs_fm = [0u64; N];
     for i in 0..N {
         lhs_mer[i] = mer.transform(random::<u64>() % MOD);
         rhs_mer[i] = mer.transform(random::<u64>() % MOD);
         lhs_sol[i] = sol.transform(random::<u64>() % MOD);
         rhs_sol[i] = sol.transform(random::<u64>() % MOD);
+        lhs_fm[i] = fm.transform(random::<u64>() % MOD);
+        rhs_fm[i] = fm.transform(random::<u64>() % MOD);
     }
 
     let mut group = c.benchmark_group("mod_mul (2^64 - 2^32 + 1)");
@@ -383,6 +456,13 @@ pub fn bench_mod_mul_goldilocks(c: &mut Criterion) {
                 .reduce(|a, b| a.wrapping_add(b))
         })
     });
+    group.bench_function("FixedMontgomery64", |b| {
+        b.iter(|| {
+            lhs_fm.iter().zip(rhs_fm.iter())
+                .map(|(a, b)| fm.mul(a, b))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
     group.bench_function("PreMulInv2by1", |b| {
         b.iter(|| {
             lhs_sol.iter().zip(rhs_sol.iter())
@@ -401,13 +481,18 @@ pub fn bench_mod_mul_proth(c: &mut Criterion) {
 
     let pro = Pro::new(&MOD);
     let monty = Montgomery::<u64>::new(MOD);
+    let fm = FixedMontgomery64::<MOD>::new(&MOD);
     let premul = PreMulInv2by1::<u64>::new(MOD);
 
     let mut lhs = [0u64; N];
     let mut rhs = [0u64; N];
+    let mut lhs_fm = [0u64; N];
+    let mut rhs_fm = [0u64; N];
     for i in 0..N {
         lhs[i] = pro.transform(random::<u64>() % MOD);
         rhs[i] = pro.transform(random::<u64>() % MOD);
+        lhs_fm[i] = fm.transform(random::<u64>() % MOD);
+        rhs_fm[i] = fm.transform(random::<u64>() % MOD);
     }
 
     let mut group = c.benchmark_group("mod_mul proth 3*2^32+1");
@@ -422,6 +507,13 @@ pub fn bench_mod_mul_proth(c: &mut Criterion) {
         b.iter(|| {
             lhs.iter().zip(rhs.iter())
                 .map(|(a, b)| monty.mul(a, b))
+                .reduce(|a, b| a.wrapping_add(b))
+        })
+    });
+    group.bench_function("FixedMontgomery64", |b| {
+        b.iter(|| {
+            lhs_fm.iter().zip(rhs_fm.iter())
+                .map(|(a, b)| fm.mul(a, b))
                 .reduce(|a, b| a.wrapping_add(b))
         })
     });

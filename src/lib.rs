@@ -296,15 +296,21 @@ pub use barrett::{
 };
 pub use double::{imax, udouble, umax};
 pub use mersenne::{FixedMersenne, FixedMersenne32, FixedMersenne64};
-pub use monty::Montgomery;
+pub use monty::{FixedMontgomery32, FixedMontgomery64, Montgomery};
 pub use preinv::PreModInv;
-pub use prim::{invm_u32, invm_u64};
+pub use prim::{powm_u32, powm_u64};
 pub use proth::{FixedProth, FixedProth32, FixedProth64};
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 pub use solinas::{FixedTrinomialSolinas, FixedTrinomialSolinas32, FixedTrinomialSolinas64};
 
 /// An integer in modulo ring based on [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form)
 pub type MontgomeryInt<T> = ReducedInt<T, Montgomery<T>>;
+
+/// An integer in modulo ring based on Montgomery form with a fixed 32-bit modulus
+pub type FixedMontgomeryInt32<const P: u32> = ReducedInt<u32, FixedMontgomery32<P>>;
+
+/// An integer in modulo ring based on Montgomery form with a fixed 64-bit modulus
+pub type FixedMontgomeryInt64<const P: u64> = ReducedInt<u64, FixedMontgomery64<P>>;
 
 /// An integer in modulo ring with a fixed (pseudo) Mersenne number as modulus
 pub type FixedMersenneInt<const P: u8, const K: umax> = ReducedInt<umax, FixedMersenne<P, K>>;
