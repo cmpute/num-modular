@@ -86,6 +86,7 @@ pub(crate) mod neg_mod_inv {
 /// The generic type T represents the underlying integer representation for modular inverse `-m^-1 mod R`,
 /// and `R=2^B` will be used as the auxiliary modulus, where B is automatically selected
 /// based on the size of T.
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct Montgomery<T> {
     m: T,   // modulus
@@ -103,7 +104,7 @@ macro_rules! impl_montgomery_for {
                 pub const fn new(m: $t) -> Self {
                     assert!(
                         m & 1 != 0,
-                        "Only odd modulus are supported by the Montgomery form"
+                        "Only odd moduli are supported by the Montgomery form"
                     );
                     Self { m, inv: neginv(m) }
                 }
@@ -341,6 +342,7 @@ macro_rules! impl_fixed_montgomery_inherent {
 /// let b = reducer.transform(5);
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), 15);
 /// ```
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct FixedMontgomery32<const P: u32>;
 
@@ -358,7 +360,7 @@ impl<const P: u32> Reducer<u32> for FixedMontgomery32<P> {
         assert!(*m == P, "modulus does not match const generic parameter");
         assert!(
             P & 1 != 0,
-            "only odd modulus are supported by the Montgomery form"
+            "only odd moduli are supported by the Montgomery form"
         );
         Self {}
     }
@@ -379,6 +381,7 @@ impl<const P: u32> Reducer<u32> for FixedMontgomery32<P> {
 /// let b = reducer.transform(20);
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (10u64 * 20) % 97);
 /// ```
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct FixedMontgomery64<const P: u64>;
 
@@ -396,7 +399,7 @@ impl<const P: u64> Reducer<u64> for FixedMontgomery64<P> {
         assert!(*m == P, "modulus does not match const generic parameter");
         assert!(
             P & 1 != 0,
-            "only odd modulus are supported by the Montgomery form"
+            "only odd moduli are supported by the Montgomery form"
         );
         Self {}
     }

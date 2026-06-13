@@ -4,6 +4,7 @@ use core::ops::*;
 use num_traits::{Inv, Pow};
 
 /// An integer in a modulo ring
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct ReducedInt<T, R: Reducer<T>> {
     /// The reduced representation of the integer in a modulo ring.
@@ -28,9 +29,10 @@ impl<T, R: Reducer<T>> ReducedInt<T, R> {
         T: PartialEq,
     {
         // we don't directly compare m because m could be empty in case of Mersenne modular integer
-        if cfg!(debug_assertions) && self.r.modulus() != rhs.r.modulus() {
-            panic!("The modulus of two operators should be the same!");
-        }
+        debug_assert!(
+            self.r.modulus() == rhs.r.modulus(),
+            "The modulus of two operators should be the same!"
+        );
     }
 
     #[inline(always)]
@@ -359,6 +361,7 @@ impl<T: PartialEq + Clone, R: Reducer<T> + Clone> ModularInteger for ReducedInt<
 // An vanilla reducer is also provided here
 /// A plain reducer that just use normal [Rem] operators. It will keep the integer
 /// in range [0, modulus) after each operation.
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct Vanilla<T>(T);
 

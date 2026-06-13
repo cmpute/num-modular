@@ -13,7 +13,7 @@ pub type imax = i128;
 
 const HALF_BITS: u32 = umax::BITS / 2;
 
-// Split umax into hi and lo parts. Tt's critical to use inline here
+// Split umax into hi and lo parts. It's critical to use inline here
 #[inline(always)]
 const fn split(v: umax) -> (umax, umax) {
     (v >> HALF_BITS, v & (umax::MAX >> HALF_BITS))
@@ -24,6 +24,7 @@ const fn div_rem(n: umax, d: umax) -> (umax, umax) {
     (n / d, n % d)
 }
 
+#[must_use]
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 /// A double width integer type based on the largest built-in integer type [umax] (currently [u128]), and
@@ -124,6 +125,7 @@ impl udouble {
 
     /// Multiplication of double width and single width
     //> (used in Self::mul::<umax>)
+    #[must_use]
     #[inline]
     pub fn checked_mul1(&self, rhs: umax) -> Option<Self> {
         let Self { lo: z0, hi: c0 } = Self::widening_mul(self.lo, rhs);
@@ -132,6 +134,7 @@ impl udouble {
     }
 
     //> (used in num-order::NumHash)
+    #[must_use]
     #[inline]
     pub fn checked_shl(self, rhs: u32) -> Option<Self> {
         if rhs < umax::BITS * 2 {
@@ -142,6 +145,7 @@ impl udouble {
     }
 
     //> (not used yet)
+    #[must_use]
     #[inline]
     pub fn checked_shr(self, rhs: u32) -> Option<Self> {
         if rhs < umax::BITS * 2 {
@@ -198,7 +202,12 @@ impl Add for udouble {
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
         let (lo, carry) = self.lo.overflowing_add(rhs.lo);
-        let hi = self.hi + rhs.hi + carry as umax;
+        let (hi_mid, overflow1) = self.hi.overflowing_add(rhs.hi);
+        let (hi, overflow2) = hi_mid.overflowing_add(umax::from(carry));
+        debug_assert!(
+            !(overflow1 || overflow2),
+            "udouble addition overflowed 256-bit width"
+        );
         Self { lo, hi }
     }
 }
@@ -216,8 +225,14 @@ impl AddAssign for udouble {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
         let (lo, carry) = self.lo.overflowing_add(rhs.lo);
+        let (hi_mid, overflow1) = self.hi.overflowing_add(rhs.hi);
+        let (hi, overflow2) = hi_mid.overflowing_add(umax::from(carry));
+        debug_assert!(
+            !(overflow1 || overflow2),
+            "udouble addition overflowed 256-bit width"
+        );
         self.lo = lo;
-        self.hi += rhs.hi + carry as umax;
+        self.hi = hi;
     }
 }
 impl AddAssign<umax> for udouble {
@@ -238,7 +253,12 @@ impl Sub for udouble {
     fn sub(self, rhs: Self) -> Self::Output {
         let carry = self.lo < rhs.lo;
         let lo = self.lo.wrapping_sub(rhs.lo);
-        let hi = self.hi - rhs.hi - carry as umax;
+        let (hi_mid, overflow1) = self.hi.overflowing_sub(rhs.hi);
+        let (hi, overflow2) = hi_mid.overflowing_sub(umax::from(carry));
+        debug_assert!(
+            !(overflow1 || overflow2),
+            "udouble subtraction underflowed 256-bit width"
+        );
         Self { lo, hi }
     }
 }
@@ -258,7 +278,13 @@ impl SubAssign for udouble {
     fn sub_assign(&mut self, rhs: Self) {
         let carry = self.lo < rhs.lo;
         self.lo = self.lo.wrapping_sub(rhs.lo);
-        self.hi -= rhs.hi + carry as umax;
+        let (hi_mid, overflow1) = self.hi.overflowing_sub(rhs.hi);
+        let (hi, overflow2) = hi_mid.overflowing_sub(umax::from(carry));
+        debug_assert!(
+            !(overflow1 || overflow2),
+            "udouble subtraction underflowed 256-bit width"
+        );
+        self.hi = hi;
     }
 }
 impl SubAssign<umax> for udouble {
@@ -425,6 +451,7 @@ impl Not for udouble {
 
 impl udouble {
     //> (used in Self::div_rem)
+    #[must_use]
     #[inline]
     pub const fn leading_zeros(self) -> u32 {
         if self.hi == 0 {
@@ -473,6 +500,7 @@ impl udouble {
     // double by single to single division.
     // equivalent to `udiv_qrnnd` in C or `divq` in assembly.
     //> (used in Self::{div, rem}::<umax>)
+    #[must_use]
     pub const fn div_rem_2by1(self, other: umax) -> (umax, umax) {
         // the following algorithm comes from `ethnum` crate
         const B: umax = 1 << HALF_BITS; // number base (64 bits)
@@ -697,5 +725,37 @@ mod tests {
             z -= y;
             assert_eq!(z, x);
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_add_overflow_panics() {
+        let _ = udouble {
+            lo: 0,
+            hi: umax::MAX,
+        } + udouble { lo: 0, hi: 1 };
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_sub_underflow_panics() {
+        let _ = udouble { lo: 0, hi: 0 } - udouble { lo: 0, hi: 1 };
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_add_assign_overflow_panics() {
+        let mut x = udouble {
+            lo: 0,
+            hi: umax::MAX,
+        };
+        x += udouble { lo: 0, hi: 1 };
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_sub_assign_underflow_panics() {
+        let mut x = udouble { lo: 0, hi: 0 };
+        x -= udouble { lo: 0, hi: 1 };
     }
 }

@@ -34,6 +34,7 @@ use crate::{DivExact, ModularUnaryOps, Reducer};
 ///
 /// Granlund, Montgomerry "Division by Invariant Integers using Multiplication"
 /// Algorithm 4.1.
+#[must_use]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PreMulInv1by1<T> {
     // Let n = ceil(log_2(divisor))
@@ -126,6 +127,7 @@ macro_rules! impl_premulinv_1by1_for {
 /// Assumes quotient fits in a Word.
 ///
 /// Möller, Granlund, "Improved division by invariant integers", Algorithm 4.
+#[must_use]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Normalized2by1Divisor<T> {
     // Normalized (top bit must be set).
@@ -239,6 +241,7 @@ macro_rules! impl_normdiv_2by1_for {
 }
 
 /// A wrapper of [Normalized2by1Divisor] that can be used as a [Reducer]
+#[must_use]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PreMulInv2by1<T> {
     div: Normalized2by1Divisor<T>,
@@ -346,6 +349,7 @@ macro_rules! impl_premulinv_2by1_reducer_for {
 ///
 /// Möller, Granlund, "Improved division by invariant integers"
 /// Algorithm 5.
+#[must_use]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Normalized3by2Divisor<T, D> {
     // Top bit must be 1.
@@ -444,7 +448,7 @@ macro_rules! impl_normdiv_3by2_for {
                 (q1, r)
             }
 
-            /// Divdide a 4-word number with double word divisor
+            /// Divide a 4-word number with double word divisor
             ///
             /// The output is (a / divisor, a % divisor)
             pub const fn div_rem_4by2(&self, a_lo: $D, a_hi: $D) -> ($D, $D) {
@@ -458,6 +462,7 @@ macro_rules! impl_normdiv_3by2_for {
 }
 
 /// A wrapper of [Normalized3by2Divisor] that can be used as a [Reducer]
+#[must_use]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PreMulInv3by2<T, D> {
     div: Normalized3by2Divisor<T, D>,

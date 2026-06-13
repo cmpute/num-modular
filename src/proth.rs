@@ -100,6 +100,7 @@ macro_rules! impl_fixed_proth_inherent {
 /// assert_eq!(reducer.residue(reducer.add(&a, &b)), 8);
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), 15);
 /// ```
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct FixedProth32<const N: u8, const K: u8>;
 
@@ -150,6 +151,7 @@ impl<const N: u8, const K: u8> Reducer<u32> for FixedProth32<N, K> {
 /// let b = reducer.transform(20);
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (10u64 * 20) % 97);
 /// ```
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct FixedProth64<const N: u8, const K: u8>;
 
@@ -202,6 +204,7 @@ impl<const N: u8, const K: u8> Reducer<u64> for FixedProth64<N, K> {
 /// let b = reducer.transform(2000);
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (1000u128 * 2000) % modulus);
 /// ```
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct FixedProth<const N: u8, const K: u8>;
 
@@ -234,6 +237,7 @@ impl<const N: u8, const K: u8> FixedProth<N, K> {
     };
 
     /// Montgomery REDC with R = 2¹²⁸ and Proth-optimised m·p product.
+    #[must_use]
     #[inline]
     pub fn reduce(&self, t: udouble) -> umax {
         let m = t.lo.wrapping_mul(Self::N0);
@@ -265,7 +269,10 @@ impl<const N: u8, const K: u8> Reducer<umax> for FixedProth<N, K> {
             (K as u128) * (1u128 << (N as u32)) < u128::MAX,
             "K·2^N + 1 exceeds type maximum"
         );
-        debug_assert!((K as u128) < (1u128 << (N as u32)), "K must be less than 2^N");
+        debug_assert!(
+            (K as u128) < (1u128 << (N as u32)),
+            "K must be less than 2^N"
+        );
         debug_assert_prime_candidate!(Self::MODULUS);
         Self {}
     }
@@ -522,7 +529,7 @@ mod tests {
     fn test_modulus_overflow_panics_u32() {
         type S = FixedProth32<31, 3>; // 3·2^31+1 > 2^32
         const M: u32 = <S>::MODULUS; // wraps to 2^31+1
-        S::new(&M); // should panic
+        let _ = S::new(&M); // should panic
     }
 
     /// FixedProth with N>64 should compute reduce correctly

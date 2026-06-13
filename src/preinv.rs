@@ -4,6 +4,7 @@ use crate::{DivExact, ModularUnaryOps};
 ///
 /// This struct stores the modular inverse of a divisor, and a limit for divisibility check.
 /// See <https://math.stackexchange.com/a/1251328> for the explanation of the trick
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct PreModInv<T> {
     d_inv: T, // modular inverse of divisor

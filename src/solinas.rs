@@ -302,6 +302,7 @@ macro_rules! impl_fixed_trinomial_solinas {
 /// let b = reducer.transform(5);
 /// assert_eq!(reducer.residue(reducer.add(&a, &b)), 8);
 /// ```
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct FixedTrinomialSolinas32<const P1: u8, const P2: u8, const K: i32>();
 
@@ -327,6 +328,7 @@ impl_fixed_trinomial_solinas!(FixedTrinomialSolinas32, u32, i32, u64, 16, 32, pr
 /// let b = reducer.transform(20);
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (10u64 * 20) % 61);
 /// ```
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct FixedTrinomialSolinas64<const P1: u8, const P2: u8, const K: i64>();
 
@@ -353,6 +355,7 @@ impl_fixed_trinomial_solinas!(FixedTrinomialSolinas64, u64, i64, u128, 32, 64, p
 /// let b = reducer.transform(2000);
 /// assert_eq!(reducer.residue(reducer.mul(&a, &b)), (1000u128 * 2000) % modulus);
 /// ```
+#[must_use]
 #[derive(Debug, Clone, Copy)]
 pub struct FixedTrinomialSolinas<const P1: u8, const P2: u8, const K: imax>();
 

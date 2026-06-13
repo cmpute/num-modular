@@ -129,9 +129,9 @@ mod _num_bigint {
             let b = rhs % m;
 
             if let Some(sm) = m.to_usize() {
-                let sself = a.to_usize().unwrap();
+                let a_usize = a.to_usize().unwrap();
                 let srhs = b.to_usize().unwrap();
-                return BigUint::from(sself.mulm(srhs, &sm));
+                return BigUint::from(a_usize.mulm(srhs, &sm));
             }
 
             (a * b) % m
@@ -178,7 +178,7 @@ mod _num_bigint {
         fn dblm(self, m: &BigUint) -> BigUint {
             let x = self % m;
             let d = x << 1;
-            if &d > m {
+            if &d >= m {
                 d - m
             } else {
                 d
@@ -187,7 +187,7 @@ mod _num_bigint {
 
         #[inline]
         fn sqm(self, m: &BigUint) -> BigUint {
-            self.modpow(&BigUint::from(2u8), m)
+            (self * self) % m
         }
     }
 
@@ -298,11 +298,15 @@ mod _num_bigint {
         #[inline]
         fn kronecker(&self, n: &BigInt) -> i8 {
             if n.is_negative() {
-                if n.magnitude().is_one() {
-                    return if self.is_negative() { -1 } else { 1 };
+                return if n.magnitude().is_one() {
+                    if self.is_negative() {
+                        -1
+                    } else {
+                        1
+                    }
                 } else {
-                    return self.kronecker(&-BigInt::one()) * self.kronecker(&-n);
-                }
+                    self.kronecker(&-BigInt::one()) * self.kronecker(&-n)
+                };
             }
 
             // n is positive from now on
@@ -407,6 +411,35 @@ mod _num_bigint {
                 assert_eq!(ra.checked_legendre(rm), a.checked_legendre(&m));
                 assert_eq!(ra.checked_jacobi(rm), a.checked_jacobi(&m));
                 assert_eq!(ra.kronecker(rm), a.kronecker(&m));
+            }
+        }
+
+        #[test]
+        fn dblm_edge_case() {
+            // When m is even and x = m/2, doubling should yield 0, not m
+            let m = &BigUint::from(10u8);
+            let x = &BigUint::from(5u8); // m/2
+            assert_eq!(x.dblm(m), BigUint::from(0u8), "dblm(m/2, m) should be 0");
+
+            let m = &BigUint::from(100u32);
+            let x = &BigUint::from(50u32); // m/2
+            assert_eq!(x.dblm(m), BigUint::from(0u8), "dblm(m/2, m) should be 0");
+
+            // Normal cases should still work
+            let m = &BigUint::from(10u8);
+            assert_eq!(BigUint::from(3u8).dblm(m), BigUint::from(6u8));
+            assert_eq!(BigUint::from(7u8).dblm(m), BigUint::from(4u8));
+            assert_eq!(BigUint::from(9u8).dblm(m), BigUint::from(8u8));
+        }
+
+        #[test]
+        fn sqm_matches_mulm() {
+            for _ in 0..NRANDOM {
+                let a = random::<u128>();
+                let ra = &BigUint::from(a);
+                let m = random::<u128>() | 1;
+                let rm = &BigUint::from(m);
+                assert_eq!(ra.sqm(rm), ra.mulm(ra, rm), "sqm should match mulm");
             }
         }
     }

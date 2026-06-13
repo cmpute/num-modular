@@ -103,7 +103,7 @@ pub trait ModularSymbols<Modulus = Self> {
     /// Only if n is not prime
     #[inline]
     fn legendre(&self, n: Modulus) -> i8 {
-        self.checked_legendre(n).expect("n shoud be a prime")
+        self.checked_legendre(n).expect("n should be a prime")
     }
 
     /// Calculate Legendre Symbol (a|n), where a is `self`. Returns [None] only if n is
@@ -189,14 +189,17 @@ pub trait ModularInteger:
 
     /// Convert an normal integer into the same ring.
     ///
-    /// This method should be perferred over the static
+    /// This method should be preferred over the static
     /// constructor to prevent unnecessary overhead of pre-computation.
+    #[must_use]
     fn convert(&self, n: Self::Base) -> Self;
 
     /// Calculate the value of self + self
+    #[must_use]
     fn double(self) -> Self;
 
     /// Calculate the value of self * self
+    #[must_use]
     fn square(self) -> Self;
 }
 
@@ -258,7 +261,7 @@ pub trait Reducer<T> {
         *lhs = self.sub(lhs, rhs);
     }
 
-    /// Calculate -monty mod m in reduced form
+    /// Calculate `-target` mod m in reduced form
     fn neg(&self, target: T) -> T;
 
     /// Calculate (lhs * rhs) mod m in reduced form
