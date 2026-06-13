@@ -3,7 +3,7 @@ use crate::{powm_u32, powm_u64, ModularUnaryOps, Reducer, Vanilla};
 
 /// Negated modular inverse on binary bases
 /// `neginv` calculates `-(m^-1) mod R`, `R = 2^k. If m is odd, then result of m + 1 will be returned.
-mod neg_mod_inv {
+pub(crate) mod neg_mod_inv {
     // Entry i contains (2i+1)^(-1) mod 256.
     #[rustfmt::skip]
     const BINV_TABLE: [u8; 128] = [
@@ -206,12 +206,87 @@ impl_montgomery_for!(u64, u64_impl);
 impl_montgomery_for!(u128, u128_impl);
 impl_montgomery_for!(usize, usize_impl);
 
+// ── Shared Reducer boilerplate ────────────────────────────────────────────
+
+/// Generates all `Reducer` methods except `new()`.
+///
+/// The caller must provide an inherent `fn reduce(&self, monty: $D) -> $T`
+/// and the associated constants `MODULUS` / `R2`.
+#[macro_export]
+macro_rules! impl_fixed_monty_ops {
+    ($T:ty, $D:ty, $r2:expr) => {
+        #[inline]
+        fn transform(&self, target: $T) -> $T {
+            if target == 0 {
+                return 0;
+            }
+            self.reduce((target as $D) * ($r2 as $D))
+        }
+        #[inline]
+        fn check(&self, target: &$T) -> bool {
+            *target < Self::MODULUS
+        }
+        #[inline]
+        fn residue(&self, target: $T) -> $T {
+            if target == 0 {
+                return 0;
+            }
+            self.reduce(target as $D)
+        }
+        #[inline]
+        fn modulus(&self) -> $T {
+            Self::MODULUS
+        }
+        #[inline]
+        fn is_zero(&self, target: &$T) -> bool {
+            target == &0
+        }
+
+        #[inline]
+        fn add(&self, lhs: &$T, rhs: &$T) -> $T {
+            Vanilla::<$T>::add(&Self::MODULUS, *lhs, *rhs)
+        }
+        #[inline]
+        fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
+            Vanilla::<$T>::sub(&Self::MODULUS, *lhs, *rhs)
+        }
+        #[inline]
+        fn dbl(&self, target: $T) -> $T {
+            Vanilla::<$T>::dbl(&Self::MODULUS, target)
+        }
+        #[inline]
+        fn neg(&self, target: $T) -> $T {
+            Vanilla::<$T>::neg(&Self::MODULUS, target)
+        }
+
+        #[inline]
+        fn mul(&self, lhs: &$T, rhs: &$T) -> $T {
+            self.reduce((*lhs as $D) * (*rhs as $D))
+        }
+        #[inline]
+        fn sqr(&self, target: $T) -> $T {
+            self.reduce((target as $D) * (target as $D))
+        }
+        #[inline]
+        fn inv(&self, target: $T) -> Option<$T> {
+            let plain = self.residue(target);
+            let inv_plain = plain.invm(&Self::MODULUS)?;
+            if inv_plain == 0 {
+                return Some(0);
+            }
+            Some(self.reduce((inv_plain as $D) * ($r2 as $D)))
+        }
+
+        impl_reduced_binary_pow!($T);
+    };
+}
+
 // ── FixedMontgomery32 / FixedMontgomery64 ──────────────────────────────────
 
 /// Const-generic Montgomery reducer, with modulus `P` known at compile time.
 ///
 /// Precomputes N0 and R² as associated constants.  ZST — no runtime state.
-macro_rules! impl_fixed_montgomery_primitive {
+macro_rules! impl_fixed_montgomery_inherent {
     ($TypeName:ident, $T:ty, $D:ty, $neginv_fn:path, $powm:ident) => {
         impl<const P: $T> $TypeName<P> {
             pub const MODULUS: $T = P;
@@ -236,78 +311,6 @@ macro_rules! impl_fixed_montgomery_primitive {
                 }
             }
         }
-
-        impl<const P: $T> Reducer<$T> for $TypeName<P> {
-            #[inline]
-            fn new(m: &$T) -> Self {
-                debug_assert!(*m == P);
-                debug_assert!(P & 1 != 0, "Only odd modulus are supported by the Montgomery form");
-                Self {}
-            }
-            #[inline]
-            fn transform(&self, target: $T) -> $T {
-                if target == 0 {
-                    return 0;
-                }
-                self.reduce((target as $D) * (Self::R2 as $D))
-            }
-            #[inline]
-            fn check(&self, target: &$T) -> bool {
-                *target < P
-            }
-            #[inline]
-            fn residue(&self, target: $T) -> $T {
-                if target == 0 {
-                    return 0;
-                }
-                self.reduce(target as $D)
-            }
-            #[inline]
-            fn modulus(&self) -> $T {
-                P
-            }
-            #[inline]
-            fn is_zero(&self, target: &$T) -> bool {
-                target == &0
-            }
-
-            #[inline]
-            fn add(&self, lhs: &$T, rhs: &$T) -> $T {
-                Vanilla::<$T>::add(&Self::MODULUS, *lhs, *rhs)
-            }
-            #[inline]
-            fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
-                Vanilla::<$T>::sub(&Self::MODULUS, *lhs, *rhs)
-            }
-            #[inline]
-            fn dbl(&self, target: $T) -> $T {
-                Vanilla::<$T>::dbl(&Self::MODULUS, target)
-            }
-            #[inline]
-            fn neg(&self, target: $T) -> $T {
-                Vanilla::<$T>::neg(&Self::MODULUS, target)
-            }
-
-            #[inline]
-            fn mul(&self, lhs: &$T, rhs: &$T) -> $T {
-                self.reduce((*lhs as $D) * (*rhs as $D))
-            }
-            #[inline]
-            fn sqr(&self, target: $T) -> $T {
-                self.reduce((target as $D) * (target as $D))
-            }
-            #[inline]
-            fn inv(&self, target: $T) -> Option<$T> {
-                let plain = self.residue(target);
-                let inv_plain = plain.invm(&P)?;
-                if inv_plain == 0 {
-                    return Some(0);
-                }
-                Some(self.transform(inv_plain))
-            }
-
-            impl_reduced_binary_pow!($T);
-        }
     };
 }
 
@@ -328,10 +331,20 @@ macro_rules! impl_fixed_montgomery_primitive {
 #[derive(Debug, Clone, Copy)]
 pub struct FixedMontgomery32<const P: u32>;
 
-impl_fixed_montgomery_primitive!(
+impl_fixed_montgomery_inherent!(
     FixedMontgomery32, u32, u64,
     neg_mod_inv::u32::neginv, powm_u32
 );
+
+impl<const P: u32> Reducer<u32> for FixedMontgomery32<P> {
+    #[inline]
+    fn new(m: &u32) -> Self {
+        debug_assert!(*m == P);
+        debug_assert!(P & 1 != 0, "Only odd modulus are supported by the Montgomery form");
+        Self {}
+    }
+    impl_fixed_monty_ops!(u32, u64, Self::R2);
+}
 
 /// A modular reducer based on [Montgomery form](https://en.wikipedia.org/wiki/Montgomery_modular_multiplication#Montgomery_form)
 /// for 64-bit operands, with the modulus `P` known at compile time.
@@ -350,10 +363,20 @@ impl_fixed_montgomery_primitive!(
 #[derive(Debug, Clone, Copy)]
 pub struct FixedMontgomery64<const P: u64>;
 
-impl_fixed_montgomery_primitive!(
+impl_fixed_montgomery_inherent!(
     FixedMontgomery64, u64, u128,
     neg_mod_inv::u64::neginv, powm_u64
 );
+
+impl<const P: u64> Reducer<u64> for FixedMontgomery64<P> {
+    #[inline]
+    fn new(m: &u64) -> Self {
+        debug_assert!(*m == P);
+        debug_assert!(P & 1 != 0, "Only odd modulus are supported by the Montgomery form");
+        Self {}
+    }
+    impl_fixed_monty_ops!(u64, u128, Self::R2);
+}
 
 // TODO(v0.6.x): accept even numbers by removing 2 factors from m and store the exponent
 // Requirement: 1. A separate class to perform modular arithmetics with 2^n as modulus

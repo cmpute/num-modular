@@ -1,3 +1,4 @@
+use crate::impl_fixed_monty_ops;
 use crate::reduced::impl_reduced_binary_pow;
 use crate::{powm_u32, powm_u64, udouble, umax, ModularUnaryOps, Reducer, Vanilla};
 
@@ -13,36 +14,10 @@ use crate::{powm_u32, powm_u64, udouble, umax, ModularUnaryOps, Reducer, Vanilla
 // which replaces a full-width multiply-add with a narrow multiply
 // (K is small), a shift, and an add.
 
-// --- const helpers (not pub) ------------------------------------------------
-
-/// Compute x⁻¹ mod 2³² using Newton iteration (quadratic convergence).
-const fn mod_inv_pow2_u32(x: u32) -> u32 {
-    // x must be odd (gcd(x,2)=1)
-    let mut inv = 1u32; // correct mod 2¹
-    inv = inv.wrapping_mul(2u32.wrapping_sub(x.wrapping_mul(inv))); // mod 2²
-    inv = inv.wrapping_mul(2u32.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁴
-    inv = inv.wrapping_mul(2u32.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁸
-    inv = inv.wrapping_mul(2u32.wrapping_sub(x.wrapping_mul(inv))); // mod 2¹⁶
-    inv = inv.wrapping_mul(2u32.wrapping_sub(x.wrapping_mul(inv))); // mod 2³²
-    inv
-}
-
-/// Compute x⁻¹ mod 2⁶⁴ using Newton iteration.
-const fn mod_inv_pow2_u64(x: u64) -> u64 {
-    let mut inv = 1u64;
-    inv = inv.wrapping_mul(2u64.wrapping_sub(x.wrapping_mul(inv))); // mod 2²
-    inv = inv.wrapping_mul(2u64.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁴
-    inv = inv.wrapping_mul(2u64.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁸
-    inv = inv.wrapping_mul(2u64.wrapping_sub(x.wrapping_mul(inv))); // mod 2¹⁶
-    inv = inv.wrapping_mul(2u64.wrapping_sub(x.wrapping_mul(inv))); // mod 2³²
-    inv = inv.wrapping_mul(2u64.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁶⁴
-    inv
-}
-
 // --- macro for FixedProth32 / FixedProth64 ----------------------------------
 
-macro_rules! impl_fixed_proth_primitive {
-    ($TypeName:ident, $T:ty, $D:ty, $max_N:expr, $inv_pow2:ident, $powm:ident) => {
+macro_rules! impl_fixed_proth_inherent {
+    ($TypeName:ident, $T:ty, $D:ty, $max_N:expr, $neginv_fn:path, $powm:ident) => {
         impl<const N: u8, const K: $T> $TypeName<N, K> {
             pub const MODULUS: $T = {
                 let p2n = match (1 as $T).checked_shl(N as u32) {
@@ -53,17 +28,13 @@ macro_rules! impl_fixed_proth_primitive {
             };
 
             /// Montgomery constant:  -MODULUS⁻¹ mod 2^BITS
-            const N0: $T = (0 as $T).wrapping_sub($inv_pow2(Self::MODULUS));
+            const N0: $T = $neginv_fn(Self::MODULUS);
 
             /// R² mod MODULUS  (R = 2^BITS, so R² = 2^{2·BITS})
             const R2: $T = $powm(2, (2 * <$T>::BITS) as $T, Self::MODULUS);
 
             #[inline]
-            pub fn reduce_single(&self, v: $T) -> $T {
-                self.reduce_double(v as $D)
-            }
-
-            pub fn reduce_double(&self, t: $D) -> $T {
+            pub fn reduce(&self, t: $D) -> $T {
                 // Standard Montgomery REDC with Proth-optimised m·p product.
                 let m = (t as $T).wrapping_mul(Self::N0);
                 // m·p = m·(K·2^N + 1) = (m·K)<<N + m
@@ -76,91 +47,6 @@ macro_rules! impl_fixed_proth_primitive {
                     r
                 }
             }
-        }
-
-        impl<const N: u8, const K: $T> Reducer<$T> for $TypeName<N, K> {
-            #[inline]
-            fn new(m: &$T) -> Self {
-                assert!(
-                    *m == Self::MODULUS,
-                    "the given modulus doesn't match with the generic params"
-                );
-                debug_assert!(N <= $max_N);
-                debug_assert!(N > 0);
-                debug_assert!(K > 0);
-                debug_assert!(K % 2 == 1);
-                debug_assert!((K as u128) < (1u128 << (N as u32)));
-                debug_assert!(
-                    (Self::MODULUS == 3 || Self::MODULUS % 3 != 0)
-                        && (Self::MODULUS == 5 || Self::MODULUS % 5 != 0)
-                        && (Self::MODULUS == 7 || Self::MODULUS % 7 != 0)
-                        && (Self::MODULUS == 11 || Self::MODULUS % 11 != 0)
-                        && (Self::MODULUS == 13 || Self::MODULUS % 13 != 0)
-                );
-                Self {}
-            }
-            #[inline]
-            fn transform(&self, target: $T) -> $T {
-                if target == 0 {
-                    return 0;
-                }
-                self.reduce_double((target as $D) * (Self::R2 as $D))
-            }
-            #[inline]
-            fn check(&self, target: &$T) -> bool { *target < Self::MODULUS }
-            #[inline]
-            fn residue(&self, target: $T) -> $T {
-                if target == 0 {
-                    return 0;
-                }
-                self.reduce_single(target)
-            }
-            #[inline]
-            fn modulus(&self) -> $T { Self::MODULUS }
-            #[inline]
-            fn is_zero(&self, target: &$T) -> bool { target == &0 }
-
-            #[inline]
-            fn add(&self, lhs: &$T, rhs: &$T) -> $T {
-                Vanilla::<$T>::add(&Self::MODULUS, *lhs, *rhs)
-            }
-            #[inline]
-            fn sub(&self, lhs: &$T, rhs: &$T) -> $T {
-                Vanilla::<$T>::sub(&Self::MODULUS, *lhs, *rhs)
-            }
-            #[inline]
-            fn dbl(&self, target: $T) -> $T {
-                Vanilla::<$T>::dbl(&Self::MODULUS, target)
-            }
-            #[inline]
-            fn neg(&self, target: $T) -> $T {
-                Vanilla::<$T>::neg(&Self::MODULUS, target)
-            }
-            #[inline]
-            fn mul(&self, lhs: &$T, rhs: &$T) -> $T {
-                self.reduce_double((*lhs as $D) * (*rhs as $D))
-            }
-            #[inline]
-            fn inv(&self, target: $T) -> Option<$T> {
-                let plain = if target == 0 { 0 } else { self.reduce_single(target) };
-                let inv_plain = if (N as u32) < usize::BITS {
-                    (plain as usize)
-                        .invm(&(Self::MODULUS as usize))
-                        .map(|v| v as $T)
-                } else {
-                    plain.invm(&Self::MODULUS)
-                }?;
-                if inv_plain == 0 {
-                    return Some(0);
-                }
-                Some(self.reduce_double((inv_plain as $D) * (Self::R2 as $D)))
-            }
-            #[inline]
-            fn sqr(&self, target: $T) -> $T {
-                self.reduce_double((target as $D) * (target as $D))
-            }
-
-            impl_reduced_binary_pow!($T);
         }
     };
 }
@@ -186,10 +72,34 @@ macro_rules! impl_fixed_proth_primitive {
 #[derive(Debug, Clone, Copy)]
 pub struct FixedProth32<const N: u8, const K: u32>;
 
-impl_fixed_proth_primitive!(
+impl_fixed_proth_inherent!(
     FixedProth32, u32, u64, 31,
-    mod_inv_pow2_u32, powm_u32
+    crate::monty::neg_mod_inv::u32::neginv, powm_u32
 );
+
+impl<const N: u8, const K: u32> Reducer<u32> for FixedProth32<N, K> {
+    #[inline]
+    fn new(m: &u32) -> Self {
+        assert!(
+            *m == Self::MODULUS,
+            "the given modulus doesn't match with the generic params"
+        );
+        debug_assert!(N <= 31);
+        debug_assert!(N > 0);
+        debug_assert!(K > 0);
+        debug_assert!(K % 2 == 1);
+        debug_assert!((K as u128) < (1u128 << (N as u32)));
+        debug_assert!(
+            (Self::MODULUS == 3 || Self::MODULUS % 3 != 0)
+                && (Self::MODULUS == 5 || Self::MODULUS % 5 != 0)
+                && (Self::MODULUS == 7 || Self::MODULUS % 7 != 0)
+                && (Self::MODULUS == 11 || Self::MODULUS % 11 != 0)
+                && (Self::MODULUS == 13 || Self::MODULUS % 13 != 0)
+        );
+        Self {}
+    }
+    impl_fixed_monty_ops!(u32, u64, Self::R2);
+}
 
 /// A modular reducer for Proth primes `K * 2^N + 1` with 64-bit operands.
 ///
@@ -211,16 +121,40 @@ impl_fixed_proth_primitive!(
 #[derive(Debug, Clone, Copy)]
 pub struct FixedProth64<const N: u8, const K: u64>;
 
-impl_fixed_proth_primitive!(
+impl_fixed_proth_inherent!(
     FixedProth64, u64, u128, 63,
-    mod_inv_pow2_u64, powm_u64
+    crate::monty::neg_mod_inv::u64::neginv, powm_u64
 );
+
+impl<const N: u8, const K: u64> Reducer<u64> for FixedProth64<N, K> {
+    #[inline]
+    fn new(m: &u64) -> Self {
+        assert!(
+            *m == Self::MODULUS,
+            "the given modulus doesn't match with the generic params"
+        );
+        debug_assert!(N <= 63);
+        debug_assert!(N > 0);
+        debug_assert!(K > 0);
+        debug_assert!(K % 2 == 1);
+        debug_assert!((K as u128) < (1u128 << (N as u32)));
+        debug_assert!(
+            (Self::MODULUS == 3 || Self::MODULUS % 3 != 0)
+                && (Self::MODULUS == 5 || Self::MODULUS % 5 != 0)
+                && (Self::MODULUS == 7 || Self::MODULUS % 7 != 0)
+                && (Self::MODULUS == 11 || Self::MODULUS % 11 != 0)
+                && (Self::MODULUS == 13 || Self::MODULUS % 13 != 0)
+        );
+        Self {}
+    }
+    impl_fixed_monty_ops!(u64, u128, Self::R2);
+}
 
 // ── FixedProth (umax / udouble) ──────────────────────────────────────────────
 
 /// A modular reducer for Proth primes `K * 2^N + 1`.
 ///
-/// Supports `N` up to 127, `K` odd with `K < 2^N`.  Montgomery form with `R = 2^N`.
+/// Supports `N` up to 127, `K` odd with `K < 2^N`.  Montgomery form with `R = 2¹²⁸`.
 ///
 /// # Example
 ///
@@ -237,14 +171,24 @@ impl_fixed_proth_primitive!(
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct FixedProth<const N: u8, const K: umax> {
+    n0: umax,
     r2: umax,
 }
 
+/// Compute -x⁻¹ mod 2¹²⁸ using Newton iteration.
+fn neginv_u128(x: u128) -> u128 {
+    let mut inv = 1u128;
+    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2²
+    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁴
+    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁸
+    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2¹⁶
+    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2³²
+    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2⁶⁴
+    inv = inv.wrapping_mul(2u128.wrapping_sub(x.wrapping_mul(inv))); // mod 2¹²⁸
+    0u128.wrapping_sub(inv)
+}
+
 impl<const N: u8, const K: umax> FixedProth<N, K> {
-    const BITMASK: umax = match 1u128.checked_shl(N as u32) {
-        Some(v) => v.wrapping_sub(1),
-        None => umax::MAX,
-    };
     pub const MODULUS: umax = {
         let p2n = match 1u128.checked_shl(N as u32) {
             Some(v) => v,
@@ -253,31 +197,22 @@ impl<const N: u8, const K: umax> FixedProth<N, K> {
         K.wrapping_mul(p2n).wrapping_add(1)
     };
 
+    /// Montgomery REDC with R = 2¹²⁸ and Proth-optimised m·p product.
     #[inline]
-    pub fn reduce_single(&self, v: umax) -> umax {
-        Self::reduce_double(udouble { hi: 0, lo: v })
-    }
-
-    /// REDC with R = 2^N.  Uses the Proth identity m ≡ 1 mod R.
-    pub fn reduce_double(v: udouble) -> umax {
-        let v0 = v.lo & Self::BITMASK;
-        let v1 = v >> N;
-        let acc = if v0 == 0 {
-            v1
+    pub fn reduce(&self, t: udouble) -> umax {
+        let m = t.lo.wrapping_mul(self.n0);
+        // m·p = m·(K·2^N + 1) = (m·K)<<N + m
+        let mp = (udouble::widening_mul(m, K) << N)
+            .overflowing_add(udouble { hi: 0, lo: m })
+            .0;
+        let (r, overflow) = t.overflowing_add(mp);
+        let r = r.hi;
+        if overflow {
+            r.wrapping_add(Self::MODULUS.wrapping_neg())
+        } else if r >= Self::MODULUS {
+            r - Self::MODULUS
         } else {
-            let t = ((1 as umax) << N) - v0;
-            let mut sum = v1;
-            sum.lo += 1;
-            if sum.lo < 1 {
-                sum.hi += 1;
-            }
-            let (tp, _) = udouble::widening_mul(t, K).overflowing_add(sum);
-            tp
-        };
-        if acc.hi > 0 || acc.lo >= Self::MODULUS {
-            acc % Self::MODULUS
-        } else {
-            acc.lo
+            r
         }
     }
 }
@@ -301,32 +236,41 @@ impl<const N: u8, const K: umax> Reducer<umax> for FixedProth<N, K> {
                 && (Self::MODULUS == 11 || Self::MODULUS % 11 != 0)
                 && (Self::MODULUS == 13 || Self::MODULUS % 13 != 0)
         );
-        let r = udouble { hi: 0, lo: 1 } << N;
-        let r2 = udouble::widening_square(r.lo);
-        Self {
-            r2: r2 % Self::MODULUS,
-        }
+
+        let n0 = neginv_u128(Self::MODULUS);
+
+        // R = 2¹²⁸,  R² = 2²⁵⁶ mod MODULUS
+        let r = udouble { hi: 1, lo: 0 } % Self::MODULUS; // 2¹²⁸ mod m
+        let r2 = udouble::widening_square(r) % Self::MODULUS;
+
+        Self { n0, r2 }
     }
     #[inline]
     fn transform(&self, target: umax) -> umax {
         if target == 0 {
             return 0;
         }
-        Self::reduce_double(udouble::widening_mul(target, self.r2))
+        self.reduce(udouble::widening_mul(target, self.r2))
     }
     #[inline]
-    fn check(&self, target: &umax) -> bool { *target < Self::MODULUS }
+    fn check(&self, target: &umax) -> bool {
+        *target < Self::MODULUS
+    }
     #[inline]
     fn residue(&self, target: umax) -> umax {
         if target == 0 {
             return 0;
         }
-        self.reduce_single(target)
+        self.reduce(udouble { hi: 0, lo: target })
     }
     #[inline]
-    fn modulus(&self) -> umax { Self::MODULUS }
+    fn modulus(&self) -> umax {
+        Self::MODULUS
+    }
     #[inline]
-    fn is_zero(&self, target: &umax) -> bool { target == &0 }
+    fn is_zero(&self, target: &umax) -> bool {
+        target == &0
+    }
 
     #[inline]
     fn add(&self, lhs: &umax, rhs: &umax) -> umax {
@@ -344,13 +288,18 @@ impl<const N: u8, const K: umax> Reducer<umax> for FixedProth<N, K> {
     fn neg(&self, target: umax) -> umax {
         Vanilla::<umax>::neg(&Self::MODULUS, target)
     }
+
     #[inline]
     fn mul(&self, lhs: &umax, rhs: &umax) -> umax {
-        Self::reduce_double(udouble::widening_mul(*lhs, *rhs))
+        self.reduce(udouble::widening_mul(*lhs, *rhs))
+    }
+    #[inline]
+    fn sqr(&self, target: umax) -> umax {
+        self.reduce(udouble::widening_square(target))
     }
     #[inline]
     fn inv(&self, target: umax) -> Option<umax> {
-        let plain = if target == 0 { 0 } else { self.reduce_single(target) };
+        let plain = self.residue(target);
         let inv_plain = if (N as u32) < usize::BITS {
             (plain as usize)
                 .invm(&(Self::MODULUS as usize))
@@ -361,11 +310,7 @@ impl<const N: u8, const K: umax> Reducer<umax> for FixedProth<N, K> {
         if inv_plain == 0 {
             return Some(0);
         }
-        Some(Self::reduce_double(udouble::widening_mul(inv_plain, self.r2)))
-    }
-    #[inline]
-    fn sqr(&self, target: umax) -> umax {
-        Self::reduce_double(udouble::widening_square(target))
+        Some(self.reduce(udouble::widening_mul(inv_plain, self.r2)))
     }
 
     impl_reduced_binary_pow!(umax);
