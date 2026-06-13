@@ -298,6 +298,7 @@ pub use double::{imax, udouble, umax};
 pub use mersenne::{FixedMersenne, FixedMersenne32, FixedMersenne64};
 pub use monty::Montgomery;
 pub use preinv::PreModInv;
+pub use prim::{invm_u32, invm_u64};
 pub use proth::{FixedProth, FixedProth32, FixedProth64};
 pub use reduced::{ReducedInt, Vanilla, VanillaInt};
 pub use solinas::{FixedTrinomialSolinas, FixedTrinomialSolinas32, FixedTrinomialSolinas64};

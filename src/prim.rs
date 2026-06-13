@@ -280,6 +280,43 @@ macro_rules! impl_unary_uprim {
     )*);
 }
 impl_unary_uprim!(u8 u16 u32 u64 u128 usize);
+macro_rules! impl_const_invm {
+    ($name:ident, $T:ty, $D:ty) => {
+        /// Const-time extended-Euclidean modular inverse.
+        ///
+        /// Returns `None` when `gcd(a,m) != 1`.
+        pub const fn $name(a: $T, m: $T) -> Option<$T> {
+            let x = if a >= m { a % m } else { a };
+            if x == 0 {
+                return None;
+            }
+            let (mut last_r, mut r) = (m, x);
+            let (mut last_t, mut t): ($T, $T) = (0, 1);
+            while r > 0 {
+                let quo = last_r / r;
+                let rem = last_r % r;
+                last_r = r;
+                r = rem;
+
+                let qt = ((quo as $D) * (t as $D) % (m as $D)) as $T;
+                let new_t = if last_t >= qt {
+                    last_t - qt
+                } else {
+                    m - (qt - last_t)
+                };
+                last_t = t;
+                t = new_t;
+            }
+            if last_r > 1 {
+                None
+            } else {
+                Some(last_t)
+            }
+        }
+    };
+}
+impl_const_invm!(invm_u32, u32, u64);
+impl_const_invm!(invm_u64, u64, u128);
 
 // forward modular operations to valye by value
 macro_rules! impl_mod_ops_by_deref {
@@ -675,6 +712,26 @@ mod tests {
             if let Some(ia) = a.invm(&m) {
                 assert_eq!(a.mulm(ia, &m), 1);
             }
+        }
+    }
+
+    #[test]
+    fn const_invm_test() {
+        // Verify const invm matches the trait-based invm
+        for _ in 0..NRANDOM {
+            let a = random::<u32>();
+            let m = (random::<u32>() % (u32::MAX >> 1)) | 1; // odd modulus
+            assert_eq!(
+                invm_u32(a, m).map(|v| (v as u64).mulm(a as u64, &(m as u64)) as u32),
+                a.invm(&m).map(|v| a.mulm(v, &m)),
+            );
+
+            let a = random::<u64>();
+            let m = (random::<u64>() % (u64::MAX >> 1)) | 1;
+            assert_eq!(
+                invm_u64(a, m).map(|v| (v as u128).mulm(a as u128, &(m as u128)) as u64),
+                a.invm(&m).map(|v| a.mulm(v, &m)),
+            );
         }
     }
 

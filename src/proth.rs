@@ -37,6 +37,7 @@ macro_rules! impl_fixed_proth {
                 impl_fixed_proth!(@compute_r2_body, $kind, $T, $D)
             }
 
+            impl_fixed_proth!(@reduce_single, $kind, $T, $D);
             impl_fixed_proth!(@reduce_double, $kind, $T, $D);
         }
 
@@ -79,7 +80,7 @@ macro_rules! impl_fixed_proth {
                 if target == 0 {
                     return 0;
                 }
-                Self::reduce_double(impl_fixed_proth!(@to_double, $kind, $D, target))
+                Self::reduce_single(target)
             }
             #[inline]
             fn modulus(&self) -> $T {
@@ -115,7 +116,7 @@ macro_rules! impl_fixed_proth {
                 let plain = if target == 0 {
                     0
                 } else {
-                    Self::reduce_double(impl_fixed_proth!(@to_double, $kind, $D, target))
+                    Self::reduce_single(target)
                 };
                 let inv_plain = if (N as u32) < usize::BITS {
                     (plain as usize)
@@ -148,9 +149,21 @@ macro_rules! impl_fixed_proth {
     (@compute_r2_body, udouble, $T:ty, $D:ty) => {{
         let r = udouble { hi: 0, lo: 1 } << N;
         let r2 = udouble::widening_square(r.lo);
-        let m_ud = udouble { hi: 0, lo: Self::MODULUS };
-        (r2 % m_ud).lo
+        r2 % Self::MODULUS
     }};
+
+    // Internal: reduce_single — one REDC fold on a single-width value.
+    // Wraps reduce_double, widening the input.
+    (@reduce_single, primitive, $T:ty, $D:ty) => {
+        pub fn reduce_single(v: $T) -> $T {
+            Self::reduce_double(v as $D)
+        }
+    };
+    (@reduce_single, udouble, $T:ty, $D:ty) => {
+        pub fn reduce_single(v: $T) -> $T {
+            Self::reduce_double(udouble { hi: 0, lo: v })
+        }
+    };
 
     // Internal: reduce_double — one REDC (shift-based fold) + normalisation.
     // After REDC the result is < (K+1)·m.  For typical Proth primes K is
@@ -196,18 +209,13 @@ macro_rules! impl_fixed_proth {
                 let (tp, _) = udouble::widening_mul(t, K).overflowing_add(sum);
                 tp
             };
-            let m_ud = udouble { hi: 0, lo: Self::MODULUS };
             if acc.hi > 0 || acc.lo >= Self::MODULUS {
-                (acc % m_ud).lo
+                acc % Self::MODULUS
             } else {
                 acc.lo
             }
         }
     };
-
-    // Convert T to D (primitive: as-cast, udouble: wrap in lo)
-    (@to_double, primitive, $D:ty, $v:expr) => { $v as $D };
-    (@to_double, udouble, $D:ty, $v:expr) => { udouble { hi: 0, lo: $v } };
 
     // Widening multiplication
     (@widen_mul, primitive, $T:ty, $D:ty, $lhs:expr, $rhs:expr) => {
