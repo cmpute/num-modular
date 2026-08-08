@@ -1,7 +1,10 @@
 //! Implementations for modular operations on primitive integers
 
 use crate::{udouble, Reducer, Vanilla};
-use crate::{DivExact, ModularAbs, ModularCoreOps, ModularPow, ModularSymbols, ModularUnaryOps};
+use crate::{
+    DivExact, DivExactAssign, ModularAbs, ModularCoreOps, ModularPow, ModularSymbols,
+    ModularUnaryOps,
+};
 
 // FIXME: implement the modular functions as const after https://github.com/rust-lang/rust/pull/68847
 
@@ -432,6 +435,19 @@ macro_rules! impl_div_exact_for_prim {
                     Some(q)
                 } else {
                     None
+                }
+            }
+        }
+
+        impl DivExactAssign<$t, ()> for $t {
+            #[inline]
+            fn div_exact_assign(&mut self, d: $t, pre: &()) -> bool {
+                match DivExact::div_exact(*self, d, pre) {
+                    Some(q) => {
+                        *self = q;
+                        true
+                    }
+                    None => false,
                 }
             }
         }

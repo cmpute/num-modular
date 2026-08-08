@@ -28,7 +28,7 @@
 // The latter two versions are efficient and practical for use.
 
 use crate::reduced::{impl_reduced_binary_pow, Vanilla};
-use crate::{DivExact, ModularUnaryOps, Reducer};
+use crate::{DivExact, DivExactAssign, ModularUnaryOps, Reducer};
 
 /// Divide a Word by a prearranged divisor.
 ///
@@ -116,6 +116,19 @@ macro_rules! impl_premulinv_1by1_for {
                     Some(q)
                 } else {
                     None
+                }
+            }
+        }
+
+        impl DivExactAssign<$T, PreMulInv1by1<$T>> for $T {
+            #[inline]
+            fn div_exact_assign(&mut self, d: $T, pre: &PreMulInv1by1<$T>) -> bool {
+                match DivExact::div_exact(*self, d, pre) {
+                    Some(q) => {
+                        *self = q;
+                        true
+                    }
+                    None => false,
                 }
             }
         }
@@ -619,6 +632,15 @@ mod tests {
                 assert_eq!(n.div_exact(d, &fast_div), Some(q));
             } else {
                 assert_eq!(n.div_exact(d, &fast_div), None);
+            }
+
+            let mut n2 = n;
+            if r == 0 {
+                assert!(n2.div_exact_assign(d, &fast_div));
+                assert_eq!(n2, q);
+            } else {
+                assert!(!n2.div_exact_assign(d, &fast_div));
+                assert_eq!(n2, n);
             }
         }
     }

@@ -1,4 +1,4 @@
-use crate::{DivExact, ModularUnaryOps};
+use crate::{DivExact, DivExactAssign, ModularUnaryOps};
 
 /// Pre-computing the modular inverse for fast divisibility check.
 ///
@@ -87,6 +87,32 @@ macro_rules! impl_preinv_for_prim_int {
                     Some(merge(q0, q1))
                 }
             }
+
+            impl DivExactAssign<$t, PreModInv<$t>> for $t {
+                #[inline]
+                fn div_exact_assign(&mut self, d: $t, pre: &PreModInv<$t>) -> bool {
+                    match DivExact::div_exact(*self, d, pre) {
+                        Some(q) => {
+                            *self = q;
+                            true
+                        }
+                        None => false,
+                    }
+                }
+            }
+
+            impl DivExactAssign<$t, PreModInv<$t>> for DoubleWord {
+                #[inline]
+                fn div_exact_assign(&mut self, d: $t, pre: &PreModInv<$t>) -> bool {
+                    match DivExact::div_exact(*self, d, pre) {
+                        Some(q) => {
+                            *self = q;
+                            true
+                        }
+                        None => false,
+                    }
+                }
+            }
         }
     };
 }
@@ -169,6 +195,49 @@ mod tests {
                 None
             };
             assert_eq!(n.div_exact(d, &pre), expect, "{} / {}", n, d);
+        }
+    }
+
+    #[test]
+    #[allow(unstable_name_collisions)]
+    fn div_exact_assign_test() {
+        const N: u8 = 100;
+
+        // () precompute (native integer division)
+        for _ in 0..N {
+            let d = random::<u8>() | 1;
+            let n: u8 = random();
+            let mut m = n;
+            let expect = if n % d == 0 { Some(n / d) } else { None };
+            let exact = m.div_exact_assign(d, &());
+            assert_eq!(exact, expect.is_some(), "{} / {}", n, d);
+            assert_eq!(m, expect.unwrap_or(n), "{} / {}", n, d);
+        }
+
+        // PreModInv precompute
+        for _ in 0..N {
+            let d = random::<u8>() | 1;
+            let pre: PreModInv<_> = d.into();
+
+            // single word
+            let n: u8 = random();
+            let mut m = n;
+            let expect = if n % d == 0 { Some(n / d) } else { None };
+            let exact = m.div_exact_assign(d, &pre);
+            assert_eq!(exact, expect.is_some(), "{} / {}", n, d);
+            assert_eq!(m, expect.unwrap_or(n), "{} / {}", n, d);
+
+            // double word
+            let n: u16 = random();
+            let mut m = n;
+            let expect = if n % (d as u16) == 0 {
+                Some(n / (d as u16))
+            } else {
+                None
+            };
+            let exact = m.div_exact_assign(d, &pre);
+            assert_eq!(exact, expect.is_some(), "{} / {}", n, d);
+            assert_eq!(m, expect.unwrap_or(n), "{} / {}", n, d);
         }
     }
 }

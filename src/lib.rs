@@ -219,6 +219,16 @@ pub trait DivExact<Rhs, Precompute>: Sized {
     fn div_exact(self, d: Rhs, pre: &Precompute) -> Option<Self::Output>;
 }
 
+/// In-place exact division, with precomputed helper values
+///
+/// This is the assign version of [DivExact]: if `d` divides `self`, `self` is replaced by
+/// the quotient and `true` is returned; otherwise `self` is unchanged and `false` is returned.
+pub trait DivExactAssign<Rhs, Precompute>: Sized {
+    /// Check if d divides self with the help of the precomputation. If d divides self,
+    /// self is replaced by the quotient and true is returned.
+    fn div_exact_assign(&mut self, d: Rhs, pre: &Precompute) -> bool;
+}
+
 /// A modular reducer that can ensure that the operations on integers are all performed
 /// in a modular ring.
 ///
