@@ -7,7 +7,7 @@ repository = "https://github.com/cmpute/num-modular"
 keywords = ["mathematics", "numeric", "number-theory", "modular", "montgomery"]
 categories = ["mathematics", "algorithms", "no-std"]
 documentation = "https://docs.rs/num-modular"
-license = "Apache-2.0"
+license = "MIT OR Apache-2.0"
 description = """
 Implementation of efficient integer division and modular arithmetic operations with generic number types.
 Supports various backends including num-bigint, etc..
